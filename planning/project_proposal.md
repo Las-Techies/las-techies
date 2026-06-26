@@ -61,3 +61,54 @@ How our project stands out:
 - Should quiz generation be fully automatic, or require manager approval before publishing?
 - What integrations are most important for MVP (GitHub, Google Docs API, internal wiki exports, Slack)?
 - How can we ensure that when users answer a quiz question incorrectly, they are shown the exact source document and section where the correct answer comes from (Slackbot integration)?
+- Authentification?
+
+### AI Feature API Endpoint Sketch
+
+**Endpoint:** `POST /ai/quizzes/generate`
+
+**Who calls it:** The frontend calls this when a team lead selects uploaded onboarding documents and clicks "Generate Quiz" in the manager portal.
+
+**Request body:**
+- `teamId`: the team identifier used to scope data access and generated output
+- `docIds`: array of uploaded/linked onboarding document IDs to use as source context
+- `quizConfig`: quiz settings object (for example question count, difficulty level, and question types)
+- `requestedByUserId`: the authenticated manager/team lead user ID for audit and ownership
+
+**What the backend does:**
+1. Validate the caller's auth/role and confirm they can generate quizzes for the provided `teamId`.
+2. Fetch and normalize document content for all `docIds` (for example PDF text extraction, markdown cleaning, and chunking).
+3. Build a structured AI prompt from the normalized content and `quizConfig` with instructions for JSON-only quiz output.
+4. Call the model provider API (for example OpenRouter) to generate quiz questions, options, correct answers, and explanations.
+5. Validate/model-check the AI response shape, attach source references where possible, save a draft quiz, and return it to the frontend for manager review.
+
+**Success response:**
+- Status: `200`
+- Body:
+```json
+{
+  "quizId": "quiz_123",
+  "status": "draft",
+  "questions": [
+    {
+      "id": "q1",
+      "type": "multiple_choice",
+      "prompt": "What is the first step in the team deployment workflow?",
+      "options": ["...", "...", "...", "..."],
+      "correctAnswer": "...",
+      "explanation": "...",
+      "sourceRefs": [
+        { "docId": "doc_45", "section": "Deployment Runbook > Pre-checks" }
+      ]
+    }
+  ]
+}
+```
+
+**Failure response:**
+- Status: `500`
+- Body: `{ "error": "AI quiz generation unavailable" }`
+- Fallback behavior: The frontend shows a retry message, keeps selected docs/config in the form, and offers a manual quiz creation option while generation is unavailable.
+
+**Why this runs on the backend (not in the browser):**
+The model provider API key and any internal document-processing credentials stay on the server and are never exposed to users. Running generation on the backend also centralizes authorization checks and protects sensitive Salesforce team onboarding content.
