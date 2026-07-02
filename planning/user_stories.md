@@ -8,9 +8,11 @@ The goal is to make onboarding more interactive, consistent, and effective — s
 
 ## User Roles
 
-A new hire: a user who is seeking a fast patch to become a productive full-time employee
-An intern: a user who is seeking focused, foundational knowledge to complete short-term tasks
-A manager: a user who is maintaining onboarding materials and tracking team readiness
+1. A new hire: a user who is seeking a fast patch to become a productive full-time employee
+
+2. An intern: a user who is seeking focused, foundational knowledge to complete short-term tasks
+
+3. A manager: a user who is maintaining onboarding materials and tracking team readiness
 
 ## User Personas
 
@@ -35,23 +37,36 @@ Chloe is a 22-year-old senior completing a part-time winter internship from her 
 ## User Stories
 
 1. As a manager, I want to upload and organize onboarding documents in one place, so that new team members can find everything without asking repeatedly.
+
 2. As a manager, I want to create short quizzes from onboarding material, so that I can verify new hires actually understand key concepts.
+
 3. As a manager, I want to assign onboarding modules by role (new hire vs intern), so that each person gets content relevant to their responsibilities.
+
 4. As a manager, I want to see each person's onboarding progress and quiz scores, so that I know who is ready for project work.
+
 5. As a manager, I want to update onboarding content with version history, so that the team always studies current processes and standards.
+
 6. As a new hire, I want a guided onboarding path with clear daily milestones, so that I can build confidence and avoid feeling overwhelmed.
+
 7. As a new hire, I want to take interactive checks after each module, so that I can confirm I retained the most important information.
+
 8. As a new hire, I want to quickly ask context-aware questions while studying, so that I can get unstuck without waiting for a manager.
+
 9. As an intern, I want onboarding content broken into short, bite-sized lessons, so that I can learn effectively during limited work windows.
+
 10. As an intern, I want mobile-friendly progress tracking and reminders, so that I can stay on track between classes and meetings.
+
 11. As an intern, I want beginner-friendly examples tied to real team tasks, so that I can contribute sooner on low-risk tickets.
+
 12. As a manager, I want automated alerts when someone is falling behind onboarding milestones, so that I can intervene early and provide support.
+
 13. As a new hire, I want to ask clarifying questions directly inside a documentation module and receive immediate, context-specific explanations, so that I can overcome technical jargon without needing to interrupt a colleague. (AI Feature)
+
 14. As a manager, I want the system to suggest relevant quiz questions based on the documentation I just uploaded, so that I can instantly verify comprehension without spending hours writing assessments manually. (AI Feature)
 
 ## Wireframe (Bonus)
 
-Insert link or image to your group's wireframe. 
+[Not Included]
 
 ## Decisions Log — User Stories
 
