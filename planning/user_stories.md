@@ -46,7 +46,17 @@ Chloe is a 22-year-old senior completing a part-time winter internship from her 
 10. As an intern, I want mobile-friendly progress tracking and reminders, so that I can stay on track between classes and meetings.
 11. As an intern, I want beginner-friendly examples tied to real team tasks, so that I can contribute sooner on low-risk tickets.
 12. As a manager, I want automated alerts when someone is falling behind onboarding milestones, so that I can intervene early and provide support.
+13. As a new hire, I want to ask clarifying questions directly inside a documentation module and receive immediate, context-specific explanations, so that I can overcome technical jargon without needing to interrupt a colleague. (AI Feature)
+14. As a manager, I want the system to suggest relevant quiz questions based on the documentation I just uploaded, so that I can instantly verify comprehension without spending hours writing assessments manually. (AI Feature)
 
 ## Wireframe (Bonus)
 
 Insert link or image to your group's wireframe. 
+
+## Decisions Log — User Stories
+
+- **Story we debated the scope of**: Story 5 (Version History). We initially wanted full version tracking (git-style history). We realized building an entire audit trail system is too broad for a rapid MVP.
+  **How we resolved it**:  We resolved it by pivoting to a "critical update notification" flag, which satisfies Chloe's persona need without heavy database overhead.
+- **Story we cut (and why)**: We cut a proposed story: "As an intern, I want a gamified leaderboard with point tracking." While Liam likes gamified learning, building a global leaderboard introduces community features and competition elements that are distracting from the core problem of documentation clarity.
+- **Story that changed after Claude's feedback**: Story 8 (Testing Out). We noticed our stories forced everyone down the exact same linear path. This directly conflicted with our veteran persona (Javier), who despises corporate fluff. We added a specific story allowing users to challenge a module upfront to bypass it.
+- **AI feature story: user benefit we landed on**: For Story 13 & 14, we strictly focused on reduced friction and time-saving benefits. We stripped out references to "the LLM", "backend embeddings", or "vector search API calls" to ensure the stories describe the end-user experience, keeping technical implementation details strictly in our planning.md API contracts.
