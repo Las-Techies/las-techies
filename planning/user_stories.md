@@ -14,19 +14,22 @@ A manager: a user who is maintaining onboarding materials and tracking team read
 
 ## User Personas
 
-Role: Manager
+### Role: Manager
 Marcus is a 42-year-old engineering manager living in Chicago, Illinois. He manages a rapidly growing team of 8 full-time Salesforce developers and relies heavily on a desktop-first setup, constantly switching between Jira, Slack, and DevOps tools. He will use the app weekly to upload new system documentation and check on his team's technical readiness before assigning them active sprint tickets. He is highly motivated to stop spending 5+ hours a week answering the same routine codebase setup questions, but his main pain point is that his team's documentation is wildly scattered across Confluence, text files, and pinned Slack messages, leaving him with zero time to manually write quizzes to test if people actually understand it.
 
+### Role: Manager
 Sarah is a 31-year-old Lead Admin based in Austin, Texas, who oversees a hybrid team of business analysts and system configuration specialists. She splits her time equally between her desktop and her phone, preferring to monitor team performance and approve access requests via mobile notifications between meetings. She uses the app almost daily during onboarding cycles to ensure her team strictly adheres to enterprise compliance rules and Org customization guidelines. Her biggest frustration is that new team members often claim they "finished reading" the onboarding wiki, but immediately make critical naming-convention errors in Sandbox environments because they didn't actually retain the information.
 
-Role: New Hire
+### Role: New Hire
 Devi is a 24-year-old recent computer science graduate who just relocated to Atlanta, Georgia, for her first corporate role. She is a digital native who works primarily on her desktop but expects slick, modern web experiences that look just as good on her phone. She will use the app daily during her first two weeks to study up and pass her mandatory onboarding checkpoints so she can prove herself and pick up her first real user story. Her biggest pain point is intense imposter syndrome; she feels completely overwhelmed by the sheer volume of technical architecture diagrams thrown at her and is terrified of asking "stupid questions" about the team's local git branching strategy.
 
+### Role: New Hire
 Javier is a 38-year-old veteran architect working remotely from Denver, Colorado. He is an extreme power user who works strictly from a multi-monitor desktop setup and despises clunky, over-simplified UI wizard flows. He will use the app intensively for just 2 or 3 days to bypass standard corporate fluff and target his learning directly toward this specific company's highly customized, complex multi-org integration frameworks. His primary pain point is that standard onboarding paths are far too generic and waste his time teaching him core Salesforce basics he already knows, rather than letting him quickly test out of familiar concepts to focus strictly on local custom code architecture.
 
-Role: intern
+### Role: intern
 Liam is a 20-year-old college junior studying Information Systems, living in Seattle, Washington, for a 10-week summer internship. He uses a laptop for school and work but manages his life entirely phone-first, meaning he appreciates bite-sized, gamified learning interfaces he can click through easily. He will use the app heavily during his first three days to get up to speed on basic Salesforce data modeling and flow builder rules so he can tackle lower-complexity bug fixes. His main pain point is a massive learning curve combined with a highly compressed timeline; he knows he only has a few weeks to deliver value and gets stuck easily if onboarding material isn't broken down into small, digestible milestones.
 
+### Role: intern
 Chloe is a 22-year-old senior completing a part-time winter internship from her apartment in Boston, Massachusetts, while finishing her degree. She balances her time between university classes and a 15-hour weekly work schedule, meaning her app usage is highly fragmented across irregular hours (like late nights or short gaps between classes). Her motivation is to learn the team’s specific business discovery processes and documentation standards so she can shadow client meetings. Her major pain point is that her onboarding materials change constantly as the team updates workflows, making it difficult for her to know if she is studying the most up-to-date business requirements for her short-term project.
 
 ## User Stories
