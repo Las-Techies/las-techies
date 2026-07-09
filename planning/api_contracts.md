@@ -12,7 +12,8 @@ This document defines every endpoint the frontend will call and the backend will
 | **Salesforce LLM Gateway Express** (Claude) | Generate quiz questions from documents | `POST /api/quizzes/generate` |
 | **Confluence REST API** | Fetch Confluence page content | `POST /api/documents/import-confluence` |
 | **GitHub API** | Fetch repository documentation/code | `POST /api/documents/import-github` |
-| **Okta (OIDC SSO)** | Authenticate `@salesforce.com` employees only | `GET /api/auth/login`, `GET /api/auth/callback` |
+| **Okta (OIDC SSO)** | Authenticate `@salesforce.com` employees only | `GET /api/auth/login`, `GET /api/auth/callback` (planned)| 
+| **GUS API** | Fetch team and membership data to populate the teams/users tables | `POST /api/teams/import-gus` (planned) |
 | **Local Libraries** (pdf-parse, mammoth) | Parse uploaded files | `POST /api/documents/upload` |
 
 ---
