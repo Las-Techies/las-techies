@@ -8,6 +8,8 @@ Salesforce teams often onboard new hires with documentation that is scattered ac
 
 Our web app solves this by turning existing team onboarding docs into a structured, measurable onboarding flow. Managers can upload or import documentation (files, Confluence, GitHub), generate AI-assisted quiz drafts based on that real team content, review/edit before publishing, and monitor completion and scores in a team dashboard. New hires use one team-scoped portal to read onboarding material, take published quizzes, and validate readiness before joining sprint work.
 
+## Project Board: https://trello.com/b/5JS2t9Kl/tasks-for-capstone
+
 ## User Roles and Personas
 
 - **Manager / Team Lead**
