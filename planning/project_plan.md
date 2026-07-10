@@ -39,6 +39,7 @@ Our web app solves this by turning existing team onboarding docs into a structur
 - Team Detail / Team Settings
 
 Wireframes to include (at least 3):
+
 - Document Submission/Import Portal
 - Quiz Builder
 - Quiz Taking Screen
@@ -54,6 +55,7 @@ Core MVP tables:
 - **quiz_attempts:** separate table for attempts with `quiz_id`, `user_id`, `attempt_number`, `status`, score/pass fields, `answers_payload`, timestamps
 
 Relationship notes:
+
 - One user belongs to one team (MVP simplification)
 - Teams own documents and quizzes
 - Quizzes are team-scoped and reference source docs used for generation
@@ -63,6 +65,7 @@ Relationship notes:
 ## Endpoints
 
 ### Documents
+
 - `POST /api/documents/upload`
 - `POST /api/documents/import-confluence`
 - `POST /api/documents/import-github`
@@ -71,6 +74,7 @@ Relationship notes:
 - `DELETE /api/documents/:documentId`
 
 ### Quizzes
+
 - `POST /api/quizzes/generate`
 - `GET /api/teams/:teamId/quizzes`
 - `GET /api/quizzes/:quizId`
@@ -80,11 +84,13 @@ Relationship notes:
 - `DELETE /api/quizzes/:quizId`
 
 ### Quiz Questions (inside quiz payload)
+
 - `POST /api/quizzes/:quizId/questions`
 - `PATCH /api/quizzes/:quizId/questions/:questionId`
 - `DELETE /api/quizzes/:quizId/questions/:questionId`
 
 ### Quiz Attempts
+
 - `POST /api/quiz-attempts`
 - `POST /api/quiz-attempts/:attemptId/answers`
 - `POST /api/quiz-attempts/:attemptId/submit`
@@ -92,14 +98,34 @@ Relationship notes:
 - `GET /api/quiz-attempts/:attemptId`
 
 ### Teams
+
 - `POST /api/teams`
 - `GET /api/teams/:teamId`
 - `GET /api/teams/:teamId/progress`
 
 ### Auth (Supabase Auth)
+
 - `POST /api/auth/sync`
 - `GET /api/auth/me`
 - `POST /api/auth/logout`
+
+## State Architecture
+
+
+|                     |          |                   |               |                                                     |
+| ------------------- | -------- | ----------------- | ------------- | --------------------------------------------------- |
+| **State Variable**  | **Type** | **Initial Value** | **Owner**     | **Trigger**                                         |
+| currentUser         | object   | null              | null          | App                                                 |
+| documents           | array    | []                | Dashboard     | Fetch documents, upload success                     |
+| isUploading         | boolean  | false             | UploadContent | Upload start/end (Axios request lifecycle)          |
+| uploadProgress      | number   | 0                 | UploadContent | Axios upload progress events (0 -> 100)             |
+| selectedDocumentIds | array    | []                | ConfigureQuiz | Select/deselect docs for generation                 |
+| quizDraft           | object   | null              | null          | ReviewAndPublish                                    |
+| isGeneratingQuiz    | boolean  | false             | ConfigureQuiz | Generate click, API response/error                  |
+| isTakingQuiz        | boolean  | false             | ModuleQuiz    | Set true on quiz start, false on submit/exit        |
+| isQuizSubmitted     | boolean  | false             | ModuleQuiz    | Set true on successful submit, reset on new attempt |
+| answers             | object   | {}                | ModuleQuiz    | User selects/changes answer options                 |
+
 
 ## AI Features
 
@@ -125,15 +151,17 @@ Relationship notes:
 
 #### AI Feature Decisions Log
 
-| Decision | Sprint | What changed | Why |
-|---|---|---|---|
-| Limited quiz generation to manager actions | Sprint 1 | Access control | Matches role boundaries and prevents unauthorized draft creation |
-| Enforced strict JSON format for generated quiz data | Sprint 1 | Prompt + parsing contract | Reduced malformed outputs and save errors |
-| Added retry + manual fallback for quiz generation failures | Sprint 2 | Error handling | Prevents blocked workflow during AI/API issues |
-| Put chatbot in shared Library page for both roles | Sprint 2 | Feature placement | Both managers and interns need doc-based Q&A |
-| Required source citations in chatbot responses | Sprint 3 | Output quality rules | Improves trust and reduces hallucinations |
-| Routed chatbot through backend with team scoping | Sprint 3 | Architecture/security | Protects API keys and enforces data isolation |
-| Added low-confidence fallback message + doc suggestions | Sprint 4 | UX fallback | Avoids showing weak answers and keeps user moving |
+
+| Decision                                                   | Sprint   | What changed              | Why                                                              |
+| ---------------------------------------------------------- | -------- | ------------------------- | ---------------------------------------------------------------- |
+| Limited quiz generation to manager actions                 | Sprint 1 | Access control            | Matches role boundaries and prevents unauthorized draft creation |
+| Enforced strict JSON format for generated quiz data        | Sprint 1 | Prompt + parsing contract | Reduced malformed outputs and save errors                        |
+| Added retry + manual fallback for quiz generation failures | Sprint 2 | Error handling            | Prevents blocked workflow during AI/API issues                   |
+| Put chatbot in shared Library page for both roles          | Sprint 2 | Feature placement         | Both managers and interns need doc-based Q&A                     |
+| Required source citations in chatbot responses             | Sprint 3 | Output quality rules      | Improves trust and reduces hallucinations                        |
+| Routed chatbot through backend with team scoping           | Sprint 3 | Architecture/security     | Protects API keys and enforces data isolation                    |
+| Added low-confidence fallback message + doc suggestions    | Sprint 4 | UX fallback               | Avoids showing weak answers and keeps user moving                |
+
 
 ## Project Management Checklist
 
@@ -141,3 +169,4 @@ Relationship notes:
 - Create Milestones by sprint
 - Keep Project Board updated (Backlog, In Progress, Review, Done)
 - Track API/data model updates when contracts evolve
+
