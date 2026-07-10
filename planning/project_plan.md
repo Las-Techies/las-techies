@@ -28,7 +28,7 @@ Our web app solves this by turning existing team onboarding docs into a structur
 
 ## Pages/Screens
 
-- Auth/Login (Okta SSO)
+- Auth/Login (Supabase Auth — email/password + GitHub/Google)
 - Manager Dashboard (team progress + quiz/document stats)
 - Document Submission/Import Portal (upload + Confluence + GitHub)
 - Shared Document Library (manager + new hire)
@@ -47,7 +47,7 @@ Wireframes to include (at least 3):
 
 Core MVP tables:
 
-- **users:** `id`, `email`, `full_name`, `role` (`manager | new_hire`), `team_id`, `auth_provider`, timestamps
+- **users:** `id`, `email`, `full_name`, `role` (`manager | new_hire`), `team_id`, `auth_provider`, `supabase_user_id`, timestamps
 - **teams:** `id`, `name`, `description`, `created_by_user_id`, timestamps
 - **documents:** `id`, `team_id`, `uploaded_by_user_id`, `title`, `source_type` (`upload | confluence | github | google_doc`), `source_url`, `storage_path`, `mime_type`, `status` (`processing | ready | failed`), `raw_text`, timestamps
 - **quizzes:** `id`, `team_id`, `title`, `description`, `status` (`draft | published | archived`), `created_by_user_id`, `published_at`, `source_document_ids` (jsonb), `generation_config` (jsonb), `questions_payload` (jsonb), timestamps
@@ -96,9 +96,8 @@ Relationship notes:
 - `GET /api/teams/:teamId`
 - `GET /api/teams/:teamId/progress`
 
-### Auth (Okta OIDC)
-- `GET /api/auth/login`
-- `GET /api/auth/callback`
+### Auth (Supabase Auth)
+- `POST /api/auth/sync`
 - `GET /api/auth/me`
 - `POST /api/auth/logout`
 

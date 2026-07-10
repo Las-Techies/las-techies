@@ -12,7 +12,7 @@ This document defines every endpoint the frontend will call and the backend will
 | **Salesforce LLM Gateway Express** (Claude) | Generate quiz questions from documents | `POST /api/quizzes/generate` |
 | **Confluence REST API** | Fetch Confluence page content | `POST /api/documents/import-confluence` |
 | **GitHub API** | Fetch repository documentation/code | `POST /api/documents/import-github` |
-| **Okta (OIDC SSO)** | Authenticate `@salesforce.com` employees only | `GET /api/auth/login`, `GET /api/auth/callback` (planned)| 
+| **Supabase Auth** | Authenticate users (email/password + GitHub/Google social login); optional `@salesforce.com` domain allowlist enforced by the app | `POST /api/auth/sync`, `GET /api/auth/me` | 
 | **GUS API** | Fetch team and membership data to populate the teams/users tables | `POST /api/teams/import-gus` (planned) |
 | **Local Libraries** (pdf-parse, mammoth) | Parse uploaded files | `POST /api/documents/upload` |
 
@@ -83,16 +83,15 @@ Attempts are stored in their own `quiz_attempts` table (see `data_model.md`), so
 
 ---
 
-### Users / Authentication (Okta OIDC SSO)
+### Users / Authentication (Supabase Auth)
 
-Authentication uses **Okta as the Identity Provider**. Only users with a valid `@salesforce.com` Okta account can log in; MFA and user provisioning/deprovisioning are enforced by Okta company-wide. The app uses the OIDC Authorization Code flow with PKCE and **never stores passwords**.
+Authentication uses **Supabase Auth** as the identity provider. The frontend uses the Supabase client SDK to sign in via **email/password** or **social login (GitHub, Google)**; Supabase returns a session containing a JWT access token. The frontend sends that token as `Authorization: Bearer <token>` on every API request, and the Express backend verifies it (via the Supabase server client) before attaching the app user, role, and `team_id` to the request. The app **never stores passwords** — credentials live in Supabase's `auth.users`. An optional `@salesforce.com` email-domain allowlist can be enforced by the app in `POST /api/auth/sync`.
 
 | CRUD | HTTP Verb | Endpoint | Description | Request Shape | Response Shape | Error Cases | External API Used | User Stories |
 |------|-----------|----------|-------------|---------------|----------------|-------------|-------------------|--------------|
-| Create | GET | `/api/auth/login` | Start SSO login; redirect user to Okta | — | `302` redirect to Okta authorize URL | 500 if IdP config invalid | **Okta (OIDC)** | 1 |
-| Create | GET | `/api/auth/callback` | Okta redirect target; exchange code for tokens and create session | query: `{ code: string, state: string }` | `302` redirect to app with session cookie set | 401 if token/`state` invalid, 403 if email not `@salesforce.com` | **Okta (OIDC)** | 1 |
-| Read | GET | `/api/auth/me` | Get current authenticated user | — | `{ id: number, email: string, fullName: string, role: string, teamId: number }` | 401 if unauthenticated | None | All |
-| Delete | POST | `/api/auth/logout` | End the app session (and optionally Okta session) | — | `{ success: true }` (or `302` to logged-out page) | 401 if unauthenticated | **Okta (OIDC)** | All |
+| Create | POST | `/api/auth/sync` | First-login provisioning: verify the Supabase token and upsert the matching app `users` row (links `supabase_user_id`, sets default role). Called by the frontend right after a successful Supabase sign-in. | — (Supabase token in `Authorization` header) | `{ id: number, email: string, fullName: string, role: string, teamId: number \| null }` | 401 if token invalid/expired, 403 if email domain not allowed | **Supabase Auth** | 1 |
+| Read | GET | `/api/auth/me` | Get current authenticated user | — (Supabase token in `Authorization` header) | `{ id: number, email: string, fullName: string, role: string, teamId: number \| null }` | 401 if unauthenticated | **Supabase Auth** | All |
+| Delete | POST | `/api/auth/logout` | End the session. The frontend calls Supabase `signOut()`; this endpoint clears any server-side state and confirms. | — | `{ success: true }` | 401 if unauthenticated | **Supabase Auth** | All |
 
 ---
 
@@ -186,49 +185,53 @@ async function fetchGitHubFile(owner, repo, path) {
 
 ---
 
-### 4. Okta OIDC SSO
+### 4. Supabase Auth
 
-**Used in:** `GET /api/auth/login`, `GET /api/auth/callback`
+**Used in:** `POST /api/auth/sync`, `GET /api/auth/me`, and the auth middleware on every protected endpoint
+
+**Frontend:** signs in with the Supabase client SDK (email/password or GitHub/Google), then sends the returned access token as `Authorization: Bearer <token>` on API requests.
 
 **Backend Implementation:**
 ```javascript
 // In backend/services/auth.js
-// Step 1: /api/auth/login builds the Okta authorize URL (Authorization Code + PKCE)
-function buildAuthorizeUrl({ state, codeChallenge }) {
-  const params = new URLSearchParams({
-    client_id: process.env.OKTA_CLIENT_ID,
-    redirect_uri: process.env.OKTA_REDIRECT_URI,
-    response_type: 'code',
-    scope: 'openid profile email',
-    state,
-    code_challenge: codeChallenge,
-    code_challenge_method: 'S256'
-  });
-  return `${process.env.OKTA_ISSUER}/v1/authorize?${params}`;
+const { createClient } = require('@supabase/supabase-js');
+
+// Server-side client. The service role key stays on the backend only, never in the browser.
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+);
+
+// Verify the Supabase access token sent by the frontend and return the auth user.
+// Used by the auth middleware and by /api/auth/me.
+async function getSupabaseUser(accessToken) {
+  const { data, error } = await supabase.auth.getUser(accessToken);
+  if (error || !data.user) {
+    throw new Error('Unauthorized: invalid or expired Supabase session');
+  }
+  return data.user; // { id, email, user_metadata, app_metadata, ... }
 }
 
-// Step 2: /api/auth/callback exchanges the code for tokens, then verifies
-async function exchangeCodeForTokens({ code, codeVerifier }) {
-  const response = await fetch(`${process.env.OKTA_ISSUER}/v1/token`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      grant_type: 'authorization_code',
-      client_id: process.env.OKTA_CLIENT_ID,
-      redirect_uri: process.env.OKTA_REDIRECT_URI,
-      code,
-      code_verifier: codeVerifier
-    })
-  });
-
-  const { id_token } = await response.json();
-  const claims = await verifyIdToken(id_token); // validate signature, iss, aud, exp
-
-  // Defense-in-depth: enforce Salesforce email domain
-  if (!claims.email.endsWith('@salesforce.com')) {
-    throw new Error('Forbidden: non-Salesforce account');
+// First-login provisioning (POST /api/auth/sync): ensure an app `users` row exists,
+// linked to the Supabase user by supabase_user_id.
+async function syncAppUser(authUser) {
+  // Optional: enforce a Salesforce-only allowlist for the demo.
+  const allowedDomain = process.env.ALLOWED_EMAIL_DOMAIN; // e.g. "@salesforce.com"
+  if (allowedDomain && !authUser.email.endsWith(allowedDomain)) {
+    throw new Error('Forbidden: email domain not allowed');
   }
-  return claims; // { sub, email, name, ... }
+
+  return prisma.user.upsert({
+    where: { supabaseUserId: authUser.id },
+    update: { email: authUser.email },
+    create: {
+      supabaseUserId: authUser.id,
+      email: authUser.email,
+      fullName: authUser.user_metadata?.full_name ?? authUser.email,
+      authProvider: authUser.app_metadata?.provider ?? 'email',
+      role: 'new_hire' // default; managers are promoted separately
+    }
+  });
 }
 ```
 
@@ -266,8 +269,8 @@ async function processDocument(file) {
 
 ## Notes
 
-- All endpoints require authentication unless specified (only `/api/auth/login` and `/api/auth/callback` are public).
-- Authentication is handled via Okta SSO; the app never stores passwords. A middleware layer validates the session cookie on every protected endpoint and attaches the user + role + team_id to the request.
+- All endpoints require authentication. The frontend obtains a session from Supabase Auth and sends the access token as `Authorization: Bearer <token>`; there are no public API routes (sign-in itself happens client-side against Supabase).
+- Authentication is handled via Supabase Auth (email/password + GitHub/Google); the app never stores passwords. A middleware layer verifies the Supabase access token on every protected endpoint and attaches the user + role + team_id to the request.
 - Manager-only endpoints: document upload/import, quiz generation, quiz publish, team progress dashboard
 - New hire endpoints: quiz taking, viewing published quizzes, viewing own attempts
 - Team-scoped data: Always filter by `teamId` to ensure data isolation
