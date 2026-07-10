@@ -62,7 +62,23 @@ Relationship notes:
 - Questions/options are embedded in `quizzes.questions_payload`
 - Attempts are separate resources in `quiz_attempts`
 
+---
+
+## External APIs Used
+
+| API | Purpose | Used In Endpoints |
+|-----|---------|-------------------|
+| **Salesforce LLM Gateway Express** (Claude) | Generate quiz questions from documents | `POST /api/quizzes/generate` |
+| **Confluence REST API** | Fetch Confluence page content | `POST /api/documents/import-confluence` |
+| **GitHub API** | Fetch repository documentation/code | `POST /api/documents/import-github` |
+| **Supabase Auth** | Authenticate users (email/password + GitHub/Google social login); optional `@salesforce.com` domain allowlist enforced by the app | `POST /api/auth/sync`, `GET /api/auth/me` | 
+| **GUS API** | Fetch team and membership data to populate the teams/users tables | `POST /api/teams/import-gus` (planned) |
+| **Local Libraries** (pdf-parse, mammoth) | Parse uploaded files | `POST /api/documents/upload` |
+
+---
+
 ## Endpoints
+
 
 ### Documents
 
