@@ -1,0 +1,1 @@
+# Prisma client singleton (import this everywhere instead of new PrismaClient()).

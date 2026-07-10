@@ -1,0 +1,1 @@
+# Business logic + external APIs: authService, quizGenerator, githubImporter, confluenceImporter, documentProcessor, scoring.
