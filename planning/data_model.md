@@ -13,7 +13,8 @@ Simplified data model for AI Onboarding Quiz App with only essential tables need
 |-------------|-----------|-------------|
 | id | int | Primary key |
 | email | text | Unique login identifier |
-| full_name | text | Display name |
+| first_name | text | User's first name |
+| last_name | text | User's last name |
 | role | enum (manager, new_hire) | User role in the system |
 | team_id | int | FK to teams.id - which team this user belongs to |
 | auth_provider | text | Source of auth via Supabase (`email`, `github`, or `google`) |
