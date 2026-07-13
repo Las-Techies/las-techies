@@ -1,0 +1,4 @@
+Welcome to Salesforce onboarding.
+Step 1: Clone the repo and install dependencies.
+Step 2: Run migrations and start backend.
+Step 3: Verify API health endpoint.
