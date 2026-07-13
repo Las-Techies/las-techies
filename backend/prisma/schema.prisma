@@ -1,0 +1,55 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Team {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model User {
+  id             Int      @id @default(autoincrement())
+  email          String   @unique
+  fullName       String
+  role           String   @default("new_hire")
+  teamId         Int?
+  authProvider   String?
+  supabaseUserId String?  @unique
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model Document {
+  id               Int      @id @default(autoincrement())
+  teamId           Int
+  uploadedByUserId Int
+  title            String
+  sourceType       String   @default("upload")
+  rawText          String?
+  status           String   @default("processing")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model Quiz {
+  id                Int      @id @default(autoincrement())
+  teamId            Int
+  title             String
+  description       String?
+  status            String   @default("draft")
+  createdByUserId   Int
+  sourceDocumentIds Json     @default("[]")
+  generationConfig  Json?
+  questionsPayload  Json     @default("[]")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}

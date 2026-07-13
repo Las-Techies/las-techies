@@ -1,6 +1,6 @@
 # Backend
 
-Express API for the AI Onboarding Quiz App. Stack: **Node.js + Express**, **Prisma** (Postgres on Supabase), **Supabase Auth**, and the **Salesforce Express LLM Gateway** for AI. TypeScript recommended (see `planning/` for contracts).
+Express API for the AI Onboarding Quiz App. Stack: **Node.js + Express**, **Prisma v6** (Postgres on Supabase), **Supabase Auth**, and the **Salesforce Express LLM Gateway** for AI. **Language: TypeScript** (official team decision — see `planning/project_plan.md`). Contracts live in `planning/`.
 
 ## Folder structure
 
