@@ -1,5 +1,6 @@
 import type { Request, Response, NextFunction } from "express";
 import { createQuiz, findQuizById } from "../models/quiz.model";
+import { findDocumentByIdForTeam } from "../models/document.model";
 import { generateQuiz as generateQuizQuestions } from "../services/quizGenerator";
 import type { GenerationConfig } from "../services/quizTypes";
 
@@ -14,15 +15,19 @@ export async function getQuiz(req: Request, res: Response, next: NextFunction) {
   }
 }
 
-// Integration seam: turns a documentId into its raw text.
-// TODO: swap the mock for the real Prisma lookup once Melanie's upload is merged
-// and Document rows with rawText exist:
-//   const doc = await prisma.document.findUnique({ where: { id } });
-//   if (!doc) throw Object.assign(new Error("Document not found"), { status: 404 });
-//   if (!doc.rawText) throw Object.assign(new Error("Document has no extracted text"), { status: 400 });
-//   return doc.rawText;
-async function getDocumentText(_id: number): Promise<string> {
-  return "The deploy workflow starts by opening a pull request. A reviewer approves it, CI runs the test suite, and once green the change is merged to main. A release is then cut and deployed to staging before production.";
+// Integration seam: loads a document's extracted text, scoped to the team.
+async function getDocumentText(id: number, teamId: number): Promise<string> {
+  const doc = await findDocumentByIdForTeam(id, teamId);
+  if (!doc) {
+    throw Object.assign(new Error(`Document ${id} not found`), { status: 404 });
+  }
+  if (doc.status !== "ready" || !doc.rawText) {
+    throw Object.assign(
+      new Error(`Document ${id} has no extracted text (status: ${doc.status})`),
+      { status: 400 }
+    );
+  }
+  return doc.rawText;
 }
 
 function parseConfig(raw: any): GenerationConfig | null {
@@ -53,7 +58,9 @@ export async function generateQuiz(req: Request, res: Response, next: NextFuncti
       return res.status(400).json({ error: { message: "Invalid generation config" } });
     }
 
-    const texts = await Promise.all(documentIds.map((id: number) => getDocumentText(id)));
+    const texts = await Promise.all(
+      documentIds.map((id: number) => getDocumentText(id, user.teamId))
+    );
     const questions = await generateQuizQuestions(texts.join("\n\n"), config);
 
     const quiz = await createQuiz({
