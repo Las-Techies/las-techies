@@ -1,5 +1,6 @@
-import pdfParse from 'pdf-parse';
+import { PDFParse } from "pdf-parse";
 import mammoth from 'mammoth';
+
 
 type UploadedFile = {
     buffer: Buffer;
@@ -22,10 +23,11 @@ export async function extractTextFromDocument(file: UploadedFile): Promise<strin
    if (extension === ".txt" || extension === ".md" || file.mimetype.startsWith("text/")) {
     //treat as text file
     text = file.buffer.toString("utf-8");
-   } else if (extension === ".pdf" || file.mimetype ==="application/pdf") {
-    //treat as pdf file
-    const pdfData = await pdfParse(file.buffer);
-    text = pdfData.text ?? "";//prevents runtime errors if pdfData.text is undefined
+} else if (extension === ".pdf" || file.mimetype === "application/pdf") {
+    const parser = new PDFParse({ data: file.buffer });
+    const pdfData = await parser.getText();
+    await parser.destroy();
+    text = pdfData.text ?? "";
    } else if (extension === ".docx" || 
     file.mimetype ===
       "application/vnd.openxmlformats-officedocument.wordprocessingml.document"

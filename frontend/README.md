@@ -1,14 +1,14 @@
 # Frontend
 
-React (Vite) client for the AI Onboarding Quiz App. Signs in via **Supabase Auth** (email/password or magic link) and calls the backend API with the Supabase access token as `Authorization: Bearer <token>`.
+React + Vite client for the AI Onboarding Quiz App, written in **TypeScript** (official team decision — use the `react-ts` template; see `planning/project_plan.md`). Signs in via **Supabase Auth** (email/password or magic link) and calls the backend API with the Supabase access token as `Authorization: Bearer <token>`.
 
 ## Folder structure
 
 ```text
 frontend/
 └── src/
-    ├── main.(tsx|jsx)      # app entry
-    ├── App.(tsx|jsx)       # top-level routes/layout
+    ├── main.tsx            # app entry
+    ├── App.tsx             # top-level routes/layout
     ├── api/                # thin fetch clients per resource (attach auth token)
     ├── pages/              # one per screen in planning/project_plan.md "Pages/Screens"
     ├── components/         # reusable UI (buttons, cards, quiz question, etc.)

@@ -10,6 +10,16 @@ Our web app solves this by turning existing team onboarding docs into a structur
 
 ## Project Board: https://trello.com/b/5JS2t9Kl/tasks-for-capstone
 
+## Tech Stack & Decisions
+
+- **Language: TypeScript across the whole project (frontend + backend).** Chosen for type safety with Prisma (typed DB results), autocomplete, self-documenting code, and shared API-shape types between frontend and backend. Everyone writes `.ts` / `.tsx`; keep `strict: true` in `tsconfig.json`.
+- **Backend:** Node.js + Express (TypeScript)
+- **ORM:** Prisma (pinned to v6) against Postgres
+- **Database:** Postgres hosted on Supabase
+- **Auth:** Supabase Auth (email/password + GitHub/Google); optional `@salesforce.com` domain allowlist enforced by the app
+- **Frontend:** React + Vite (TypeScript, `react-ts` template)
+- **AI:** Salesforce Express LLM Gateway (Claude)
+
 ## User Roles and Personas
 
 - **Manager / Team Lead**

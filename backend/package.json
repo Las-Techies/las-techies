@@ -4,6 +4,8 @@
   "description": "Express API for the AI Onboarding Quiz App. Stack: **Node.js + Express**, **Prisma** (Postgres on Supabase), **Supabase Auth**, and the **Salesforce Express LLM Gateway** for AI. TypeScript recommended (see `planning/` for contracts).",
   "main": "index.js",
   "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "seed": "tsx src/db/seeds/seed.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -11,11 +13,22 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@prisma/client": "^6.19.3",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
     "mammoth": "^1.12.0",
     "multer": "^2.2.0",
     "pdf-parse": "^2.4.5"
   },
   "devDependencies": {
-    "@types/multer": "^2.2.0"
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/multer": "^2.2.0",
+    "@types/node": "^26.1.0",
+    "prisma": "^6.19.3",
+    "ts-node": "^10.9.2",
+    "tsx": "^4.23.0",
+    "typescript": "^6.0.3"
   }
 }
