@@ -1,4 +1,5 @@
-import { Link, useLocation } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { QUIZ_WORKFLOW_ROUTES } from "../../features/quiz/workflow";
 import { useAuth } from "../../context/AuthContext";
 
@@ -15,8 +16,9 @@ const navItems: NavItem[] = [
 
 function AppNav() {
   const location = useLocation();
+  const navigate = useNavigate();
   const isWorkflowRoute = QUIZ_WORKFLOW_ROUTES.some((route) => route === location.pathname);
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
   const firstName =
     (user?.user_metadata?.first_name as string | undefined) ?? "there";
   const role =
@@ -24,9 +26,33 @@ function AppNav() {
       ? "Manager"
       : "New Hire";
 
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!isMenuOpen) return;
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setIsMenuOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [isMenuOpen]);
+
+  const handleLogout = async () => {
+    setIsMenuOpen(false);
+    await signOut();
+    navigate("/");
+  };
+
   return (
     <header className="app-nav">
-      <div className="brand">SageForce</div>
+      <Link to="/" className="brand">
+        SageForce
+      </Link>
       <nav className="app-nav-links">
         {navItems.map((item) => {
           if (item.type === "label") {
@@ -52,11 +78,27 @@ function AppNav() {
           );
         })}
       </nav>
-      <div className="app-nav-user">
-        <span className="user-avatar" />
-        <span>
-          Hi, {firstName} <span className="muted">· {role}</span>
-        </span>
+      <div className="app-nav-user" ref={menuRef}>
+        <button
+          type="button"
+          className="app-nav-user-trigger"
+          aria-haspopup="menu"
+          aria-expanded={isMenuOpen}
+          onClick={() => setIsMenuOpen((open) => !open)}
+        >
+          <span className="user-avatar" />
+          <span>
+            Hi, {firstName} <span className="muted">· {role}</span>
+          </span>
+        </button>
+
+        {isMenuOpen ? (
+          <div className="app-nav-user-menu" role="menu">
+            <button type="button" role="menuitem" onClick={handleLogout}>
+              Log out
+            </button>
+          </div>
+        ) : null}
       </div>
     </header>
   );
