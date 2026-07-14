@@ -1,9 +1,14 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import AppNav from "../components/navigation/AppNav";
 import StepTabs from "../components/navigation/StepTabs";
-import { saveQuizConfig } from "../features/quiz/storage";
-import type { QuizDifficulty } from "../features/quiz/types";
+import { apiFetch } from "../api/client";
+import {
+  loadUploadedDocuments,
+  saveGeneratedQuizId,
+  saveQuizConfig,
+} from "../features/quiz/storage";
+import type { GeneratedQuiz, QuizDifficulty } from "../features/quiz/types";
 import { QUIZ_WORKFLOW_ROUTES, QUIZ_WORKFLOW_STEPS } from "../features/quiz/workflow";
 
 type QuizFormState = {
@@ -32,39 +37,6 @@ function ConfigureQuizPage() {
   const navigate = useNavigate();
   const todayIso = useMemo(() => new Date().toISOString().split("T")[0], []);
 
-  useEffect(() => {
-    if (!isGenerating) return;
-
-    const timeout = setTimeout(() => {
-      const topicLabel = form.topic.trim() || "workplace safety";
-      const count = Number.parseInt(form.questionCount, 10) || 3;
-      const generated = Array.from({ length: count }, (_, index) => {
-        if (index % 3 === 0) {
-          return `What is the first policy managers should explain in ${topicLabel}?`;
-        }
-        if (index % 3 === 1) {
-          return `Which checklist item is most critical before starting ${topicLabel} tasks?`;
-        }
-        return `What is the best response when a teammate reports a ${topicLabel} concern?`;
-      });
-
-      setGeneratedQuestions(generated);
-      saveQuizConfig({
-        moduleTitle: form.moduleTitle.trim(),
-        topic: form.topic.trim(),
-        passingScore: Number.parseInt(form.passingScore, 10),
-        timeLimit: Number.parseInt(form.timeLimit, 10),
-        questionCount: count,
-        dueDate: form.dueDate,
-        difficulty: form.difficulty,
-        generatedQuestions: generated,
-      });
-      setIsGenerating(false);
-    }, 1400);
-
-    return () => clearTimeout(timeout);
-  }, [form, isGenerating]);
-
   const updateForm = <K extends keyof QuizFormState>(field: K, value: QuizFormState[K]) => {
     setForm((current) => ({ ...current, [field]: value }));
   };
@@ -78,14 +50,59 @@ function ConfigureQuizPage() {
       form.dueDate
   );
 
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
     if (!isFormValid) {
       setError("Please fill all fields before generating AI questions.");
       return;
     }
+
+    const documents = loadUploadedDocuments();
+    const documentIds = documents.map((doc) => doc.id);
+    if (documentIds.length === 0) {
+      setError("Please upload a document first before generating questions.");
+      return;
+    }
+
     setError("");
     setGeneratedQuestions([]);
     setIsGenerating(true);
+
+    const count = Number.parseInt(form.questionCount, 10) || 3;
+
+    try {
+      const quiz = await apiFetch<GeneratedQuiz>("/api/quizzes/generate", {
+        method: "POST",
+        body: JSON.stringify({
+          documentIds,
+          config: {
+            numQuestions: count,
+            difficulty: form.difficulty.toLowerCase(),
+            questionTypes: ["multiple_choice"],
+            topic: form.topic.trim(),
+          },
+        }),
+      });
+
+      const generated = quiz.questionsPayload.map((question) => question.prompt);
+      setGeneratedQuestions(generated);
+      saveGeneratedQuizId(quiz.id);
+      saveQuizConfig({
+        moduleTitle: form.moduleTitle.trim(),
+        topic: form.topic.trim(),
+        passingScore: Number.parseInt(form.passingScore, 10),
+        timeLimit: Number.parseInt(form.timeLimit, 10),
+        questionCount: count,
+        dueDate: form.dueDate,
+        difficulty: form.difficulty,
+        generatedQuestions: generated,
+      });
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to generate quiz. Please try again."
+      );
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   const handleNext = () => {
