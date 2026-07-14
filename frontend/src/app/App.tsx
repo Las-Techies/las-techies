@@ -1,9 +1,9 @@
 import { Navigate, Route, Routes } from "react-router-dom";
-import ConfigureQuizPage from "./pages/ConfigureQuizPage";
-import LoginPage from "./pages/LoginPage";
-import QuizResultsPage from "./pages/QuizResultsPage";
-import ReviewPublishPage from "./pages/ReviewPublishPage";
-import UploadContentPage from "./pages/UploadContentPage";
+import ConfigureQuizPage from "../pages/ConfigureQuizPage";
+import LoginPage from "../pages/LoginPage";
+import QuizResultsPage from "../pages/QuizResultsPage";
+import ReviewPublishPage from "../pages/ReviewPublishPage";
+import UploadContentPage from "../pages/UploadContentPage";
 
 function App() {
   return (
