@@ -1,11 +1,9 @@
-import type { ChangeEventHandler } from "react";
+import type { ChangeEventHandler, DragEventHandler } from "react";
 import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import AppNav from "../components/AppNav";
-import StepTabs from "../components/StepTabs";
-
-const steps = ["Upload Content", "Configure Quiz", "Review & Publish"];
-const stepRoutes = ["/upload-content", "/configure-quiz", "/review-publish"];
+import AppNav from "../components/navigation/AppNav";
+import StepTabs from "../components/navigation/StepTabs";
+import { QUIZ_WORKFLOW_ROUTES, QUIZ_WORKFLOW_STEPS } from "../features/quiz/workflow";
 
 type UploadedItem = {
   id: string;
@@ -13,21 +11,6 @@ type UploadedItem = {
   meta: string;
   status: "Ready" | "Processing...";
 };
-
-const initialUploads: UploadedItem[] = [
-  {
-    id: "seed-pdf",
-    name: "OSHA_2026_Guidelines.pdf",
-    meta: "PDF • 2.4 MB",
-    status: "Ready",
-  },
-  {
-    id: "seed-mp4",
-    name: "SafetyVideo_Q3.mp4",
-    meta: "MP4 • 48 MB",
-    status: "Processing...",
-  },
-];
 
 const formatBytes = (size: number) => {
   if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
@@ -42,8 +25,7 @@ const fileTypeLabel = (file: File) => {
 function UploadContentPage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [isDragActive, setIsDragActive] = useState(false);
-  const [pickedFileName, setPickedFileName] = useState<string | null>(null);
-  const [uploads, setUploads] = useState<UploadedItem[]>(initialUploads);
+  const [uploads, setUploads] = useState<UploadedItem[]>([]);
 
   const onPickFile = () => fileInputRef.current?.click();
 
@@ -61,7 +43,6 @@ function UploadContentPage() {
     });
 
     if (nextItems.length === 0) return;
-    setPickedFileName(nextItems[0].name);
     setUploads((prev) => [...nextItems, ...prev]);
   };
 
@@ -72,27 +53,35 @@ function UploadContentPage() {
     event.target.value = "";
   };
 
+  const handleDragOver: DragEventHandler<HTMLElement> = (event) => {
+    event.preventDefault();
+    if (!isDragActive) setIsDragActive(true);
+  };
+
+  const handleDragLeave = () => {
+    if (isDragActive) setIsDragActive(false);
+  };
+
+  const handleDrop: DragEventHandler<HTMLElement> = (event) => {
+    event.preventDefault();
+    if (isDragActive) setIsDragActive(false);
+    if (event.dataTransfer.files) {
+      addFilesToUploadList(event.dataTransfer.files);
+    }
+  };
+
   return (
     <div className="app-shell">
       <AppNav />
       <main className="page-wrap">
         <h1>Upload + Generate</h1>
-        <StepTabs steps={steps} activeIndex={0} stepRoutes={stepRoutes} />
+        <StepTabs steps={QUIZ_WORKFLOW_STEPS} activeIndex={0} stepRoutes={QUIZ_WORKFLOW_ROUTES} />
 
         <section
           className={`card upload-zone ${isDragActive ? "active" : ""}`}
-          onDragOver={(event) => {
-            event.preventDefault();
-            setIsDragActive(true);
-          }}
-          onDragLeave={() => setIsDragActive(false)}
-          onDrop={(event) => {
-            event.preventDefault();
-            setIsDragActive(false);
-            if (event.dataTransfer.files) {
-              addFilesToUploadList(event.dataTransfer.files);
-            }
-          }}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
         >
           <h2>Drag &amp; drop content</h2>
           <p>Drop PDF, DOCX, or MP4 here</p>
@@ -107,28 +96,29 @@ function UploadContentPage() {
             accept=".pdf,.doc,.docx,.mp4"
             multiple
           />
-          {pickedFileName ? <small>Selected: {pickedFileName}</small> : null}
         </section>
 
         <section className="card uploads-table">
           <h3>Uploaded Files</h3>
-          {uploads.map((upload) => (
-            <div className="upload-row" key={upload.id}>
-              <div>
-                <strong>{upload.name}</strong>
-                <p>{upload.meta}</p>
+          {uploads.length === 0 ? (
+            <p className="uploads-empty">No files uploaded yet.</p>
+          ) : (
+            uploads.map((upload) => (
+              <div className="upload-row" key={upload.id}>
+                <div>
+                  <strong>{upload.name}</strong>
+                  <p>{upload.meta}</p>
+                </div>
+                <span className={`status ${upload.status === "Ready" ? "success" : "warning"}`}>
+                  {upload.status}
+                </span>
               </div>
-              <span className={`status ${upload.status === "Ready" ? "success" : "warning"}`}>
-                {upload.status}
-              </span>
-            </div>
-          ))}
+            ))
+          )}
         </section>
 
         <div className="page-actions">
-          <button className="secondary-btn" type="button">
-            Back
-          </button>
+          <span />
           <Link className="primary-btn btn-link" to="/configure-quiz">
             Continue to Configure Quiz
           </Link>

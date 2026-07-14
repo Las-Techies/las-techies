@@ -1,41 +1,100 @@
-import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
-import AppNav from "../components/AppNav";
-import StepTabs from "../components/StepTabs";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import AppNav from "../components/navigation/AppNav";
+import StepTabs from "../components/navigation/StepTabs";
+import { saveQuizConfig } from "../features/quiz/storage";
+import type { QuizDifficulty } from "../features/quiz/types";
+import { QUIZ_WORKFLOW_ROUTES, QUIZ_WORKFLOW_STEPS } from "../features/quiz/workflow";
 
-const steps = ["Upload Content", "Configure Quiz", "Review & Publish"];
-const stepRoutes = ["/upload-content", "/configure-quiz", "/review-publish"];
+type QuizFormState = {
+  moduleTitle: string;
+  topic: string;
+  passingScore: string;
+  timeLimit: string;
+  questionCount: string;
+  dueDate: string;
+  difficulty: QuizDifficulty;
+};
 
 function ConfigureQuizPage() {
-  const [moduleTitle, setModuleTitle] = useState("");
-  const [topic, setTopic] = useState("");
-  const [passingScore, setPassingScore] = useState("");
-  const [timeLimit, setTimeLimit] = useState("");
-  const [questionCount, setQuestionCount] = useState("");
-  const [difficulty, setDifficulty] = useState<"Easy" | "Medium" | "Hard">("Medium");
-  const [prompt, setPrompt] = useState("");
+  const [form, setForm] = useState<QuizFormState>({
+    moduleTitle: "",
+    topic: "",
+    passingScore: "",
+    timeLimit: "",
+    questionCount: "",
+    dueDate: "",
+    difficulty: "Medium",
+  });
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedQuestions, setGeneratedQuestions] = useState<string[]>([]);
+  const [error, setError] = useState("");
+  const navigate = useNavigate();
+  const todayIso = useMemo(() => new Date().toISOString().split("T")[0], []);
 
   useEffect(() => {
     if (!isGenerating) return;
 
     const timeout = setTimeout(() => {
-      const topicLabel = topic.trim() || "workplace safety";
-      setGeneratedQuestions([
-        `Q1 What is the first policy managers should explain in ${topicLabel}?`,
-        `Q2 Which checklist item is most critical before starting ${topicLabel} tasks?`,
-        `Q3 What is the best response when a teammate reports a ${topicLabel} concern?`,
-      ]);
+      const topicLabel = form.topic.trim() || "workplace safety";
+      const count = Number.parseInt(form.questionCount, 10) || 3;
+      const generated = Array.from({ length: count }, (_, index) => {
+        if (index % 3 === 0) {
+          return `What is the first policy managers should explain in ${topicLabel}?`;
+        }
+        if (index % 3 === 1) {
+          return `Which checklist item is most critical before starting ${topicLabel} tasks?`;
+        }
+        return `What is the best response when a teammate reports a ${topicLabel} concern?`;
+      });
+
+      setGeneratedQuestions(generated);
+      saveQuizConfig({
+        moduleTitle: form.moduleTitle.trim(),
+        topic: form.topic.trim(),
+        passingScore: Number.parseInt(form.passingScore, 10),
+        timeLimit: Number.parseInt(form.timeLimit, 10),
+        questionCount: count,
+        dueDate: form.dueDate,
+        difficulty: form.difficulty,
+        generatedQuestions: generated,
+      });
       setIsGenerating(false);
     }, 1400);
 
     return () => clearTimeout(timeout);
-  }, [isGenerating, topic]);
+  }, [form, isGenerating]);
+
+  const updateForm = <K extends keyof QuizFormState>(field: K, value: QuizFormState[K]) => {
+    setForm((current) => ({ ...current, [field]: value }));
+  };
+
+  const isFormValid = Boolean(
+    form.moduleTitle.trim() &&
+      form.topic.trim() &&
+      form.passingScore &&
+      form.timeLimit &&
+      form.questionCount &&
+      form.dueDate
+  );
 
   const handleGenerate = () => {
+    if (!isFormValid) {
+      setError("Please fill all fields before generating AI questions.");
+      return;
+    }
+    setError("");
     setGeneratedQuestions([]);
     setIsGenerating(true);
+  };
+
+  const handleNext = () => {
+    if (generatedQuestions.length === 0) {
+      setError("Please click Done and generate questions before continuing.");
+      return;
+    }
+    setError("");
+    navigate("/review-publish");
   };
 
   return (
@@ -43,7 +102,7 @@ function ConfigureQuizPage() {
       <AppNav />
       <main className="page-wrap">
         <h1>Upload + Generate</h1>
-        <StepTabs steps={steps} activeIndex={1} stepRoutes={stepRoutes} />
+        <StepTabs steps={QUIZ_WORKFLOW_STEPS} activeIndex={1} stepRoutes={QUIZ_WORKFLOW_ROUTES} />
 
         <section className="two-col">
           <div className="card quiz-settings-card">
@@ -52,16 +111,16 @@ function ConfigureQuizPage() {
               <label>
                 Module Title
                 <input
-                  value={moduleTitle}
-                  onChange={(event) => setModuleTitle(event.target.value)}
+                  value={form.moduleTitle}
+                  onChange={(event) => updateForm("moduleTitle", event.target.value)}
                 />
               </label>
 
               <label>
                 Passing Score (%)
                 <select
-                  value={passingScore}
-                  onChange={(event) => setPassingScore(event.target.value)}
+                  value={form.passingScore}
+                  onChange={(event) => updateForm("passingScore", event.target.value)}
                 >
                   <option value="">Select score</option>
                   <option value="60">60</option>
@@ -75,8 +134,8 @@ function ConfigureQuizPage() {
               <label>
                 Time Limit (minutes)
                 <select
-                  value={timeLimit}
-                  onChange={(event) => setTimeLimit(event.target.value)}
+                  value={form.timeLimit}
+                  onChange={(event) => updateForm("timeLimit", event.target.value)}
                 >
                   <option value="">Select time</option>
                   <option value="15">15</option>
@@ -90,23 +149,33 @@ function ConfigureQuizPage() {
               <label>
                 Number of Questions
                 <select
-                  value={questionCount}
-                  onChange={(event) => setQuestionCount(event.target.value)}
+                  value={form.questionCount}
+                  onChange={(event) => updateForm("questionCount", event.target.value)}
                 >
                   <option value="">Select quantity</option>
-                  <option value="5 questions">5 questions</option>
-                  <option value="10 questions">10 questions</option>
-                  <option value="15 questions">15 questions</option>
-                  <option value="20 questions">20 questions</option>
+                  <option value="5">5 questions</option>
+                  <option value="10">10 questions</option>
+                  <option value="15">15 questions</option>
+                  <option value="20">20 questions</option>
                 </select>
+              </label>
+
+              <label>
+                Due Date
+                <input
+                  type="date"
+                  value={form.dueDate}
+                  min={todayIso}
+                  onChange={(event) => updateForm("dueDate", event.target.value)}
+                />
               </label>
 
               <label>
                 Topic Focus
                 <input
-                  value={topic}
-                  onChange={(event) => setTopic(event.target.value)}
-                  placeholder="e.g. OSHA safety basics, PPE rules, fire safety"
+                  value={form.topic}
+                  onChange={(event) => updateForm("topic", event.target.value)}
+                  placeholder="Quiz should focus on..."
                 />
               </label>
 
@@ -116,8 +185,8 @@ function ConfigureQuizPage() {
                   <button
                     key={value}
                     type="button"
-                    className={difficulty === value ? "selected" : ""}
-                    onClick={() => setDifficulty(value)}
+                    className={form.difficulty === value ? "selected" : ""}
+                    onClick={() => updateForm("difficulty", value)}
                   >
                     {value}
                   </button>
@@ -130,6 +199,7 @@ function ConfigureQuizPage() {
                 <span aria-hidden>✓</span> Done
               </button>
             </div>
+            {error ? <p className="form-error">{error}</p> : null}
           </div>
 
           <div className="card ai-preview-card">
@@ -149,16 +219,8 @@ function ConfigureQuizPage() {
                     </button>
                   ))}
                 </div>
-              ) : (
-                <p className="ai-empty">Click Done to generate questions from your settings.</p>
-              )}
+              ) : null}
             </div>
-            <input
-              className="ai-prompt"
-              value={prompt}
-              onChange={(event) => setPrompt(event.target.value)}
-              placeholder="Ask AI what question topics you want to generate..."
-            />
           </div>
         </section>
 
@@ -166,9 +228,9 @@ function ConfigureQuizPage() {
           <Link className="secondary-btn btn-link" to="/upload-content">
             Back
           </Link>
-          <Link className="primary-btn btn-link" to="/review-publish">
+          <button className="primary-btn btn-link" type="button" onClick={handleNext}>
             Next: Review &amp; Publish
-          </Link>
+          </button>
         </div>
       </main>
     </div>

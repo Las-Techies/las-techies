@@ -1,5 +1,7 @@
 import type { CSSProperties } from "react";
-import AppNav from "../components/AppNav";
+import { useEffect, useState } from "react";
+import AppNav from "../components/navigation/AppNav";
+import { loadQuizConfig } from "../features/quiz/storage";
 
 const breakdownRows = [
   { topic: "PPE Requirements", wrong: "0 / 3", ringPercent: 100, dotClass: "dot-1" },
@@ -8,6 +10,16 @@ const breakdownRows = [
 ];
 
 function QuizResultsPage() {
+  const [passingScore, setPassingScore] = useState(70);
+  const score = 80;
+
+  useEffect(() => {
+    const quizConfig = loadQuizConfig();
+    setPassingScore(quizConfig.passingScore);
+  }, []);
+
+  const didPass = score >= passingScore;
+
   return (
     <div className="app-shell">
       <AppNav />
@@ -18,9 +30,11 @@ function QuizResultsPage() {
         <section className="results-top">
           <div className="card score-card">
             <h3>SCORE</h3>
-            <div className="score-value">80%</div>
-            <span className="status success">PASSED</span>
-            <p>Passing threshold: 70%</p>
+            <div className="score-value">{score}%</div>
+            <span className={`status ${didPass ? "success" : "fail"}`}>
+              {didPass ? "PASSED" : "FAILED"}
+            </span>
+            <p>Passing threshold: {passingScore}%</p>
           </div>
 
           <div className="card breakdown-card">
@@ -62,7 +76,7 @@ function QuizResultsPage() {
                   <span className="ring-label">75%</span>
                 </div>
                 <div className="donut-core">
-                  <span>80%</span>
+                  <span>{score}%</span>
                 </div>
               </div>
             </div>

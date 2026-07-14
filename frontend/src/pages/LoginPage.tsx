@@ -1,28 +1,31 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+import mascotLogo from "../assets/sageforce-mascot-transparent.png";
 
 function LoginPage() {
-  const [role, setRole] = useState<"new_hire" | "manager">("new_hire");
+  const [role, setRole] = useState<"" | "new_hire" | "manager">("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const navigate = useNavigate();
+
+  const handleLogin = () => {
+    if (!email.trim() || !password.trim() || role === "") {
+      setError("Please fill out email, password, and role before logging in.");
+      return;
+    }
+    setError("");
+    navigate("/upload-content");
+  };
 
   return (
     <main className="login-page">
       <section className="login-left">
-        <h1>AI-powered training built for frontline teams.</h1>
-        <p>
-          Launch onboarding and compliance quizzes in minutes using your existing docs and
-          videos.
-        </p>
-        <ul>
-          <li>Fast content ingestion</li>
-          <li>Auto-generated quiz questions</li>
-          <li>Manager-ready analytics dashboard</li>
-        </ul>
+        <img className="login-mascot" src={mascotLogo} alt="SageForce mascot logo" />
       </section>
 
       <section className="login-card">
-        <h2>Welcome to (app name)</h2>
+        <h2>Welcome to SageForce</h2>
 
         <label>
           Work Email
@@ -62,12 +65,15 @@ function LoginPage() {
           </button>
         </div>
 
-        <Link className="primary-btn btn-link" to="/upload-content">
-          Continue
-        </Link>
-        <a className="help-link" href="#">
-          Need help signing in?
-        </a>
+        <div className="login-actions">
+          <a className="help-link" href="#">
+            Need help signing in?
+          </a>
+          <button className="primary-btn btn-link" type="button" onClick={handleLogin}>
+            Log in
+          </button>
+        </div>
+        {error ? <p className="form-error">{error}</p> : null}
       </section>
     </main>
   );
