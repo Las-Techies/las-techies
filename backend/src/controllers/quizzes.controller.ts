@@ -42,26 +42,52 @@ function parseConfig(raw: any): GenerationConfig | null {
   return config;
 }
 
+// Streams progress over SSE while the LLM generates, so the frontend can show
+// live "generating question X of N" feedback instead of a blind spinner.
+// Once headers are flushed as text/event-stream, failures are reported as an
+// "error" event in the stream (status code can no longer change), not a
+// normal HTTP error response.
 export async function generateQuiz(req: Request, res: Response, next: NextFunction) {
+  const user = (req as any).user;
+  const { documentIds } = req.body ?? {};
+
+  if (!Array.isArray(documentIds) || documentIds.length === 0) {
+    return res
+      .status(400)
+      .json({ error: { message: "documentIds must be a non-empty array" } });
+  }
+
+  const config = parseConfig(req.body?.config);
+  if (!config) {
+    return res.status(400).json({ error: { message: "Invalid generation config" } });
+  }
+
+  res.writeHead(200, {
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache",
+    Connection: "keep-alive",
+    "X-Accel-Buffering": "no",
+  });
+
+  const send = (event: Record<string, unknown>) => {
+    res.write(`data: ${JSON.stringify(event)}\n\n`);
+  };
+
   try {
-    const user = (req as any).user;
-    const { documentIds } = req.body ?? {};
-
-    if (!Array.isArray(documentIds) || documentIds.length === 0) {
-      return res
-        .status(400)
-        .json({ error: { message: "documentIds must be a non-empty array" } });
-    }
-
-    const config = parseConfig(req.body?.config);
-    if (!config) {
-      return res.status(400).json({ error: { message: "Invalid generation config" } });
-    }
-
     const texts = await Promise.all(
       documentIds.map((id: number) => getDocumentText(id, user.teamId))
     );
-    const questions = await generateQuizQuestions(texts.join("\n\n"), config);
+
+    const questions = await generateQuizQuestions(texts.join("\n\n"), config, {
+      onProgress: ({ attempt, questionsDetected }) => {
+        send({
+          type: "progress",
+          attempt,
+          questionsDetected,
+          totalQuestions: config.numQuestions,
+        });
+      },
+    });
 
     const quiz = await createQuiz({
       teamId: user.teamId,
@@ -72,8 +98,11 @@ export async function generateQuiz(req: Request, res: Response, next: NextFuncti
       questionsPayload: questions,
     });
 
-    res.status(201).json(quiz);
+    send({ type: "done", quiz });
   } catch (err) {
-    next(err);
+    const message = err instanceof Error ? err.message : "Failed to generate quiz";
+    send({ type: "error", message });
+  } finally {
+    res.end();
   }
 }

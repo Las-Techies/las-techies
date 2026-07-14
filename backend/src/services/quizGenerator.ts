@@ -12,7 +12,19 @@ export class QuizGenerationError extends Error {
   }
 }
 
-async function callGateway(documentText: string, config: GenerationConfig): Promise<string> {
+export type GenerationProgress = {
+  attempt: number;
+  questionsDetected: number;
+};
+
+// Streams the gateway response via SSE and reports the running-total question
+// count as soon as each "prompt" field appears in the partial JSON, so the
+// caller can show live progress instead of waiting for the full completion.
+async function callGatewayStream(
+  documentText: string,
+  config: GenerationConfig,
+  onDelta: (accumulated: string) => void
+): Promise<string> {
   if (!env.llmGatewayUrl || !env.llmKey) {
     throw new QuizGenerationError(
       "LLM gateway is not configured. Set LLM_GATEWAY_URL and ENG_AI_MODEL_GW_KEY in backend/.env."
@@ -27,6 +39,7 @@ async function callGateway(documentText: string, config: GenerationConfig): Prom
     },
     body: JSON.stringify({
       model: MODEL,
+      stream: true,
       messages: [
         {
           role: "system",
@@ -38,16 +51,48 @@ async function callGateway(documentText: string, config: GenerationConfig): Prom
     }),
   });
 
-  if (!res.ok) {
+  if (!res.ok || !res.body) {
     throw new QuizGenerationError(`LLM gateway returned ${res.status} ${res.statusText}`);
   }
 
-  const data: any = await res.json();
-  const content: unknown = data?.choices?.[0]?.message?.content;
-  if (typeof content !== "string" || content.trim() === "") {
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let accumulated = "";
+
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+
+    // SSE events are separated by a blank line; keep any trailing partial
+    // event in the buffer until more bytes arrive.
+    const events = buffer.split("\n\n");
+    buffer = events.pop() ?? "";
+
+    for (const event of events) {
+      const line = event.trim();
+      if (!line.startsWith("data:")) continue;
+      const payload = line.slice("data:".length).trim();
+      if (payload === "" || payload === "[DONE]") continue;
+
+      try {
+        const parsed = JSON.parse(payload);
+        const delta = parsed?.choices?.[0]?.delta?.content;
+        if (typeof delta === "string" && delta) {
+          accumulated += delta;
+          onDelta(accumulated);
+        }
+      } catch {
+        // Partial/malformed SSE fragment — wait for more bytes.
+      }
+    }
+  }
+
+  if (accumulated.trim() === "") {
     throw new QuizGenerationError("LLM gateway returned an empty response");
   }
-  return content;
+  return accumulated;
 }
 
 // Claude sometimes wraps JSON in ```json fences or adds stray prose.
@@ -101,16 +146,30 @@ function validate(parsed: any, config: GenerationConfig): QuizQuestion[] {
   return questions;
 }
 
+// Counts completed "prompt" fields in the partial JSON streamed so far, as a
+// proxy for "questions generated so far". Approximate by design — it only
+// needs to be good enough for a live progress indicator.
+function countDetectedQuestions(accumulated: string): number {
+  const matches = accumulated.match(/"prompt"\s*:/g);
+  return matches ? matches.length : 0;
+}
+
 export async function generateQuiz(
   documentText: string,
   config: GenerationConfig,
-  maxRetries = 1
+  options?: { maxRetries?: number; onProgress?: (progress: GenerationProgress) => void }
 ): Promise<QuizQuestion[]> {
+  const maxRetries = options?.maxRetries ?? 1;
   let lastError: unknown;
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
-      const raw = await callGateway(documentText, config);
+      const raw = await callGatewayStream(documentText, config, (accumulated) => {
+        options?.onProgress?.({
+          attempt: attempt + 1,
+          questionsDetected: Math.min(countDetectedQuestions(accumulated), config.numQuestions),
+        });
+      });
       return validate(extractJson(raw), config);
     } catch (err) {
       lastError = err;

@@ -2,13 +2,13 @@ import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import AppNav from "../components/navigation/AppNav";
 import StepTabs from "../components/navigation/StepTabs";
-import { apiFetch } from "../api/client";
+import { streamQuizGeneration } from "../api/client";
 import {
   loadUploadedDocuments,
   saveGeneratedQuizId,
   saveQuizConfig,
 } from "../features/quiz/storage";
-import type { GeneratedQuiz, QuizDifficulty } from "../features/quiz/types";
+import type { QuizDifficulty } from "../features/quiz/types";
 import { QUIZ_WORKFLOW_ROUTES, QUIZ_WORKFLOW_STEPS } from "../features/quiz/workflow";
 
 type QuizFormState = {
@@ -33,6 +33,7 @@ function ConfigureQuizPage() {
   });
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedQuestions, setGeneratedQuestions] = useState<string[]>([]);
+  const [generationStatus, setGenerationStatus] = useState("");
   const [error, setError] = useState("");
   const navigate = useNavigate();
   const todayIso = useMemo(() => new Date().toISOString().split("T")[0], []);
@@ -65,14 +66,14 @@ function ConfigureQuizPage() {
 
     setError("");
     setGeneratedQuestions([]);
+    setGenerationStatus("Starting generation…");
     setIsGenerating(true);
 
     const count = Number.parseInt(form.questionCount, 10) || 3;
 
     try {
-      const quiz = await apiFetch<GeneratedQuiz>("/api/quizzes/generate", {
-        method: "POST",
-        body: JSON.stringify({
+      const quiz = await streamQuizGeneration(
+        {
           documentIds,
           config: {
             numQuestions: count,
@@ -80,8 +81,20 @@ function ConfigureQuizPage() {
             questionTypes: ["multiple_choice"],
             topic: form.topic.trim(),
           },
-        }),
-      });
+        },
+        (event) => {
+          if (event.type === "progress") {
+            setGenerationStatus(
+              event.attempt > 1
+                ? `Retrying (attempt ${event.attempt})… generated ${event.questionsDetected} of ${event.totalQuestions} questions`
+                : `Generating question ${Math.min(
+                    event.questionsDetected + 1,
+                    event.totalQuestions
+                  )} of ${event.totalQuestions}…`
+            );
+          }
+        }
+      );
 
       const generated = quiz.questionsPayload.map((question) => question.prompt);
       setGeneratedQuestions(generated);
@@ -102,6 +115,7 @@ function ConfigureQuizPage() {
       );
     } finally {
       setIsGenerating(false);
+      setGenerationStatus("");
     }
   };
 
@@ -227,6 +241,7 @@ function ConfigureQuizPage() {
                   <div className="loading-line" />
                   <div className="loading-line" />
                   <div className="loading-line short" />
+                  <p className="ai-loading-status">{generationStatus}</p>
                 </div>
               ) : generatedQuestions.length > 0 ? (
                 <div className="generated-questions">

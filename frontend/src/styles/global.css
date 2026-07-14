@@ -494,6 +494,13 @@ label {
   width: 82%;
 }
 
+.ai-loading-status {
+  margin: 4px 0 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: #0176d3;
+}
+
 @keyframes shimmer {
   0% {
     background-position: 100% 0;
