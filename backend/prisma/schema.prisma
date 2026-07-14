@@ -19,7 +19,8 @@ model Team {
 model User {
   id             Int      @id @default(autoincrement())
   email          String   @unique
-  fullName       String
+  firstName      String
+  lastName       String
   role           String   @default("new_hire")
   teamId         Int?
   authProvider   String?

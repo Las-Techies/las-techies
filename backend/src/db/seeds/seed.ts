@@ -150,7 +150,8 @@ async function main() {
     create: {
       id: MANAGER_ID,
       email: "manager@example.com",
-      fullName: "Demo Manager",
+      firstName: "Demo",
+      lastName: "Manager",
       role: "manager",
       teamId: TEAM_ID,
     },
@@ -184,7 +185,7 @@ async function main() {
   await resyncSequence("Document");
 
   console.log(
-    `Seed complete: team "${team.name}" (id ${team.id}), user "${manager.fullName}" (id ${manager.id}), ${onboardingDocuments.length} onboarding documents (ids 1-${onboardingDocuments.length}).`
+    `Seed complete: team "${team.name}" (id ${team.id}), user "${manager.firstName} ${manager.lastName}" (id ${manager.id}), ${onboardingDocuments.length} onboarding documents (ids 1-${onboardingDocuments.length}).`
   );
 }
 

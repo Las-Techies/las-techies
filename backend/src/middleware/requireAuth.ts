@@ -32,15 +32,17 @@ export async function requireAuth(
     const supabaseUser = data.user;
     const role =
       (supabaseUser.user_metadata?.role as string | undefined) ?? "new_hire";
-    const fullName =
-      (supabaseUser.user_metadata?.full_name as string | undefined) ??
-      supabaseUser.email ??
+    const firstName =
+      (supabaseUser.user_metadata?.first_name as string | undefined) ??
       "Unknown";
+    const lastName =
+      (supabaseUser.user_metadata?.last_name as string | undefined) ?? "";
 
     const user = await findOrCreateUserFromSupabase({
       supabaseUserId: supabaseUser.id,
       email: supabaseUser.email ?? "",
-      fullName,
+      firstName,
+      lastName,
       role,
       teamId: DEFAULT_TEAM_ID,
     });

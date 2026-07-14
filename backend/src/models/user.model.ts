@@ -7,7 +7,8 @@ export function findUserBySupabaseId(supabaseUserId: string) {
 export async function findOrCreateUserFromSupabase(input: {
   supabaseUserId: string;
   email: string;
-  fullName: string;
+  firstName: string;
+  lastName: string;
   role: string; // from JWT user_metadata; applied only on first creation
   teamId: number; // default team for now (GUS import comes later)
 }) {
@@ -18,7 +19,8 @@ export async function findOrCreateUserFromSupabase(input: {
     data: {
       supabaseUserId: input.supabaseUserId,
       email: input.email,
-      fullName: input.fullName,
+      firstName: input.firstName,
+      lastName: input.lastName,
       role: input.role,
       teamId: input.teamId,
       authProvider: "supabase",
