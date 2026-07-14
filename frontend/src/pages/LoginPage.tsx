@@ -1,21 +1,39 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import mascotLogo from "../assets/sageforce-mascot-transparent.png";
+import { useAuth } from "../context/AuthContext";
 
 function LoginPage() {
   const [role, setRole] = useState<"" | "new_hire" | "manager">("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
   const navigate = useNavigate();
+  const { signInWithRole } = useAuth();
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
     if (!email.trim() || !password.trim() || role === "") {
       setError("Please fill out email, password, and role before logging in.");
       return;
     }
+
     setError("");
-    navigate("/upload-content");
+    setSubmitting(true);
+    try {
+      const session = await signInWithRole(email.trim(), password, role);
+      if (!session) {
+        setError(
+          "Account created. Please confirm your email, then log in again."
+        );
+        return;
+      }
+      navigate(role === "manager" ? "/upload-content" : "/quiz-results");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to log in. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -69,8 +87,13 @@ function LoginPage() {
           <a className="help-link" href="#">
             Need help signing in?
           </a>
-          <button className="primary-btn btn-link" type="button" onClick={handleLogin}>
-            Log in
+          <button
+            className="primary-btn btn-link"
+            type="button"
+            onClick={handleLogin}
+            disabled={submitting}
+          >
+            {submitting ? "Logging in…" : "Log in"}
           </button>
         </div>
         {error ? <p className="form-error">{error}</p> : null}
