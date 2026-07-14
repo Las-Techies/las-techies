@@ -51,6 +51,7 @@ const learnerPool = [
 function ReviewPublishPage() {
   const [quizConfig, setQuizConfig] = useState<QuizConfig>(DEFAULT_QUIZ_CONFIG);
   const [quiz, setQuiz] = useState<GeneratedQuiz | null>(null);
+  const [isLoadingQuiz, setIsLoadingQuiz] = useState(false);
   const [selectedLearners, setSelectedLearners] = useState<string[]>([]);
   const [isPublishModalOpen, setIsPublishModalOpen] = useState(false);
 
@@ -60,9 +61,11 @@ function ReviewPublishPage() {
     const quizId = loadGeneratedQuizId();
     if (quizId === null) return;
 
+    setIsLoadingQuiz(true);
     apiFetch<GeneratedQuiz>(`/api/quizzes/${quizId}`)
       .then((data) => setQuiz(data))
-      .catch(() => setQuiz(null));
+      .catch(() => setQuiz(null))
+      .finally(() => setIsLoadingQuiz(false));
   }, []);
 
   // Prefer the real generated quiz (with real options + correct answers);
@@ -131,7 +134,7 @@ function ReviewPublishPage() {
               </div>
               <div>
                 <span>Questions</span>
-                <strong>{questionDetails.length}</strong>
+                <strong>{isLoadingQuiz ? "--" : questionDetails.length}</strong>
               </div>
               <div>
                 <span>Passing Score</span>
@@ -153,21 +156,25 @@ function ReviewPublishPage() {
           </div>
 
           <div className="review-list">
-            {questionDetails.map((item, index) => (
-              <article className="review-question-card" key={item.prompt}>
-                <h3>
-                  Q{index + 1}. {item.prompt}
-                </h3>
-                <ul>
-                  {item.options.map((option) => (
-                    <li key={option}>{option}</li>
-                  ))}
-                </ul>
-                <p>
-                  <strong>Correct Answer:</strong> {item.answer}
-                </p>
-              </article>
-            ))}
+            {isLoadingQuiz ? (
+              <p className="review-loading">Loading quiz…</p>
+            ) : (
+              questionDetails.map((item, index) => (
+                <article className="review-question-card" key={item.prompt}>
+                  <h3>
+                    Q{index + 1}. {item.prompt}
+                  </h3>
+                  <ul>
+                    {item.options.map((option) => (
+                      <li key={option}>{option}</li>
+                    ))}
+                  </ul>
+                  <p>
+                    <strong>Correct Answer:</strong> {item.answer}
+                  </p>
+                </article>
+              ))
+            )}
           </div>
 
           <div className="assign-learners">
@@ -193,7 +200,7 @@ function ReviewPublishPage() {
             <button
               className="primary-btn btn-link"
               type="button"
-              disabled={selectedLearners.length === 0}
+              disabled={selectedLearners.length === 0 || isLoadingQuiz}
               onClick={() => setIsPublishModalOpen(true)}
             >
               Publish
