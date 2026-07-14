@@ -1,26 +1,28 @@
 # Frontend
 
-React + Vite client for the AI Onboarding Quiz App, written in **TypeScript** (official team decision — use the `react-ts` template; see `planning/project_plan.md`). Signs in via **Supabase Auth** (email/password or magic link) and calls the backend API with the Supabase access token as `Authorization: Bearer <token>`.
+React + Vite client for the quiz flow.
 
 ## Folder structure
 
 ```text
 frontend/
 └── src/
-    ├── main.tsx            # app entry
-    ├── App.tsx             # top-level routes/layout
-    ├── api/                # thin fetch clients per resource (attach auth token)
-    ├── pages/              # one per screen in planning/project_plan.md "Pages/Screens"
-    ├── components/         # reusable UI (buttons, cards, quiz question, etc.)
-    ├── context/            # AuthContext (current user/role/team from Supabase + /api/auth/me)
-    ├── hooks/              # reusable React hooks (data fetching, forms)
-    └── styles/             # global styles / theme
+    ├── app/
+    │   └── App.tsx                    # route definitions
+    ├── assets/                        # static images/icons
+    ├── components/
+    │   └── navigation/                # top nav and workflow tabs
+    ├── features/
+    │   └── quiz/                      # quiz domain types, storage, workflow constants
+    ├── pages/                         # page-level screens
+    ├── styles/
+    │   └── global.css                 # global styling
+    ├── main.tsx                       # app entry
+    └── vite-env.d.ts
 ```
 
-## Pages map to `planning/project_plan.md`
+## Notes
 
-`Login`, `ManagerDashboard`, `DocumentPortal` (upload + Confluence + GitHub), `Library` (docs + Ask AI), `QuizBuilder` (generate/edit/publish), `QuizList`, `QuizDetail`, `QuizTaking`, `Results`.
-
-## Env vars (Vite exposes only `VITE_`-prefixed vars to the browser)
-
-`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` (the anon key is safe for the browser — never put the service role key here), `VITE_API_BASE_URL`.
+- Keep page-specific logic inside `src/pages`.
+- Put reusable quiz logic in `src/features/quiz`.
+- Put shared UI pieces in `src/components`.
