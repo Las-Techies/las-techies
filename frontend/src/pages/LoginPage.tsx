@@ -5,6 +5,8 @@ import { useAuth } from "../context/AuthContext";
 
 function LoginPage() {
   const [role, setRole] = useState<"" | "new_hire" | "manager">("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -13,15 +15,29 @@ function LoginPage() {
   const { signInWithRole } = useAuth();
 
   const handleLogin = async () => {
-    if (!email.trim() || !password.trim() || role === "") {
-      setError("Please fill out email, password, and role before logging in.");
+    if (
+      !firstName.trim() ||
+      !lastName.trim() ||
+      !email.trim() ||
+      !password.trim() ||
+      role === ""
+    ) {
+      setError(
+        "Please fill out your name, email, password, and role before logging in."
+      );
       return;
     }
 
     setError("");
     setSubmitting(true);
     try {
-      const session = await signInWithRole(email.trim(), password, role);
+      const session = await signInWithRole(
+        email.trim(),
+        password,
+        role,
+        firstName.trim(),
+        lastName.trim()
+      );
       if (!session) {
         setError(
           "Account created. Please confirm your email, then log in again."
@@ -44,6 +60,28 @@ function LoginPage() {
 
       <section className="login-card">
         <h2>Welcome to SageForce</h2>
+
+        <div className="name-row">
+          <label>
+            First Name
+            <input
+              type="text"
+              placeholder="Frida"
+              value={firstName}
+              onChange={(event) => setFirstName(event.target.value)}
+            />
+          </label>
+
+          <label>
+            Last Name
+            <input
+              type="text"
+              placeholder="Arriaga"
+              value={lastName}
+              onChange={(event) => setLastName(event.target.value)}
+            />
+          </label>
+        </div>
 
         <label>
           Work Email

@@ -17,7 +17,9 @@ type AuthContextValue = {
   signInWithRole: (
     email: string,
     password: string,
-    role: UserRole
+    role: UserRole,
+    firstName: string,
+    lastName: string
   ) => Promise<Session | null>;
   signOut: () => Promise<void>;
 };
@@ -46,10 +48,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   async function signInWithRole(
     email: string,
     password: string,
-    role: UserRole
+    role: UserRole,
+    firstName: string,
+    lastName: string
   ): Promise<Session | null> {
     // Try to sign in first; if the account doesn't exist yet, create it and
-    // stash the selected role in user_metadata so it rides along in the JWT.
+    // stash the selected role + name in user_metadata so it rides along in the JWT.
     const signIn = await supabase.auth.signInWithPassword({ email, password });
     if (!signIn.error) {
       return signIn.data.session;
@@ -58,7 +62,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const signUp = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { role } },
+      options: {
+        data: { role, first_name: firstName, last_name: lastName },
+      },
     });
     if (signUp.error) {
       throw signUp.error;

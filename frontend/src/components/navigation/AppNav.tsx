@@ -1,5 +1,6 @@
 import { Link, useLocation } from "react-router-dom";
 import { QUIZ_WORKFLOW_ROUTES } from "../../features/quiz/workflow";
+import { useAuth } from "../../context/AuthContext";
 
 type NavItem =
   | { label: string; type: "label" }
@@ -15,6 +16,13 @@ const navItems: NavItem[] = [
 function AppNav() {
   const location = useLocation();
   const isWorkflowRoute = QUIZ_WORKFLOW_ROUTES.some((route) => route === location.pathname);
+  const { user } = useAuth();
+  const firstName =
+    (user?.user_metadata?.first_name as string | undefined) ?? "there";
+  const role =
+    (user?.user_metadata?.role as string | undefined) === "manager"
+      ? "Manager"
+      : "New Hire";
 
   return (
     <header className="app-nav">
@@ -46,7 +54,9 @@ function AppNav() {
       </nav>
       <div className="app-nav-user">
         <span className="user-avatar" />
-        <span>Manager</span>
+        <span>
+          Hi, {firstName} <span className="muted">· {role}</span>
+        </span>
       </div>
     </header>
   );
