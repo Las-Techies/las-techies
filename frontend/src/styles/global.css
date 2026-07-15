@@ -220,6 +220,74 @@ label {
   color: #ba0517;
 }
 
+.form-info {
+  margin: 10px 0 0;
+  font-size: 13px;
+  color: #027e46;
+}
+
+.role-setup-intro {
+  margin: 0 0 16px;
+  font-size: 13px;
+  color: #4a4a4a;
+}
+
+.oauth-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 16px 0;
+  color: #a8a8a8;
+  font-size: 12px;
+}
+
+.oauth-divider::before,
+.oauth-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: #e5e5e5;
+}
+
+.google-btn {
+  width: 100%;
+  border: 1px solid #dddbda;
+  border-radius: 8px;
+  background: #fff;
+  padding: 10px 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #2e2e2e;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.google-btn:hover:not(:disabled) {
+  background: #f8f8f8;
+  border-color: #c9c9c9;
+}
+
+.google-btn:disabled {
+  color: #a8a8a8;
+  cursor: default;
+}
+
+.forgot-password-link {
+  display: inline-block;
+  margin: -6px 0 12px;
+  border: none;
+  background: none;
+  padding: 0;
+  font-size: 12px;
+  color: #0b4f94;
+  cursor: pointer;
+}
+
+.forgot-password-link:disabled {
+  color: #7a7a7a;
+  cursor: default;
+}
+
 .app-shell {
   min-height: 100vh;
   background: #f3f3f3;
@@ -239,7 +307,6 @@ label {
   font-weight: 700;
   line-height: 1;
   max-width: 72px;
-  cursor: pointer;
 }
 
 .app-nav-links {

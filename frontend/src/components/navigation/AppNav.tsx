@@ -50,9 +50,7 @@ function AppNav() {
 
   return (
     <header className="app-nav">
-      <Link to="/" className="brand">
-        SageForce
-      </Link>
+      <div className="brand">SageForce</div>
       <nav className="app-nav-links">
         {navItems.map((item) => {
           if (item.type === "label") {

@@ -14,7 +14,8 @@ type AuthContextValue = {
   session: Session | null;
   user: User | null;
   loading: boolean;
-  signInWithRole: (
+  signIn: (email: string, password: string) => Promise<Session | null>;
+  signUp: (
     email: string,
     password: string,
     role: UserRole,
@@ -22,6 +23,9 @@ type AuthContextValue = {
     lastName: string
   ) => Promise<Session | null>;
   signOut: () => Promise<void>;
+  resetPassword: (email: string) => Promise<void>;
+  signInWithGoogle: () => Promise<void>;
+  setRole: (role: UserRole) => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -45,35 +49,73 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => subscription.subscription.unsubscribe();
   }, []);
 
-  async function signInWithRole(
+  // Explicit login for a returning user — no fallback to signUp, so a wrong
+  // password reports as a login failure instead of a confusing "already
+  // registered" error.
+  async function signIn(email: string, password: string): Promise<Session | null> {
+    const result = await supabase.auth.signInWithPassword({ email, password });
+    if (result.error) {
+      throw new Error("Incorrect email or password. Please try again.");
+    }
+    return result.data.session;
+  }
+
+  // Explicit account creation — stashes the selected role + name in
+  // user_metadata so it rides along in the JWT for requireAuth to read.
+  async function signUp(
     email: string,
     password: string,
     role: UserRole,
     firstName: string,
     lastName: string
   ): Promise<Session | null> {
-    // Try to sign in first; if the account doesn't exist yet, create it and
-    // stash the selected role + name in user_metadata so it rides along in the JWT.
-    const signIn = await supabase.auth.signInWithPassword({ email, password });
-    if (!signIn.error) {
-      return signIn.data.session;
-    }
-
-    const signUp = await supabase.auth.signUp({
+    const result = await supabase.auth.signUp({
       email,
       password,
       options: {
         data: { role, first_name: firstName, last_name: lastName },
       },
     });
-    if (signUp.error) {
-      throw signUp.error;
+    if (result.error) {
+      if (/already registered|already exists/i.test(result.error.message)) {
+        throw new Error(
+          "An account with this email already exists. Try logging in instead."
+        );
+      }
+      throw result.error;
     }
-    return signUp.data.session;
+    return result.data.session;
   }
 
   async function signOut() {
     await supabase.auth.signOut();
+  }
+
+  // Sends a password-reset email. Supabase redirects the user back here
+  // with a recovery token after they click the link in that email.
+  async function resetPassword(email: string): Promise<void> {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.origin,
+    });
+    if (error) throw error;
+  }
+
+  // Redirects to Google; Supabase bounces the user back to redirectTo with a
+  // session already established. Google doesn't know about "manager" vs
+  // "new hire", so role starts unset — LoginPage prompts for it afterward.
+  async function signInWithGoogle(): Promise<void> {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: window.location.origin },
+    });
+    if (error) throw error;
+  }
+
+  // Fills in the role for a Google account after the fact, since Google
+  // sign-in has no equivalent of the New Hire/Manager picker on signup.
+  async function setRole(role: UserRole): Promise<void> {
+    const { error } = await supabase.auth.updateUser({ data: { role } });
+    if (error) throw error;
   }
 
   return (
@@ -82,8 +124,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         session,
         user: session?.user ?? null,
         loading,
-        signInWithRole,
+        signIn,
+        signUp,
         signOut,
+        resetPassword,
+        signInWithGoogle,
+        setRole,
       }}
     >
       {children}
