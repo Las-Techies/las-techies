@@ -1,19 +1,17 @@
-📝 `NOTE` Use this template repo to initialize the contents of your group's capstone repo project. As you work on your assignment over the course of the week, update the appropriate repo deliverables. All project planning should be included in the planning directory. (🚫 Remove this paragraph before submitting your assignment.)
-
 # SITE Capstone Project
 
-SITE Course Year: **20__**
+SITE Course Year: **2026**
 
-Cohort: **Add Company Sponsor Name**
+Cohort: **Salesforce x Codepath**
 
-Team Member Names:**Insert Team Member Names**
+Team Member Names:**Frida Arriaga, Esmeralda Benitez, Reyna Obregon, Melanie Perez**
 
-Mentors Names: **Insert Professional Mentor Names**
+Mentors Names: **Greg Merrill, Aryan Tyagi, Jennifer Jin, Mitch Mikusek, & Srinivas Ranganathan**
 
 Project Code Repository Links
 
-* [Frontend Repo Link]()
-* [Backend Repo Link]()
+* [Frontend Repo Link](https://github.com/Las-Techies/las-techies/tree/main/frontend)
+* [Backend Repo Link](https://github.com/Las-Techies/las-techies/tree/main/backend)
 
 ## Project Overview
 
