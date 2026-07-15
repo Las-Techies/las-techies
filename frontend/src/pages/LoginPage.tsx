@@ -1,9 +1,16 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import mascotLogo from "../assets/sageforce-mascot-transparent.png";
 import { useAuth } from "../context/AuthContext";
 
+type Mode = "login" | "signup";
+
+function routeForRole(role: string | undefined): string {
+  return role === "manager" ? "/upload-content" : "/quiz-results";
+}
+
 function LoginPage() {
+  const [mode, setMode] = useState<Mode>("login");
   const [role, setRole] = useState<"" | "new_hire" | "manager">("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -12,9 +19,44 @@ function LoginPage() {
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const navigate = useNavigate();
-  const { signInWithRole } = useAuth();
+  const { session, loading, signIn, signUp } = useAuth();
+
+  // Already logged in (e.g. came back to "/" with a valid session) —
+  // skip the form entirely instead of asking them to log in again.
+  useEffect(() => {
+    if (!loading && session) {
+      navigate(routeForRole(session.user.user_metadata?.role), { replace: true });
+    }
+  }, [loading, session, navigate]);
+
+  const switchMode = (next: Mode) => {
+    setMode(next);
+    setError("");
+  };
 
   const handleLogin = async () => {
+    if (!email.trim() || !password.trim()) {
+      setError("Please enter your email and password.");
+      return;
+    }
+
+    setError("");
+    setSubmitting(true);
+    try {
+      const result = await signIn(email.trim(), password);
+      if (!result) {
+        setError("Unable to log in. Please try again.");
+        return;
+      }
+      navigate(routeForRole(result.user.user_metadata?.role));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to log in. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleSignup = async () => {
     if (
       !firstName.trim() ||
       !lastName.trim() ||
@@ -23,7 +65,7 @@ function LoginPage() {
       role === ""
     ) {
       setError(
-        "Please fill out your name, email, password, and role before logging in."
+        "Please fill out your name, email, password, and role before creating an account."
       );
       return;
     }
@@ -31,24 +73,35 @@ function LoginPage() {
     setError("");
     setSubmitting(true);
     try {
-      const session = await signInWithRole(
+      const result = await signUp(
         email.trim(),
         password,
         role,
         firstName.trim(),
         lastName.trim()
       );
-      if (!session) {
+      if (!result) {
         setError(
-          "Account created. Please confirm your email, then log in again."
+          "Account created. Please confirm your email, then log in."
         );
+        switchMode("login");
         return;
       }
-      navigate(role === "manager" ? "/upload-content" : "/quiz-results");
+      navigate(routeForRole(role));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to log in. Please try again.");
+      setError(
+        err instanceof Error ? err.message : "Unable to create your account. Please try again."
+      );
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleSubmit = () => {
+    if (mode === "login") {
+      handleLogin();
+    } else {
+      handleSignup();
     }
   };
 
@@ -59,29 +112,31 @@ function LoginPage() {
       </section>
 
       <section className="login-card">
-        <h2>Welcome to SageForce</h2>
+        <h2>{mode === "login" ? "Welcome back" : "Welcome to SageForce"}</h2>
 
-        <div className="name-row">
-          <label>
-            First Name
-            <input
-              type="text"
-              placeholder="Frida"
-              value={firstName}
-              onChange={(event) => setFirstName(event.target.value)}
-            />
-          </label>
+        {mode === "signup" ? (
+          <div className="name-row">
+            <label>
+              First Name
+              <input
+                type="text"
+                placeholder="Frida"
+                value={firstName}
+                onChange={(event) => setFirstName(event.target.value)}
+              />
+            </label>
 
-          <label>
-            Last Name
-            <input
-              type="text"
-              placeholder="Arriaga"
-              value={lastName}
-              onChange={(event) => setLastName(event.target.value)}
-            />
-          </label>
-        </div>
+            <label>
+              Last Name
+              <input
+                type="text"
+                placeholder="Arriaga"
+                value={lastName}
+                onChange={(event) => setLastName(event.target.value)}
+              />
+            </label>
+          </div>
+        ) : null}
 
         <label>
           Work Email
@@ -103,35 +158,54 @@ function LoginPage() {
           />
         </label>
 
-        <label>Role</label>
-        <div className="role-switch">
-          <button
-            type="button"
-            className={role === "new_hire" ? "selected role-option" : "role-option"}
-            onClick={() => setRole("new_hire")}
-          >
-            New Hire
-          </button>
-          <button
-            type="button"
-            className={role === "manager" ? "selected role-option" : "role-option"}
-            onClick={() => setRole("manager")}
-          >
-            Manager
-          </button>
-        </div>
+        {mode === "signup" ? (
+          <>
+            <label>Role</label>
+            <div className="role-switch">
+              <button
+                type="button"
+                className={role === "new_hire" ? "selected role-option" : "role-option"}
+                onClick={() => setRole("new_hire")}
+              >
+                New Hire
+              </button>
+              <button
+                type="button"
+                className={role === "manager" ? "selected role-option" : "role-option"}
+                onClick={() => setRole("manager")}
+              >
+                Manager
+              </button>
+            </div>
+          </>
+        ) : null}
 
         <div className="login-actions">
-          <a className="help-link" href="#">
-            Need help signing in?
+          <a
+            className="help-link"
+            href="#"
+            onClick={(event) => {
+              event.preventDefault();
+              switchMode(mode === "login" ? "signup" : "login");
+            }}
+          >
+            {mode === "login"
+              ? "New here? Create an account"
+              : "Already have an account? Log in"}
           </a>
           <button
             className="primary-btn btn-link"
             type="button"
-            onClick={handleLogin}
+            onClick={handleSubmit}
             disabled={submitting}
           >
-            {submitting ? "Logging in…" : "Log in"}
+            {submitting
+              ? mode === "login"
+                ? "Logging in…"
+                : "Creating account…"
+              : mode === "login"
+                ? "Log in"
+                : "Create account"}
           </button>
         </div>
         {error ? <p className="form-error">{error}</p> : null}
