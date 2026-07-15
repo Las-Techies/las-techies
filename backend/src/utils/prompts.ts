@@ -18,6 +18,17 @@ ${doc.rawText}
     )
     .join("\n\n---\n\n");
 
+  const difficultyGuide: Record<string, string> = {
+    easy: "Test recall of a single explicit fact stated directly in the source (a name, step, tool, or definition).",
+    medium:
+      "Test understanding of how or why something works — e.g. the relationship between two steps, the purpose of a process, or applying a rule to a described scenario.",
+    hard:
+      "Test synthesis across multiple parts of the source, edge cases, or the consequence of doing something incorrectly. Require the reader to reason, not just recall.",
+  };
+  const difficultyNote =
+    difficultyGuide[config.difficulty.toLowerCase()] ??
+    "Match the requested difficulty level as closely as possible.";
+
   return `Generate exactly ${config.numQuestions} ${config.difficulty} quiz questions
 from the SOURCE DOCUMENTS below.
 
@@ -29,6 +40,16 @@ Rules:
 - If there are multiple source documents, distribute questions across them as evenly as possible.
 - citation.sourceDocumentId MUST match one of the DOCUMENT ID values provided below.
 - citation.sourceDocumentTitle MUST exactly match the paired DOCUMENT TITLE.
+
+Difficulty guidance for "${config.difficulty}":
+${difficultyNote}
+
+Writing high-quality questions and options:
+- Every incorrect option must be plausible to someone who skimmed the source — never obviously wrong, silly, or off-topic.
+- All options for a question should be similar in length and level of detail. Don't make the correct answer noticeably longer or more specific than the others.
+- Never use "All of the above", "None of the above", or options that only differ by a negation (e.g. "X happens" vs "X does not happen").
+- Do not phrase the question so the correct answer simply repeats a distinctive phrase from the source verbatim while the wrong answers use generic language — vary the wording so the question can't be solved by pattern-matching alone.
+- Each question should stand on its own and test one clear idea; avoid compound questions ("...and also...").
 
 Return ONLY valid JSON (no markdown, no prose) in this exact shape:
 {
