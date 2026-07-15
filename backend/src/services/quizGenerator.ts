@@ -17,11 +17,17 @@ export type GenerationProgress = {
   questionsDetected: number;
 };
 
+type SourceDocument = {
+  id: number;
+  title: string;
+  rawText: string;
+};
+
 // Streams the gateway response via SSE and reports the running-total question
 // count as soon as each "prompt" field appears in the partial JSON, so the
 // caller can show live progress instead of waiting for the full completion.
 async function callGatewayStream(
-  documentText: string,
+  documents: SourceDocument[],
   config: GenerationConfig,
   onDelta: (accumulated: string) => void
 ): Promise<string> {
@@ -46,7 +52,7 @@ async function callGatewayStream(
           content:
             "You are a quiz generator for Salesforce onboarding documentation. You only output valid JSON.",
         },
-        { role: "user", content: buildPrompt(documentText, config) },
+        { role: "user", content: buildPrompt(documents, config) },
       ],
     }),
   });
@@ -178,7 +184,7 @@ function countDetectedQuestions(accumulated: string): number {
 }
 
 export async function generateQuiz(
-  documentText: string,
+  documents: SourceDocument[],
   config: GenerationConfig,
   options?: { maxRetries?: number; onProgress?: (progress: GenerationProgress) => void }
 ): Promise<QuizQuestion[]> {
@@ -187,7 +193,7 @@ export async function generateQuiz(
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
-      const raw = await callGatewayStream(documentText, config, (accumulated) => {
+      const raw = await callGatewayStream(documents, config, (accumulated) => {
         options?.onProgress?.({
           attempt: attempt + 1,
           questionsDetected: Math.min(countDetectedQuestions(accumulated), config.numQuestions),

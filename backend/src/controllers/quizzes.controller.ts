@@ -15,8 +15,14 @@ export async function getQuiz(req: Request, res: Response, next: NextFunction) {
   }
 }
 
+type QuizSourceDocument = {
+  id: number;
+  title: string;
+  rawText: string;
+};
+
 // Integration seam: loads a document's extracted text, scoped to the team.
-async function getDocumentText(id: number, teamId: number): Promise<string> {
+async function getDocumentSource(id: number, teamId: number): Promise<QuizSourceDocument> {
   const doc = await findDocumentByIdForTeam(id, teamId);
   if (!doc) {
     throw Object.assign(new Error(`Document ${id} not found`), { status: 404 });
@@ -27,7 +33,11 @@ async function getDocumentText(id: number, teamId: number): Promise<string> {
       { status: 400 }
     );
   }
-  return doc.rawText;
+  return {
+    id: doc.id,
+    title: doc.title,
+    rawText: doc.rawText,
+  };
 }
 
 function parseConfig(raw: any): GenerationConfig | null {
@@ -74,11 +84,11 @@ export async function generateQuiz(req: Request, res: Response, next: NextFuncti
   };
 
   try {
-    const texts = await Promise.all(
-      documentIds.map((id: number) => getDocumentText(id, user.teamId))
+    const sourceDocuments = await Promise.all(
+      documentIds.map((id: number) => getDocumentSource(id, user.teamId))
     );
 
-    const questions = await generateQuizQuestions(texts.join("\n\n"), config, {
+    const questions = await generateQuizQuestions(sourceDocuments, config, {
       onProgress: ({ attempt, questionsDetected }) => {
         send({
           type: "progress",
