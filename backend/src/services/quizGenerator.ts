@@ -141,6 +141,29 @@ function validate(parsed: any, config: GenerationConfig): QuizQuestion[] {
     if (typeof q.explanation !== "string" || q.explanation.trim() === "") {
       throw new QuizGenerationError(`Question ${n}: empty or missing explanation`);
     }
+
+    //citation validation aka don't accept this question unless citation data is complete/valid
+    if (!q.citation || typeof q.citation !== "object") {
+      throw new QuizGenerationError(`Question ${n}: missing citation object`);
+    }
+    if (//checking that sourceDocumentId is a number and finite
+      typeof q.citation.sourceDocumentId !== "number" ||
+      !Number.isFinite(q.citation.sourceDocumentId)
+    ) {
+      throw new QuizGenerationError(`Question ${n}: invalid citation.sourceDocumentId`);
+    }
+    if (//checking that sourceDocumentTitle is a string and not empty
+      typeof q.citation.sourceDocumentTitle !== "string" ||
+      q.citation.sourceDocumentTitle.trim() === ""
+    ) {
+      throw new QuizGenerationError(`Question ${n}: missing citation.sourceDocumentTitle`);
+    }
+    if (//checking that sourceSnippet is a string and not empty
+      typeof q.citation.sourceSnippet !== "string" ||
+      q.citation.sourceSnippet.trim() === ""
+    ) {
+      throw new QuizGenerationError(`Question ${n}: missing citation.sourceSnippet`);
+    }
   });
 
   return questions;

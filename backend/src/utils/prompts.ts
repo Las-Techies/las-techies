@@ -21,7 +21,12 @@ Return ONLY valid JSON (no markdown, no prose) in this exact shape:
         { "id": 1, "text": "string", "isCorrect": true },
         { "id": 2, "text": "string", "isCorrect": false }
       ],
-      "explanation": "string"
+      "explanation": "string",
+      "citation": {
+        "sourceDocumentId": 12,
+        "sourceDocumentTitle": "Team Onboarding Guide",
+        "sourceSnippet": "Before starting work on a new project, the team should read and understand the following documents..."
+      }
     }
   ]
 }

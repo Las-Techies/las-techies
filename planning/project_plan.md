@@ -8,7 +8,7 @@ Salesforce teams often onboard new hires with documentation that is scattered ac
 
 Our web app solves this by turning existing team onboarding docs into a structured, measurable onboarding flow. Managers can upload or import documentation (files, Confluence, GitHub), generate AI-assisted quiz drafts based on that real team content, review/edit before publishing, and monitor completion and scores in a team dashboard. New hires use one team-scoped portal to read onboarding material, take published quizzes, and validate readiness before joining sprint work.
 
-## Project Board: https://trello.com/b/5JS2t9Kl/tasks-for-capstone
+## Project Board: [https://trello.com/b/5JS2t9Kl/tasks-for-capstone](https://trello.com/b/5JS2t9Kl/tasks-for-capstone)
 
 ## Tech Stack & Decisions
 
@@ -78,19 +78,20 @@ Relationship notes:
 
 ## External APIs Used
 
-| API | Purpose | Used In Endpoints |
-|-----|---------|-------------------|
-| **Salesforce LLM Gateway Express** (Claude) | Generate quiz questions from documents | `POST /api/quizzes/generate` |
-| **Confluence REST API** | Fetch Confluence page content | `POST /api/documents/import-confluence` |
-| **GitHub API** | Fetch repository documentation/code | `POST /api/documents/import-github` |
-| **Supabase Auth** | Authenticate users (email/password + GitHub/Google social login); optional `@salesforce.com` domain allowlist enforced by the app | `POST /api/auth/sync`, `GET /api/auth/me` | 
-| **GUS API** | Fetch team and membership data to populate the teams/users tables | `POST /api/teams/import-gus` (planned) |
-| **Local Libraries** (pdf-parse, mammoth) | Parse uploaded files | `POST /api/documents/upload` |
+
+| API                                         | Purpose                                                                                                                           | Used In Endpoints                         |
+| ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
+| **Salesforce LLM Gateway Express** (Claude) | Generate quiz questions from documents                                                                                            | `POST /api/quizzes/generate`              |
+| **Confluence REST API**                     | Fetch Confluence page content                                                                                                     | `POST /api/documents/import-confluence`   |
+| **GitHub API**                              | Fetch repository documentation/code                                                                                               | `POST /api/documents/import-github`       |
+| **Supabase Auth**                           | Authenticate users (email/password + GitHub/Google social login); optional `@salesforce.com` domain allowlist enforced by the app | `POST /api/auth/sync`, `GET /api/auth/me` |
+| **GUS API**                                 | Fetch team and membership data to populate the teams/users tables                                                                 | `POST /api/teams/import-gus` (planned)    |
+| **Local Libraries** (pdf-parse, mammoth)    | Parse uploaded files                                                                                                              | `POST /api/documents/upload`              |
+
 
 ---
 
 ## Endpoints
-
 
 ### Documents
 
@@ -162,8 +163,14 @@ Relationship notes:
 - **What it does:** Creates quiz drafts from selected onboarding docs.
 - **Where it lives:** Manager Quiz Builder -> `Generate Quiz`.
 - **Input:** `teamId`, `documentIds[]`, `config` (`numQuestions`, `difficulty`, `questionTypes[]`) + selected docs `raw_text`.
-- **Output:** Draft quiz with `questions[]` (prompt, options, correct answer, explanation).
-- **Validation:** Good output is valid schema, requested count, grounded in docs, and editable; bad output is malformed/duplicated/hallucinated.
+- **Output:** Draft quiz with `questions[]` (prompt, options, correct answer, explanation, citation metadata per question).
+- **Validation:** Good output is valid schema, requested count, grounded in docs, editable, and includes per-question citations; bad output is malformed/duplicated/hallucinated or missing citation fields.
+- **Question payload contract (required fields):**
+  - `prompt`, `type`, `options[]`, `explanation`
+  - `citation.sourceDocumentId` (number)
+  - `citation.sourceDocumentTitle` (string)
+  - `citation.sourceSnippet` (string; short evidence excerpt from source doc)
+- **Citation validation rule:** If any generated question is missing citation fields, quiz generation should fail validation and retry (or return a validation error if retries are exhausted).
 - **Endpoint:** `POST /api/quizzes/generate`
 - **Fallback:** Show error + retry, while keeping manual edit flow available.
 
@@ -185,6 +192,7 @@ Relationship notes:
 | Limited quiz generation to manager actions                 | Sprint 1 | Access control            | Matches role boundaries and prevents unauthorized draft creation |
 | Enforced strict JSON format for generated quiz data        | Sprint 1 | Prompt + parsing contract | Reduced malformed outputs and save errors                        |
 | Added retry + manual fallback for quiz generation failures | Sprint 2 | Error handling            | Prevents blocked workflow during AI/API issues                   |
+| Added per-question citation metadata (`sourceDocumentId`, `sourceDocumentTitle`, `sourceSnippet`) | Sprint 1 | Quiz payload contract     | Enables answer footnotes and improves traceability to source docs |
 | Put chatbot in shared Library page for both roles          | Sprint 2 | Feature placement         | Both managers and interns need doc-based Q&A                     |
 | Required source citations in chatbot responses             | Sprint 3 | Output quality rules      | Improves trust and reduces hallucinations                        |
 | Routed chatbot through backend with team scoping           | Sprint 3 | Architecture/security     | Protects API keys and enforces data isolation                    |
