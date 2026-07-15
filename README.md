@@ -15,7 +15,16 @@ Project Code Repository Links
 
 ## Project Overview
 
-Add a quick summary of what your project theme and objectives are. 
+### Theme
+
+Productivity/Professional Services
+
+### Description
+
+The main purpose of our project is to streamline team-specific onboarding by transforming existing documentation into measurable learning through AI-generated quizzes.
+
+Our platform provides a centralized onboarding portal where Salesforce teams can upload or link their current onboarding resources without rebuilding content from scratch. The AI backend parses these materials and generates quizzes tailored to each team’s workflows, infrastructure, codebase, and processes. New hires complete these quizzes to validate understanding before joining sprint work, while managers track completion and performance through a dashboard.
+
 
 Deployment Website: **Add Link to Deployed Project**
 
