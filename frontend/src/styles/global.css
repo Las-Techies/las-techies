@@ -111,6 +111,12 @@ label {
   white-space: nowrap;
 }
 
+.name-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
 .role-switch {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -233,6 +239,7 @@ label {
   font-weight: 700;
   line-height: 1;
   max-width: 72px;
+  cursor: pointer;
 }
 
 .app-nav-links {
@@ -259,11 +266,26 @@ label {
 }
 
 .app-nav-user {
+  position: relative;
+}
+
+.app-nav-user-trigger {
   display: flex;
   align-items: center;
   gap: 10px;
   color: #5f5f5f;
   font-size: 13px;
+  border: none;
+  background: none;
+  padding: 6px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.app-nav-user-trigger:hover,
+.app-nav-user-trigger[aria-expanded="true"] {
+  background: #f3f3f3;
 }
 
 .user-avatar {
@@ -271,6 +293,37 @@ label {
   height: 22px;
   border-radius: 999px;
   background: #e9edf3;
+}
+
+.app-nav-user-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 140px;
+  background: #fff;
+  border: 1px solid #dddbda;
+  border-radius: 8px;
+  box-shadow: 0 10px 24px rgba(2, 42, 84, 0.14);
+  padding: 6px;
+  z-index: 10;
+}
+
+.app-nav-user-menu button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: none;
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #ba0517;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.app-nav-user-menu button:hover {
+  background: #fdeeee;
 }
 
 .page-wrap {
@@ -486,6 +539,13 @@ label {
 
 .loading-line.short {
   width: 82%;
+}
+
+.ai-loading-status {
+  margin: 4px 0 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: #0176d3;
 }
 
 @keyframes shimmer {
@@ -800,6 +860,14 @@ label {
   margin: 0;
   font-size: 13px;
   color: #4a4a4a;
+}
+
+.review-loading {
+  margin: 0;
+  padding: 24px 0;
+  text-align: center;
+  font-size: 14px;
+  color: #706e6b;
 }
 
 .review-summary {

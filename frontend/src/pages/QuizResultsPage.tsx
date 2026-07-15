@@ -1,7 +1,9 @@
 import type { CSSProperties } from "react";
 import { useEffect, useState } from "react";
 import AppNav from "../components/navigation/AppNav";
-import { loadQuizConfig } from "../features/quiz/storage";
+import { apiFetch } from "../api/client";
+import { loadGeneratedQuizId, loadQuizConfig } from "../features/quiz/storage";
+import type { GeneratedQuiz } from "../features/quiz/types";
 
 const breakdownRows = [
   { topic: "PPE Requirements", wrong: "0 / 3", ringPercent: 100, dotClass: "dot-1" },
@@ -11,11 +13,24 @@ const breakdownRows = [
 
 function QuizResultsPage() {
   const [passingScore, setPassingScore] = useState(70);
+  const [quiz, setQuiz] = useState<GeneratedQuiz | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
   const score = 80;
 
   useEffect(() => {
-    const quizConfig = loadQuizConfig();
-    setPassingScore(quizConfig.passingScore);
+    setPassingScore(loadQuizConfig().passingScore);
+
+    const quizId = loadGeneratedQuizId();
+    if (quizId === null) return;
+
+    setLoading(true);
+    apiFetch<GeneratedQuiz>(`/api/quizzes/${quizId}`)
+      .then((data) => setQuiz(data))
+      .catch((err) =>
+        setError(err instanceof Error ? err.message : "Failed to load quiz.")
+      )
+      .finally(() => setLoading(false));
   }, []);
 
   const didPass = score >= passingScore;
@@ -25,7 +40,7 @@ function QuizResultsPage() {
       <AppNav />
       <main className="page-wrap">
         <h1>Quiz Results</h1>
-        <p className="subtle">OSHA Basics 2026 • Submitted Jul 2, 2026</p>
+        <p className="subtle">{quiz?.title ?? "OSHA Basics 2026"} • Submitted Jul 2, 2026</p>
 
         <section className="results-top">
           <div className="card score-card">
@@ -85,13 +100,47 @@ function QuizResultsPage() {
 
         <section className="card">
           <h2>Question Breakdown</h2>
-          <p className="ok">✓ What is the minimum PPE requirement for Zone A?</p>
-          <p className="bad">
-            ✕ How often must fire extinguishers be inspected according to OSHA 2026 guidelines?
-          </p>
-          <p className="ok">
-            ✓ Which class of fire extinguisher is required for chemical fires involving metals?
-          </p>
+          {loading ? <p className="subtle">Loading quiz…</p> : null}
+          {error ? <p className="form-error">{error}</p> : null}
+
+          {quiz ? (
+            <div className="review-list">
+              {quiz.questionsPayload.map((question, index) => {
+                const correct = question.options.find((option) => option.isCorrect);
+                return (
+                  <article className="review-question-card" key={question.id}>
+                    <h3>
+                      Q{index + 1}. {question.prompt}
+                    </h3>
+                    <ul>
+                      {question.options.map((option) => (
+                        <li key={option.id}>
+                          {option.isCorrect ? "✓ " : ""}
+                          {option.text}
+                        </li>
+                      ))}
+                    </ul>
+                    <p>
+                      <strong>Correct Answer:</strong> {correct?.text ?? "N/A"}
+                    </p>
+                    {question.explanation ? (
+                      <p className="subtle">{question.explanation}</p>
+                    ) : null}
+                  </article>
+                );
+              })}
+            </div>
+          ) : !loading && !error ? (
+            <>
+              <p className="ok">✓ What is the minimum PPE requirement for Zone A?</p>
+              <p className="bad">
+                ✕ How often must fire extinguishers be inspected according to OSHA 2026 guidelines?
+              </p>
+              <p className="ok">
+                ✓ Which class of fire extinguisher is required for chemical fires involving metals?
+              </p>
+            </>
+          ) : null}
         </section>
 
         <div className="page-actions">

@@ -11,4 +11,6 @@ export const env = {
   port: Number(process.env.PORT ?? 4000),
   llmGatewayUrl: process.env.LLM_GATEWAY_URL ?? "",
   llmKey: process.env.ENG_AI_MODEL_GW_KEY ?? "",
+  supabaseUrl: process.env.SUPABASE_URL ?? "",
+  supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY ?? "",
 };

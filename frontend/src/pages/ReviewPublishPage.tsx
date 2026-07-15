@@ -2,8 +2,13 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import AppNav from "../components/navigation/AppNav";
 import StepTabs from "../components/navigation/StepTabs";
-import { loadQuizConfig } from "../features/quiz/storage";
-import { DEFAULT_QUIZ_CONFIG, type QuizConfig } from "../features/quiz/types";
+import { apiFetch } from "../api/client";
+import { loadGeneratedQuizId, loadQuizConfig } from "../features/quiz/storage";
+import {
+  DEFAULT_QUIZ_CONFIG,
+  type GeneratedQuiz,
+  type QuizConfig,
+} from "../features/quiz/types";
 import { QUIZ_WORKFLOW_ROUTES, QUIZ_WORKFLOW_STEPS } from "../features/quiz/workflow";
 
 const questionBankDefault = [
@@ -45,24 +50,42 @@ const learnerPool = [
 
 function ReviewPublishPage() {
   const [quizConfig, setQuizConfig] = useState<QuizConfig>(DEFAULT_QUIZ_CONFIG);
+  const [quiz, setQuiz] = useState<GeneratedQuiz | null>(null);
+  const [isLoadingQuiz, setIsLoadingQuiz] = useState(false);
   const [selectedLearners, setSelectedLearners] = useState<string[]>([]);
   const [isPublishModalOpen, setIsPublishModalOpen] = useState(false);
 
   useEffect(() => {
     setQuizConfig(loadQuizConfig());
+
+    const quizId = loadGeneratedQuizId();
+    if (quizId === null) return;
+
+    setIsLoadingQuiz(true);
+    apiFetch<GeneratedQuiz>(`/api/quizzes/${quizId}`)
+      .then((data) => setQuiz(data))
+      .catch(() => setQuiz(null))
+      .finally(() => setIsLoadingQuiz(false));
   }, []);
 
-  const selectedQuestions = useMemo(
-    () =>
-      (quizConfig.generatedQuestions.length > 0
+  // Prefer the real generated quiz (with real options + correct answers);
+  // fall back to the static bank only when no quiz has been generated.
+  const questionDetails = useMemo(() => {
+    if (quiz && quiz.questionsPayload.length > 0) {
+      return quiz.questionsPayload.map((question) => ({
+        prompt: question.prompt,
+        options: question.options.map((option) => option.text),
+        answer: question.options.find((option) => option.isCorrect)?.text ?? "N/A",
+      }));
+    }
+
+    const prompts = (
+      quizConfig.generatedQuestions.length > 0
         ? quizConfig.generatedQuestions
         : questionBankDefault.map((q) => q.prompt)
-      ).slice(0, quizConfig.questionCount),
-    [quizConfig.generatedQuestions, quizConfig.questionCount]
-  );
+    ).slice(0, quizConfig.questionCount);
 
-  const questionDetails = useMemo(() => {
-    return selectedQuestions.map((question, index) => {
+    return prompts.map((question, index) => {
       const fromBank = questionBankDefault[index % questionBankDefault.length];
       const cleanPrompt = question.replace(/^Q\d+[\s.:,-]*/i, "").trim();
       return {
@@ -71,7 +94,7 @@ function ReviewPublishPage() {
         answer: fromBank.answer,
       };
     });
-  }, [selectedQuestions]);
+  }, [quiz, quizConfig.generatedQuestions, quizConfig.questionCount]);
 
   const toggleLearner = (name: string) => {
     setSelectedLearners((prev) =>
@@ -111,7 +134,7 @@ function ReviewPublishPage() {
               </div>
               <div>
                 <span>Questions</span>
-                <strong>{selectedQuestions.length}</strong>
+                <strong>{isLoadingQuiz ? "--" : questionDetails.length}</strong>
               </div>
               <div>
                 <span>Passing Score</span>
@@ -133,21 +156,25 @@ function ReviewPublishPage() {
           </div>
 
           <div className="review-list">
-            {questionDetails.map((item, index) => (
-              <article className="review-question-card" key={item.prompt}>
-                <h3>
-                  Q{index + 1}. {item.prompt}
-                </h3>
-                <ul>
-                  {item.options.map((option) => (
-                    <li key={option}>{option}</li>
-                  ))}
-                </ul>
-                <p>
-                  <strong>Correct Answer:</strong> {item.answer}
-                </p>
-              </article>
-            ))}
+            {isLoadingQuiz ? (
+              <p className="review-loading">Loading quiz…</p>
+            ) : (
+              questionDetails.map((item, index) => (
+                <article className="review-question-card" key={item.prompt}>
+                  <h3>
+                    Q{index + 1}. {item.prompt}
+                  </h3>
+                  <ul>
+                    {item.options.map((option) => (
+                      <li key={option}>{option}</li>
+                    ))}
+                  </ul>
+                  <p>
+                    <strong>Correct Answer:</strong> {item.answer}
+                  </p>
+                </article>
+              ))
+            )}
           </div>
 
           <div className="assign-learners">
@@ -173,7 +200,7 @@ function ReviewPublishPage() {
             <button
               className="primary-btn btn-link"
               type="button"
-              disabled={selectedLearners.length === 0}
+              disabled={selectedLearners.length === 0 || isLoadingQuiz}
               onClick={() => setIsPublishModalOpen(true)}
             >
               Publish
