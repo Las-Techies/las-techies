@@ -1,5 +1,9 @@
 node_modules
 # Keep environment variables out of version control
 .env
+CLAUDE.md
 
 /generated/prisma
+
+# Local Python deps used for tooling/scripts
+.pydeps/
