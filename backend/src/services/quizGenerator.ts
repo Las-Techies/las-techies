@@ -50,7 +50,10 @@ async function callGatewayStream(
         {
           role: "system",
           content:
-            "You are a quiz generator for Salesforce onboarding documentation. You only output valid JSON.",
+            "You are an expert instructional designer who writes onboarding assessments for " +
+            "Salesforce engineering teams. You write clear, unambiguous questions that test real " +
+            "understanding of the source material, not just keyword-matching. You only output valid JSON " +
+            "with no markdown fences and no prose before or after the JSON.",
         },
         { role: "user", content: buildPrompt(documents, config) },
       ],
