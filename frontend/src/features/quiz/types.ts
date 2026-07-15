@@ -12,6 +12,7 @@ export type QuizQuestion = {
   type: string;
   options: QuizQuestionOption[];
   explanation: string;
+  citation?: QuizCitation; // optional for fallback safety
 };
 
 export type GeneratedQuiz = {
@@ -40,6 +41,14 @@ export type QuizConfig = {
   difficulty: QuizDifficulty;
   generatedQuestions: string[];
 };
+
+export type QuizCitation = {
+  sourceDocumentId: number;
+  sourceDocumentTitle: string;
+  sourceSnippet: string;
+};
+
+
 
 export const QUIZ_CONFIG_STORAGE_KEY = "sageforce_configure_quiz";
 

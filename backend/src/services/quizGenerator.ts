@@ -17,11 +17,17 @@ export type GenerationProgress = {
   questionsDetected: number;
 };
 
+type SourceDocument = {
+  id: number;
+  title: string;
+  rawText: string;
+};
+
 // Streams the gateway response via SSE and reports the running-total question
 // count as soon as each "prompt" field appears in the partial JSON, so the
 // caller can show live progress instead of waiting for the full completion.
 async function callGatewayStream(
-  documentText: string,
+  documents: SourceDocument[],
   config: GenerationConfig,
   onDelta: (accumulated: string) => void
 ): Promise<string> {
@@ -46,7 +52,7 @@ async function callGatewayStream(
           content:
             "You are a quiz generator for Salesforce onboarding documentation. You only output valid JSON.",
         },
-        { role: "user", content: buildPrompt(documentText, config) },
+        { role: "user", content: buildPrompt(documents, config) },
       ],
     }),
   });
@@ -141,6 +147,29 @@ function validate(parsed: any, config: GenerationConfig): QuizQuestion[] {
     if (typeof q.explanation !== "string" || q.explanation.trim() === "") {
       throw new QuizGenerationError(`Question ${n}: empty or missing explanation`);
     }
+
+    //citation validation aka don't accept this question unless citation data is complete/valid
+    if (!q.citation || typeof q.citation !== "object") {
+      throw new QuizGenerationError(`Question ${n}: missing citation object`);
+    }
+    if (//checking that sourceDocumentId is a number and finite
+      typeof q.citation.sourceDocumentId !== "number" ||
+      !Number.isFinite(q.citation.sourceDocumentId)
+    ) {
+      throw new QuizGenerationError(`Question ${n}: invalid citation.sourceDocumentId`);
+    }
+    if (//checking that sourceDocumentTitle is a string and not empty
+      typeof q.citation.sourceDocumentTitle !== "string" ||
+      q.citation.sourceDocumentTitle.trim() === ""
+    ) {
+      throw new QuizGenerationError(`Question ${n}: missing citation.sourceDocumentTitle`);
+    }
+    if (//checking that sourceSnippet is a string and not empty
+      typeof q.citation.sourceSnippet !== "string" ||
+      q.citation.sourceSnippet.trim() === ""
+    ) {
+      throw new QuizGenerationError(`Question ${n}: missing citation.sourceSnippet`);
+    }
   });
 
   return questions;
@@ -155,7 +184,7 @@ function countDetectedQuestions(accumulated: string): number {
 }
 
 export async function generateQuiz(
-  documentText: string,
+  documents: SourceDocument[],
   config: GenerationConfig,
   options?: { maxRetries?: number; onProgress?: (progress: GenerationProgress) => void }
 ): Promise<QuizQuestion[]> {
@@ -164,7 +193,7 @@ export async function generateQuiz(
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
-      const raw = await callGatewayStream(documentText, config, (accumulated) => {
+      const raw = await callGatewayStream(documents, config, (accumulated) => {
         options?.onProgress?.({
           attempt: attempt + 1,
           questionsDetected: Math.min(countDetectedQuestions(accumulated), config.numQuestions),

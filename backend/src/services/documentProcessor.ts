@@ -34,8 +34,8 @@ export async function extractTextFromDocument(file: UploadedFile): Promise<strin
   ) {
     const result = await mammoth.extractRawText({ buffer: file.buffer });
     text = result.value ?? "";
-  } else {
-    throw new Error("Unsupported file type. Use .txt, .md, .pdf, or .docx");
+  } else { 
+   throw new Error("Unsupported file type. Use .txt, .md, .pdf, or .docx");
   }
 
   //final text cleaning: removing extra whitespace, newlines, and formatting characters

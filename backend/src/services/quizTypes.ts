@@ -10,6 +10,11 @@ export interface QuizOption {
     type: "multiple_choice";
     options: QuizOption[];
     explanation: string;
+    citation: {
+      sourceDocumentId: number;
+      sourceDocumentTitle: string;
+      sourceSnippet: string;
+    }
   }
   
   export interface GenerationConfig {
