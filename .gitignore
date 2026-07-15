@@ -3,3 +3,6 @@ node_modules
 .env
 
 /generated/prisma
+
+# Local Python deps used for tooling/scripts
+.pydeps/
