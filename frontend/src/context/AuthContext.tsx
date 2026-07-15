@@ -23,6 +23,9 @@ type AuthContextValue = {
     lastName: string
   ) => Promise<Session | null>;
   signOut: () => Promise<void>;
+  resetPassword: (email: string) => Promise<void>;
+  signInWithGoogle: () => Promise<void>;
+  setRole: (role: UserRole) => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -88,6 +91,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await supabase.auth.signOut();
   }
 
+  // Sends a password-reset email. Supabase redirects the user back here
+  // with a recovery token after they click the link in that email.
+  async function resetPassword(email: string): Promise<void> {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.origin,
+    });
+    if (error) throw error;
+  }
+
+  // Redirects to Google; Supabase bounces the user back to redirectTo with a
+  // session already established. Google doesn't know about "manager" vs
+  // "new hire", so role starts unset — LoginPage prompts for it afterward.
+  async function signInWithGoogle(): Promise<void> {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: window.location.origin },
+    });
+    if (error) throw error;
+  }
+
+  // Fills in the role for a Google account after the fact, since Google
+  // sign-in has no equivalent of the New Hire/Manager picker on signup.
+  async function setRole(role: UserRole): Promise<void> {
+    const { error } = await supabase.auth.updateUser({ data: { role } });
+    if (error) throw error;
+  }
+
   return (
     <AuthContext.Provider
       value={{
@@ -97,6 +127,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signIn,
         signUp,
         signOut,
+        resetPassword,
+        signInWithGoogle,
+        setRole,
       }}
     >
       {children}
