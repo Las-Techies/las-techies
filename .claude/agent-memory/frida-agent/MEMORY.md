@@ -1,0 +1,1 @@
+- [User role](user_role.md) — beginner intern, first full-stack project; explain simply and ground in real files
