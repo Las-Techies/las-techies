@@ -42,15 +42,18 @@ model Document {
 }
 
 model Quiz {
-  id                Int      @id @default(autoincrement())
+  id                Int       @id @default(autoincrement())
   teamId            Int
   title             String
   description       String?
-  status            String   @default("draft")
+  status            String    @default("draft")
   createdByUserId   Int
-  sourceDocumentIds Json     @default("[]")
+  sourceDocumentIds Json      @default("[]")
   generationConfig  Json?
-  questionsPayload  Json     @default("[]")
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  questionsPayload  Json      @default("[]")
+  passingScore      Int?
+  timeLimitMinutes  Int?
+  dueDate           DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 }

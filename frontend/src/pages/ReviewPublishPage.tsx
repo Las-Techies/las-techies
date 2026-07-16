@@ -54,6 +54,8 @@ function ReviewPublishPage() {
   const [isLoadingQuiz, setIsLoadingQuiz] = useState(false);
   const [selectedLearners, setSelectedLearners] = useState<string[]>([]);
   const [isPublishModalOpen, setIsPublishModalOpen] = useState(false);
+  const [isPublishing, setIsPublishing] = useState(false);
+  const [publishError, setPublishError] = useState("");
   const [hoveredCitationQuestion, setHoveredCitationQuestion] = useState<string | null>(null);
   const [expandedCitationQuestion, setExpandedCitationQuestion] = useState<string | null>(null);
   const [sourceTextByDocumentId, setSourceTextByDocumentId] = useState<Record<number, string>>({});
@@ -139,16 +141,52 @@ function ReviewPublishPage() {
     );
   };
 
+  // Prefer values actually persisted on the quiz record; only fall back to
+  // the locally-cached form state when no quiz has been generated/loaded yet
+  // (e.g. this is a brand-new session with nothing saved server-side).
+  const displayTitle = quiz?.title || quizConfig.moduleTitle || "Untitled Module";
+  const displayPassingScore = quiz?.passingScore ?? quizConfig.passingScore;
+  const displayTimeLimit = quiz?.timeLimitMinutes ?? quizConfig.timeLimit;
+  const displayDueDateSource = quiz?.dueDate ?? quizConfig.dueDate;
+
   const formattedDueDate = useMemo(() => {
-    if (!quizConfig.dueDate) return "Not set";
-    const parsed = new Date(quizConfig.dueDate);
-    if (Number.isNaN(parsed.getTime())) return quizConfig.dueDate;
+    if (!displayDueDateSource) return "Not set";
+    const parsed = new Date(displayDueDateSource);
+    if (Number.isNaN(parsed.getTime())) return displayDueDateSource;
     return parsed.toLocaleDateString("en-US", {
       month: "short",
       day: "2-digit",
       year: "numeric",
     });
-  }, [quizConfig.dueDate]);
+  }, [displayDueDateSource]);
+
+  const isPublished = quiz?.status === "published";
+
+  async function handleConfirmPublish() {
+    if (!quiz) {
+      // No real quiz to publish (e.g. still on the static fallback bank) —
+      // just close the modal, there's nothing to persist.
+      setIsPublishModalOpen(false);
+      return;
+    }
+
+    setIsPublishing(true);
+    setPublishError("");
+    try {
+      const updated = await apiFetch<GeneratedQuiz>(`/api/quizzes/${quiz.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ status: "published" }),
+      });
+      setQuiz(updated);
+      setIsPublishModalOpen(false);
+    } catch (err) {
+      setPublishError(
+        err instanceof Error ? err.message : "Failed to publish quiz. Please try again."
+      );
+    } finally {
+      setIsPublishing(false);
+    }
+  }
 
   const selectedLearnerSet = useMemo(() => new Set(selectedLearners), [selectedLearners]);
 
@@ -245,8 +283,8 @@ function ReviewPublishPage() {
             <h3>Review Summary</h3>
             <div className="review-summary-grid">
               <div>
-                <span>Module</span>
-                <strong>{quizConfig.moduleTitle || "Untitled Module"}</strong>
+                <span>Quiz Title</span>
+                <strong>{displayTitle}</strong>
               </div>
               <div>
                 <span>Questions</span>
@@ -254,11 +292,11 @@ function ReviewPublishPage() {
               </div>
               <div>
                 <span>Passing Score</span>
-                <strong>{quizConfig.passingScore || "--"}%</strong>
+                <strong>{displayPassingScore || "--"}%</strong>
               </div>
               <div>
                 <span>Time Limit</span>
-                <strong>{quizConfig.timeLimit || "--"} min</strong>
+                <strong>{displayTimeLimit || "--"} min</strong>
               </div>
               <div>
                 <span>Topic</span>
@@ -445,10 +483,10 @@ function ReviewPublishPage() {
             <button
               className="primary-btn btn-link"
               type="button"
-              disabled={selectedLearners.length === 0 || isLoadingQuiz}
+              disabled={selectedLearners.length === 0 || isLoadingQuiz || isPublished}
               onClick={() => setIsPublishModalOpen(true)}
             >
-              Publish
+              {isPublished ? "Published" : "Publish"}
             </button>
           </div>
         </section>
@@ -466,20 +504,26 @@ function ReviewPublishPage() {
                 )}
                 ?
               </p>
+              {publishError ? <p className="form-error">{publishError}</p> : null}
               <div className="modal-actions">
                 <button
                   type="button"
                   className="secondary-btn"
-                  onClick={() => setIsPublishModalOpen(false)}
+                  disabled={isPublishing}
+                  onClick={() => {
+                    setPublishError("");
+                    setIsPublishModalOpen(false);
+                  }}
                 >
                   Cancel
                 </button>
                 <button
                   type="button"
                   className="primary-btn"
-                  onClick={() => setIsPublishModalOpen(false)}
+                  disabled={isPublishing}
+                  onClick={handleConfirmPublish}
                 >
-                  Confirm Publish
+                  {isPublishing ? "Publishing…" : "Confirm Publish"}
                 </button>
               </div>
             </div>

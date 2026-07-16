@@ -23,6 +23,9 @@ export type GeneratedQuiz = {
   status: string;
   sourceDocumentIds: number[];
   questionsPayload: QuizQuestion[];
+  passingScore: number | null;
+  timeLimitMinutes: number | null;
+  dueDate: string | null;
 };
 
 export type UploadedDocument = {
