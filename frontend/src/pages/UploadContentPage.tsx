@@ -1,10 +1,10 @@
 import type { ChangeEventHandler, DragEventHandler } from "react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import AppNav from "../components/navigation/AppNav";
 import StepTabs from "../components/navigation/StepTabs";
 import { apiFetch } from "../api/client";
-import { saveUploadedDocuments } from "../features/quiz/storage";
+import { loadUploadedDocuments, saveUploadedDocuments } from "../features/quiz/storage";
 import { QUIZ_WORKFLOW_ROUTES, QUIZ_WORKFLOW_STEPS } from "../features/quiz/workflow";
 
 type UploadStatus = "Processing..." | "Ready" | "Failed";
@@ -15,10 +15,15 @@ type UploadedItem = {
   name: string;
   meta: string;
   status: UploadStatus;
+  createdAt: string | null;
 };
 
 type UploadResponse = {
   data: { id: number; title: string; status: string; createdAt: string };
+};
+
+type MyDocumentsResponse = {
+  data: Array<{ id: number; title: string; status: string; createdAt: string }>;
 };
 
 const formatBytes = (size: number) => {
@@ -27,12 +32,71 @@ const formatBytes = (size: number) => {
 };
 
 const fileTypeLabel = (file: File) => file.name.split(".").pop()?.toUpperCase() ?? "FILE";
+const mapStoredStatus = (status: string): UploadStatus =>
+  status.toLowerCase() === "ready"
+    ? "Ready"
+    : status.toLowerCase() === "failed"
+      ? "Failed"
+      : "Processing...";
+const formatAddedDate = (value: string | null) => {
+  if (!value) return "";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "";
+  return parsed.toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+};
 
 function UploadContentPage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [isDragActive, setIsDragActive] = useState(false);
   const [uploads, setUploads] = useState<UploadedItem[]>([]);
+  const [isLoadingDocuments, setIsLoadingDocuments] = useState(true);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    const hydrateUploads = async () => {
+      try {
+        const res = await apiFetch<MyDocumentsResponse>("/api/documents/mine");
+        const serverUploads: UploadedItem[] = res.data.map((document) => ({
+          key: `saved-${document.id}`,
+          documentId: document.id,
+          name: document.title,
+          meta: "SAVED",
+          status: mapStoredStatus(document.status),
+          createdAt: document.createdAt ?? null,
+        }));
+        setUploads(serverUploads);
+        saveUploadedDocuments(
+          res.data.map((document) => ({
+            id: document.id,
+            title: document.title,
+            status: document.status,
+            createdAt: document.createdAt,
+          }))
+        );
+      } catch {
+        // Fallback to local cache if the API request fails.
+        const savedDocuments = loadUploadedDocuments();
+        if (savedDocuments.length === 0) return;
+        const hydratedUploads: UploadedItem[] = savedDocuments.map((document) => ({
+          key: `saved-${document.id}`,
+          documentId: document.id,
+          name: document.title,
+          meta: "SAVED",
+          status: mapStoredStatus(document.status),
+          createdAt: document.createdAt ?? null,
+        }));
+        setUploads(hydratedUploads);
+      } finally {
+        setIsLoadingDocuments(false);
+      }
+    };
+
+    void hydrateUploads();
+  }, []);
 
   const onPickFile = () => fileInputRef.current?.click();
 
@@ -46,7 +110,7 @@ function UploadContentPage() {
       const meta = `${fileTypeLabel(file)} • ${formatBytes(file.size)}`;
 
       setUploads((prev) => [
-        { key, documentId: null, name: file.name, meta, status: "Processing..." },
+        { key, documentId: null, name: file.name, meta, status: "Processing...", createdAt: null },
         ...prev,
       ]);
 
@@ -58,13 +122,25 @@ function UploadContentPage() {
           body: formData,
         });
 
-        setUploads((prev) =>
-          prev.map((item) =>
+        setUploads((prev) => {
+          const nextUploads: UploadedItem[] = prev.map((item) =>
             item.key === key
-              ? { ...item, documentId: res.data.id, status: "Ready" }
+              ? { ...item, documentId: res.data.id, status: "Ready" as const, createdAt: res.data.createdAt }
               : item
-          )
-        );
+          );
+
+          const readyDocs = nextUploads
+            .filter((item) => item.status === "Ready" && item.documentId !== null)
+            .map((item) => ({
+              id: item.documentId as number,
+              title: item.name,
+              status: "ready",
+              createdAt: item.createdAt,
+            }));
+
+          saveUploadedDocuments(readyDocs);
+          return nextUploads;
+        });
       } catch (err) {
         setError(err instanceof Error ? err.message : "Upload failed.");
         setUploads((prev) =>
@@ -75,18 +151,6 @@ function UploadContentPage() {
       }
     }
 
-    // Persist the ready documents so the Configure step can generate from them.
-    setUploads((current) => {
-      const readyDocs = current
-        .filter((item) => item.status === "Ready" && item.documentId !== null)
-        .map((item) => ({
-          id: item.documentId as number,
-          title: item.name,
-          status: "ready",
-        }));
-      saveUploadedDocuments(readyDocs);
-      return current;
-    });
   };
 
   const onFileChange: ChangeEventHandler<HTMLInputElement> = (event) => {
@@ -145,7 +209,9 @@ function UploadContentPage() {
 
         <section className="card uploads-table">
           <h3>Uploaded Files</h3>
-          {uploads.length === 0 ? (
+          {isLoadingDocuments ? (
+            <p className="uploads-empty">Loading documents...</p>
+          ) : uploads.length === 0 ? (
             <p className="uploads-empty">No files uploaded yet.</p>
           ) : (
             uploads.map((upload) => (
@@ -153,6 +219,9 @@ function UploadContentPage() {
                 <div>
                   <strong>{upload.name}</strong>
                   <p>{upload.meta}</p>
+                  {formatAddedDate(upload.createdAt) ? (
+                    <p>Added {formatAddedDate(upload.createdAt)}</p>
+                  ) : null}
                 </div>
                 <span
                   className={`status ${

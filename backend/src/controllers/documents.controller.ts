@@ -1,6 +1,7 @@
 import type { NextFunction, Request, Response } from "express";
 import {
   createDocument,
+  findDocumentsForUser,
   findDocumentByIdForTeam,
 } from "../models/document.model";
 import { extractTextFromDocument } from "../services/documentProcessor";
@@ -94,6 +95,24 @@ export async function getDocumentById(
     }
 
     return res.json({ data: document });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function getMyDocuments(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  try {
+    const user = (req as any).user as AuthUser | undefined;
+    if (!user?.id || !user?.teamId) {
+      return res.status(401).json({ error: { message: "Unauthorized" } });
+    }
+
+    const documents = await findDocumentsForUser(user.id, user.teamId);
+    return res.json({ data: documents });
   } catch (error) {
     next(error);
   }

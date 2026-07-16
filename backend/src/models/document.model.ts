@@ -23,3 +23,16 @@ export function createDocument(input: {
 export function findDocumentByIdForTeam(id: number, teamId: number) {
   return prisma.document.findFirst({ where: { id, teamId } });
 }
+
+export function findDocumentsForUser(userId: number, teamId: number) {
+  return prisma.document.findMany({
+    where: { uploadedByUserId: userId, teamId },
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      title: true,
+      status: true,
+      createdAt: true,
+    },
+  });
+}

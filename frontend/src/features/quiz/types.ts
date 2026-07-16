@@ -32,6 +32,7 @@ export type UploadedDocument = {
   id: number;
   title: string;
   status: string;
+  createdAt?: string | null;
 };
 
 export type QuizConfig = {
