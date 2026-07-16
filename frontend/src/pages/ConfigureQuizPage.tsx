@@ -81,6 +81,12 @@ function ConfigureQuizPage() {
             questionTypes: ["multiple_choice"],
             topic: form.topic.trim(),
           },
+          metadata: {
+            moduleTitle: form.moduleTitle.trim(),
+            passingScore: Number.parseInt(form.passingScore, 10),
+            timeLimitMinutes: Number.parseInt(form.timeLimit, 10),
+            dueDate: form.dueDate,
+          },
         },
         (event) => {
           if (event.type === "progress") {

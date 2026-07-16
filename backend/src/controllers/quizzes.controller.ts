@@ -1,5 +1,10 @@
 import type { Request, Response, NextFunction } from "express";
-import { createQuiz, findQuizById } from "../models/quiz.model";
+import {
+  createQuiz,
+  findQuizById,
+  isValidQuizStatus,
+  updateQuizStatus,
+} from "../models/quiz.model";
 import { findDocumentByIdForTeam } from "../models/document.model";
 import { generateQuiz as generateQuizQuestions } from "../services/quizGenerator";
 import type { GenerationConfig } from "../services/quizTypes";
@@ -9,6 +14,35 @@ export async function getQuiz(req: Request, res: Response, next: NextFunction) {
     const id = Number(req.params.quizId);
     const quiz = await findQuizById(id);
     if (!quiz) return res.status(404).json({ error: { message: "Quiz not found" } });
+    res.json(quiz);
+  } catch (err) {
+    next(err);
+  }
+}
+
+// Scoped to the requesting user's team so one team can't publish/unpublish
+// another team's quiz by guessing an id.
+export async function updateQuiz(req: Request, res: Response, next: NextFunction) {
+  try {
+    const user = (req as any).user;
+    const id = Number(req.params.quizId);
+    if (!Number.isFinite(id)) {
+      return res.status(400).json({ error: { message: "Invalid quiz id" } });
+    }
+
+    const { status } = req.body ?? {};
+    if (!isValidQuizStatus(status)) {
+      return res
+        .status(400)
+        .json({ error: { message: "status must be one of: draft, published" } });
+    }
+
+    const result = await updateQuizStatus(id, user.teamId, status);
+    if (result.count === 0) {
+      return res.status(404).json({ error: { message: "Quiz not found" } });
+    }
+
+    const quiz = await findQuizById(id);
     res.json(quiz);
   } catch (err) {
     next(err);
@@ -52,6 +86,47 @@ function parseConfig(raw: any): GenerationConfig | null {
   return config;
 }
 
+type QuizMetadata = {
+  title?: string;
+  passingScore?: number;
+  timeLimitMinutes?: number;
+  dueDate?: Date;
+};
+
+// All optional/best-effort: a malformed metadata field is dropped rather than
+// failing the whole generation request, since the AI-generation path is the
+// part worth protecting from a bad request body.
+function parseMetadata(raw: any): QuizMetadata {
+  const metadata: QuizMetadata = {};
+  if (!raw || typeof raw !== "object") return metadata;
+
+  if (typeof raw.moduleTitle === "string" && raw.moduleTitle.trim() !== "") {
+    metadata.title = raw.moduleTitle.trim();
+  }
+  if (
+    typeof raw.passingScore === "number" &&
+    Number.isFinite(raw.passingScore) &&
+    raw.passingScore >= 0 &&
+    raw.passingScore <= 100
+  ) {
+    metadata.passingScore = raw.passingScore;
+  }
+  if (
+    typeof raw.timeLimitMinutes === "number" &&
+    Number.isFinite(raw.timeLimitMinutes) &&
+    raw.timeLimitMinutes > 0
+  ) {
+    metadata.timeLimitMinutes = raw.timeLimitMinutes;
+  }
+  if (typeof raw.dueDate === "string" && raw.dueDate.trim() !== "") {
+    const parsedDate = new Date(raw.dueDate);
+    if (!Number.isNaN(parsedDate.getTime())) {
+      metadata.dueDate = parsedDate;
+    }
+  }
+  return metadata;
+}
+
 // Streams progress over SSE while the LLM generates, so the frontend can show
 // live "generating question X of N" feedback instead of a blind spinner.
 // Once headers are flushed as text/event-stream, failures are reported as an
@@ -71,6 +146,8 @@ export async function generateQuiz(req: Request, res: Response, next: NextFuncti
   if (!config) {
     return res.status(400).json({ error: { message: "Invalid generation config" } });
   }
+
+  const metadata = parseMetadata(req.body?.metadata);
 
   res.writeHead(200, {
     "Content-Type": "text/event-stream",
@@ -102,10 +179,15 @@ export async function generateQuiz(req: Request, res: Response, next: NextFuncti
     const quiz = await createQuiz({
       teamId: user.teamId,
       createdByUserId: user.id,
-      title: `Quiz from document${documentIds.length > 1 ? "s" : ""} ${documentIds.join(", ")}`,
+      title:
+        metadata.title ??
+        `Quiz from document${documentIds.length > 1 ? "s" : ""} ${documentIds.join(", ")}`,
       sourceDocumentIds: documentIds,
       generationConfig: config,
       questionsPayload: questions,
+      passingScore: metadata.passingScore,
+      timeLimitMinutes: metadata.timeLimitMinutes,
+      dueDate: metadata.dueDate,
     });
 
     send({ type: "done", quiz });
