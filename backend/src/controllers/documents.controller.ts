@@ -14,6 +14,18 @@ type AuthUser = {
   teamId: number;
 };
 
+type ImportGoogleDriveBody = {
+  url?: string;
+  googleAccessToken?: string;
+};
+
+type ImportGoogleDriveFolderBody = {
+  folderId?: string;
+  folderUrl?: string;
+  googleAccessToken?: string;
+  maxFiles?: number;
+};
+
 export async function uploadDocument(
   req: Request,
   res: Response,
@@ -162,6 +174,192 @@ export async function getMyDocuments(
 
     const documents = await findDocumentsForUser(user.id, user.teamId);
     return res.json({ data: documents });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function importGoogleDriveDocument(
+  req: Request<unknown, unknown, ImportGoogleDriveBody>,
+  res: Response,
+  next: NextFunction
+) {
+  try {
+    const user = (req as any).user as AuthUser | undefined;
+    if (!user?.id || !user?.teamId) {
+      return res.status(401).json({ error: { message: "Unauthorized" } });
+    }
+
+    const url = req.body?.url?.trim();
+    if (!url) {
+      return res
+        .status(400)
+        .json({ error: { message: "Google Docs URL is required" } });
+    }
+
+    try {
+      const { title, rawText } = await extractTextFromGoogleDriveUrl(url);
+
+      const document = await createDocument({
+        teamId: user.teamId,
+        uploadedByUserId: user.id,
+        title,
+        sourceType: "google_drive",
+        sourceUrl: url,
+        rawText,
+        status: "ready",
+      });
+
+      return res.status(201).json({
+        data: {
+          id: document.id,
+          title: document.title,
+          status: document.status,
+          createdAt: document.createdAt,
+        },
+      });
+    } catch (error) {
+      const failedDocument = await createDocument({
+        teamId: user.teamId,
+        uploadedByUserId: user.id,
+        title: "Google Drive Import",
+        sourceType: "google_drive",
+        sourceUrl: url,
+        rawText: null,
+        status: "failed",
+      });
+
+      return res.status(422).json({
+        error: { message: (error as Error).message },
+        data: {
+          id: failedDocument.id,
+          status: failedDocument.status,
+        },
+      });
+    }
+  } catch (error) {
+    next(error);
+  }
+}
+
+function extractFolderId(input: string): string | null {
+  const trimmed = input.trim();
+  const directIdPattern = /^[A-Za-z0-9_-]{10,}$/;
+  if (directIdPattern.test(trimmed)) {
+    return trimmed;
+  }
+
+  try {
+    const parsed = new URL(trimmed);
+    const match = parsed.pathname.match(/\/folders\/([^/]+)/);
+    return match?.[1] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export async function importGoogleDriveFolder(
+  req: Request<unknown, unknown, ImportGoogleDriveFolderBody>,
+  res: Response,
+  next: NextFunction
+) {
+  try {
+    const user = (req as any).user as AuthUser | undefined;
+    if (!user?.id || !user?.teamId) {
+      return res.status(401).json({ error: { message: "Unauthorized" } });
+    }
+
+    const folderInput = req.body?.folderId?.trim() || req.body?.folderUrl?.trim();
+    const googleAccessToken = req.body?.googleAccessToken?.trim();
+    const maxFiles = Math.min(Math.max(Number(req.body?.maxFiles ?? 25), 1), 100);
+
+    if (!folderInput) {
+      return res
+        .status(400)
+        .json({ error: { message: "Google Drive folder ID or URL is required" } });
+    }
+    if (!googleAccessToken) {
+      return res
+        .status(400)
+        .json({ error: { message: "Google access token is required" } });
+    }
+
+    const folderId = extractFolderId(folderInput);
+    if (!folderId) {
+      return res
+        .status(400)
+        .json({ error: { message: "Invalid Google Drive folder URL or ID" } });
+    }
+
+    const files = await listGoogleDriveFolderFiles(folderId, googleAccessToken, maxFiles);
+    const supportedFiles = files.filter(isSupportedGoogleDriveFile);
+    const skipped = files.length - supportedFiles.length;
+
+    const items: Array<{
+      documentId: number | null;
+      title: string;
+      status: "ready" | "failed";
+      createdAt: Date | null;
+      sourceUrl: string | null;
+      error?: string;
+    }> = [];
+
+    let imported = 0;
+    let failed = 0;
+
+    for (const file of supportedFiles) {
+      try {
+        const extracted = await extractTextFromGoogleDriveFile(file, googleAccessToken);
+        const document = await createDocument({
+          teamId: user.teamId,
+          uploadedByUserId: user.id,
+          title: extracted.title,
+          sourceType: "google_drive",
+          sourceUrl: extracted.sourceUrl,
+          rawText: extracted.rawText,
+          status: "ready",
+        });
+        imported += 1;
+        items.push({
+          documentId: document.id,
+          title: document.title,
+          status: "ready",
+          createdAt: document.createdAt,
+          sourceUrl: extracted.sourceUrl,
+        });
+      } catch (error) {
+        const sourceUrl = file.webViewLink ?? `https://drive.google.com/file/d/${file.id}/view`;
+        const failedDocument = await createDocument({
+          teamId: user.teamId,
+          uploadedByUserId: user.id,
+          title: file.name,
+          sourceType: "google_drive",
+          sourceUrl,
+          rawText: null,
+          status: "failed",
+        });
+        failed += 1;
+        items.push({
+          documentId: failedDocument.id,
+          title: failedDocument.title,
+          status: "failed",
+          createdAt: failedDocument.createdAt,
+          sourceUrl,
+          error: (error as Error).message,
+        });
+      }
+    }
+
+    return res.status(200).json({
+      data: {
+        folderId,
+        totalFound: files.length,
+        imported,
+        failed,
+        skipped,
+        items,
+      },
+    });
   } catch (error) {
     next(error);
   }
