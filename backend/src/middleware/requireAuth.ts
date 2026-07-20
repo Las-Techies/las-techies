@@ -37,6 +37,12 @@ export async function requireAuth(
       "Unknown";
     const lastName =
       (supabaseUser.user_metadata?.last_name as string | undefined) ?? "";
+    // Team now rides along in the JWT like role/name do; fall back to the
+    // demo team when a user has no team_id set (GUS import comes later).
+    const teamIdRaw = supabaseUser.user_metadata?.team_id;
+    const teamId = Number.isInteger(Number(teamIdRaw))
+      ? Number(teamIdRaw)
+      : DEFAULT_TEAM_ID;
 
     const user = await findOrCreateUserFromSupabase({
       supabaseUserId: supabaseUser.id,
@@ -44,7 +50,7 @@ export async function requireAuth(
       firstName,
       lastName,
       role,
-      teamId: DEFAULT_TEAM_ID,
+      teamId,
     });
 
     (req as any).user = {

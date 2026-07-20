@@ -144,6 +144,18 @@ async function main() {
     },
   });
 
+  // A second team so team-scoping can be tested end to end: set a user's
+  // user_metadata.team_id to 2 in Supabase and confirm they can't see team 1's data.
+  await prisma.team.upsert({
+    where: { id: 2 },
+    update: {},
+    create: {
+      id: 2,
+      name: "Sales Engineering",
+      description: "Second demo team for verifying per-team data isolation.",
+    },
+  });
+
   const manager = await prisma.user.upsert({
     where: { id: MANAGER_ID },
     update: {},
