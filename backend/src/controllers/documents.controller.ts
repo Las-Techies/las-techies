@@ -6,6 +6,7 @@ import {
   findDocumentByIdForTeam,
 } from "../models/document.model";
 import { extractTextFromDocument } from "../services/documentProcessor";
+import { embedDocument } from "../services/documentEmbedder";
 import { findQuizzesReferencingDocument } from "../models/quiz.model";
 
 type AuthUser = {
@@ -39,6 +40,13 @@ export async function uploadDocument(
         sourceType: "upload",
         rawText,
         status: "ready",
+      });
+
+      // Best-effort: the chatbot's retrieval index shouldn't block the
+      // upload response, and a document is still useful for quiz
+      // generation even if embedding fails (e.g. model download hiccup).
+      embedDocument({ id: document.id, teamId: document.teamId, rawText }).catch((error) => {
+        console.error(`Failed to embed document ${document.id} for chat retrieval:`, error);
       });
 
       return res.status(201).json({
