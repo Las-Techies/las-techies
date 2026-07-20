@@ -5,7 +5,17 @@ import {
   findDocumentsForUser,
   findDocumentByIdForTeam,
 } from "../models/document.model";
-import { extractTextFromDocument } from "../services/documentProcessor";
+import {
+  extractTextFromGoogleDriveFile,
+  extractTextFromDocument,
+  isSupportedGoogleDriveFile,
+  listGoogleDriveFolderFiles,
+  extractTextFromGithubFile,
+  isSupportedGithubFile,
+  listGithubRepoFiles,
+  parseGithubRepoUrl,
+  extractTextFromGoogleDriveUrl,
+} from "../services/documentProcessor";
 import { embedDocument } from "../services/documentEmbedder";
 import { findQuizzesReferencingDocument } from "../models/quiz.model";
 
@@ -23,6 +33,13 @@ type ImportGoogleDriveFolderBody = {
   folderId?: string;
   folderUrl?: string;
   googleAccessToken?: string;
+  maxFiles?: number;
+};
+
+type ImportGithubRepoBody = {
+  repoUrl?: string;
+  branch?: string;
+  githubAccessToken?: string;
   maxFiles?: number;
 };
 
@@ -179,7 +196,7 @@ export async function getMyDocuments(
   }
 }
 
-export async function importGoogleDriveDocument(
+export async function importGoogleDriveDocument(//import from google drive url
   req: Request<unknown, unknown, ImportGoogleDriveBody>,
   res: Response,
   next: NextFunction
@@ -258,7 +275,7 @@ function extractFolderId(input: string): string | null {
   }
 }
 
-export async function importGoogleDriveFolder(
+export async function importGoogleDriveFolder(//import from google drive folder url
   req: Request<unknown, unknown, ImportGoogleDriveFolderBody>,
   res: Response,
   next: NextFunction
@@ -353,6 +370,117 @@ export async function importGoogleDriveFolder(
     return res.status(200).json({
       data: {
         folderId,
+        totalFound: files.length,
+        imported,
+        failed,
+        skipped,
+        items,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function importGithubRepo(
+  req: Request<unknown, unknown, ImportGithubRepoBody>,
+  res: Response,
+  next: NextFunction
+) {
+  try {
+    const user = (req as any).user as AuthUser | undefined;
+    if (!user?.id || !user?.teamId) {
+      return res.status(401).json({ error: { message: "Unauthorized" } });
+    }
+
+    const repoUrl = req.body?.repoUrl?.trim();
+    if (!repoUrl) {
+      return res
+        .status(400)
+        .json({ error: { message: "GitHub repository URL is required" } });
+    }
+
+    const maxFiles = Math.min(Math.max(Number(req.body?.maxFiles ?? 25), 1), 100);
+    const githubAccessToken = req.body?.githubAccessToken?.trim() || undefined;
+    const { owner, repo } = parseGithubRepoUrl(repoUrl);
+    const { branch, files } = await listGithubRepoFiles(
+      owner,
+      repo,
+      req.body?.branch,
+      githubAccessToken,
+      maxFiles
+    );
+
+    const supportedFiles = files.filter((file) => isSupportedGithubFile(file.path));
+    const skipped = files.length - supportedFiles.length;
+
+    const items: Array<{
+      documentId: number | null;
+      title: string;
+      status: "ready" | "failed";
+      createdAt: Date | null;
+      sourceUrl: string | null;
+      error?: string;
+    }> = [];
+
+    let imported = 0;
+    let failed = 0;
+
+    for (const file of supportedFiles) {
+      try {
+        const extracted = await extractTextFromGithubFile(
+          owner,
+          repo,
+          branch,
+          file.path,
+          githubAccessToken
+        );
+
+        const document = await createDocument({
+          teamId: user.teamId,
+          uploadedByUserId: user.id,
+          title: extracted.title,
+          sourceType: "github",
+          sourceUrl: extracted.sourceUrl,
+          rawText: extracted.rawText,
+          status: "ready",
+        });
+        imported += 1;
+        items.push({
+          documentId: document.id,
+          title: document.title,
+          status: "ready",
+          createdAt: document.createdAt,
+          sourceUrl: extracted.sourceUrl,
+        });
+      } catch (error) {
+        const sourceUrl = `https://github.com/${owner}/${repo}/blob/${branch}/${file.path}`;
+        const failedDocument = await createDocument({
+          teamId: user.teamId,
+          uploadedByUserId: user.id,
+          title: file.path,
+          sourceType: "github",
+          sourceUrl,
+          rawText: null,
+          status: "failed",
+        });
+        failed += 1;
+        items.push({
+          documentId: failedDocument.id,
+          title: failedDocument.title,
+          status: "failed",
+          createdAt: failedDocument.createdAt,
+          sourceUrl,
+          error: (error as Error).message,
+        });
+      }
+    }
+
+    return res.status(200).json({
+      data: {
+        owner,
+        repo,
+        branch,
         totalFound: files.length,
         imported,
         failed,

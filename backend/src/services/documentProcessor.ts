@@ -1,5 +1,6 @@
 import { PDFParse } from "pdf-parse";
 import mammoth from 'mammoth';
+import { env } from "../config/env";
 
 
 type UploadedFile = {
@@ -13,6 +14,13 @@ type GoogleDriveFile = {
   name: string;
   mimeType: string;
   webViewLink?: string;
+};
+
+type GithubTreeEntry = {
+  path: string;
+  type: "blob" | "tree";
+  size?: number;
+  url: string;
 };
 
 function getExtension(filename: string): string {//will get the .pdf, .docx, .doc, .txt, .csv, .xls, .xlsx, .ppt, .pptx
@@ -197,5 +205,138 @@ export function isSupportedGoogleDriveFile(file: GoogleDriveFile): boolean {
     "text/markdown",
   ]);
   return supportedMimeTypes.has(file.mimeType) || file.name.toLowerCase().endsWith(".md");
+}
+
+type ParsedGithubRepo = {
+  owner: string;
+  repo: string;
+};
+
+export function parseGithubRepoUrl(repoUrl: string): ParsedGithubRepo {
+  let parsed: URL;
+  try {
+    parsed = new URL(repoUrl.trim());
+  } catch {
+    throw new Error("Invalid GitHub repository URL.");
+  }
+
+  if (parsed.hostname !== "github.com") {
+    throw new Error("Only github.com repository links are supported.");
+  }
+
+  const parts = parsed.pathname.split("/").filter(Boolean);
+  const owner = parts.at(0);
+  const repoPart = parts.at(1);
+  if (!owner || !repoPart) {
+    throw new Error("GitHub repository URL must include owner and repo name.");
+  }
+
+  return {
+    owner,
+    repo: repoPart.replace(/\.git$/i, ""),
+  };
+}
+
+async function githubApiRequest(
+  endpoint: string,
+  githubAccessToken?: string
+): Promise<Response> {
+  const resolvedToken = githubAccessToken?.trim() || env.githubToken.trim();
+  const response = await fetch(`https://api.github.com${endpoint}`, {
+    headers: {
+      Accept: "application/vnd.github+json",
+      "User-Agent": "las-techies-onboarding-quiz",
+      ...(resolvedToken
+        ? { Authorization: `Bearer ${resolvedToken}` }
+        : {}),
+    },
+  });
+
+  if (!response.ok) {
+    const payload = await response.text().catch(() => "");
+    throw new Error(
+      `GitHub API request failed (${response.status}). ${payload || "Make sure the repo is public and exists."}`
+    );
+  }
+
+  return response;
+}
+
+async function fetchDefaultBranch(
+  owner: string,
+  repo: string,
+  githubAccessToken?: string
+): Promise<string> {
+  const response = await githubApiRequest(
+    `/repos/${owner}/${repo}`,
+    githubAccessToken
+  );
+  const payload = (await response.json()) as { default_branch?: string };
+  if (!payload.default_branch) {
+    throw new Error("Could not determine repository default branch.");
+  }
+  return payload.default_branch;
+}
+
+export async function listGithubRepoFiles(
+  owner: string,
+  repo: string,
+  branch: string | undefined,
+  githubAccessToken: string | undefined,
+  maxFiles = 25
+): Promise<{ branch: string; files: GithubTreeEntry[] }> {
+  const resolvedBranch =
+    branch?.trim() || (await fetchDefaultBranch(owner, repo, githubAccessToken));
+  const response = await githubApiRequest(
+    `/repos/${owner}/${repo}/git/trees/${encodeURIComponent(resolvedBranch)}?recursive=1`,
+    githubAccessToken
+  );
+  const payload = (await response.json()) as { tree?: GithubTreeEntry[] };
+
+  const files = (payload.tree ?? [])
+    .filter((entry) => entry.type === "blob")
+    .slice(0, maxFiles);
+
+  return { branch: resolvedBranch, files };
+}
+
+export function isSupportedGithubFile(path: string): boolean {
+  const normalized = path.toLowerCase();
+  if (
+    normalized.includes("node_modules/") ||
+    normalized.includes("/dist/") ||
+    normalized.includes("/build/")
+  ) {
+    return false;
+  }
+  return normalized.endsWith(".md");
+}
+
+export async function extractTextFromGithubFile(
+  owner: string,
+  repo: string,
+  branch: string,
+  path: string,
+  githubAccessToken?: string
+): Promise<{ title: string; rawText: string; sourceUrl: string }> {
+  const response = await githubApiRequest(
+    `/repos/${owner}/${repo}/contents/${encodeURIComponent(path)}?ref=${encodeURIComponent(branch)}`,
+    githubAccessToken
+  );
+  const payload = (await response.json()) as { content?: string; encoding?: string };
+  if (!payload.content || payload.encoding !== "base64") {
+    throw new Error("Unsupported repository file payload.");
+  }
+
+  const rawText = Buffer.from(payload.content, "base64").toString("utf-8").trim();
+  if (!rawText) {
+    throw new Error("No readable text found in repository file.");
+  }
+
+  return {
+    title: path,
+    rawText,
+    sourceUrl: `https://github.com/${owner}/${repo}/blob/${encodeURIComponent(branch)}/${path}`,
+  };
 }
 

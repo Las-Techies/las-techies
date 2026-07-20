@@ -6,6 +6,7 @@ import {
   getMyDocuments,
   importGoogleDriveDocument,
   importGoogleDriveFolder,
+  importGithubRepo,
   uploadDocument,
   getDocumentById,
 } from "../controllers/documents.controller";
@@ -17,6 +18,7 @@ const router = Router();
 router.post("/upload", upload.single("file"), uploadDocument);
 router.post("/import/google-drive", importGoogleDriveDocument);
 router.post("/import/google-drive-folder", importGoogleDriveFolder);
+router.post("/import/github-repo", importGithubRepo);
 router.get("/mine", getMyDocuments);
 router.get("/:documentId", getDocumentById);
 router.delete("/:documentId", deleteDocument);
