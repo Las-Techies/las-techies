@@ -2,16 +2,21 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { QUIZ_WORKFLOW_ROUTES } from "../../features/quiz/workflow";
 import { useAuth } from "../../context/AuthContext";
+import { clearPreviewRole, getPreviewRole } from "../../features/auth/previewRole";
+import logoBadge from "../../assets/sageforce-logo-badge.png";
 
-type NavItem =
-  | { label: string; type: "label" }
-  | { label: string; type: "link"; to: string };
+type NavItem = { label: string; type: "link"; to: string };
 
-const navItems: NavItem[] = [
-  { label: "Manager Dashboard", type: "label" },
+const managerNavItems: NavItem[] = [
   { label: "Upload + Generate", type: "link", to: "/upload-content" },
-  { label: "Learner Module", type: "label" },
-  { label: "Quiz Results", type: "link", to: "/quiz-results" },
+  { label: "Learner Module", type: "link", to: "/learner-module" },
+];
+
+const newHireNavItems: NavItem[] = [
+  { label: "Home", type: "link", to: "/home" },
+  { label: "Learner Module", type: "link", to: "/learner-module" },
+  { label: "Quiz", type: "link", to: "/quiz-taking" },
+  { label: "Results", type: "link", to: "/quiz-results" },
 ];
 
 function AppNav() {
@@ -21,10 +26,14 @@ function AppNav() {
   const { user, signOut } = useAuth();
   const firstName =
     (user?.user_metadata?.first_name as string | undefined) ?? "there";
-  const role =
-    (user?.user_metadata?.role as string | undefined) === "manager"
-      ? "Manager"
-      : "New Hire";
+  const effectiveRole =
+    (user?.user_metadata?.role as string | undefined) ?? getPreviewRole() ?? "new_hire";
+  const isManager = effectiveRole === "manager";
+  const role = isManager ? "Manager" : "New Hire";
+  const initials =
+    ((user?.user_metadata?.first_name as string | undefined)?.[0] ?? "") +
+    ((user?.user_metadata?.last_name as string | undefined)?.[0] ?? "");
+  const navItems = isManager ? managerNavItems : newHireNavItems;
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -44,23 +53,19 @@ function AppNav() {
 
   const handleLogout = async () => {
     setIsMenuOpen(false);
+    clearPreviewRole();
     await signOut();
     navigate("/");
   };
 
   return (
     <header className="app-nav">
-      <div className="brand">SageForce</div>
+      <div className="brand">
+        <img className="brand-logo" src={logoBadge} alt="" aria-hidden />
+        <span className="brand-name">SageForce</span>
+      </div>
       <nav className="app-nav-links">
         {navItems.map((item) => {
-          if (item.type === "label") {
-            return (
-              <span key={item.label} className="app-nav-link muted">
-                {item.label}
-              </span>
-            );
-          }
-
           const isActive =
             location.pathname === item.to ||
             (item.to === "/upload-content" && isWorkflowRoute);
@@ -84,7 +89,7 @@ function AppNav() {
           aria-expanded={isMenuOpen}
           onClick={() => setIsMenuOpen((open) => !open)}
         >
-          <span className="user-avatar" />
+          <span className="user-avatar">{initials.toUpperCase() || "•"}</span>
           <span>
             Hi, {firstName} <span className="muted">· {role}</span>
           </span>
