@@ -2,11 +2,13 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import mascotLogo from "../assets/sageforce-mascot-transparent.png";
 import { useAuth } from "../context/AuthContext";
+import { setPreviewRole } from "../features/auth/previewRole";
+import type { UserRole } from "../context/AuthContext";
 
 type Mode = "login" | "signup";
 
 function routeForRole(role: string | undefined): string {
-  return role === "manager" ? "/upload-content" : "/quiz-results";
+  return role === "manager" ? "/upload-content" : "/home";
 }
 
 function LoginPage() {
@@ -146,6 +148,13 @@ function LoginPage() {
     } else {
       handleSignup();
     }
+  };
+
+  // Temporary shortcut: jump straight into either role's tabs without a full
+  // login. Remove before shipping — it's only for exploring the app locally.
+  const enterAs = (nextRole: UserRole) => {
+    setPreviewRole(nextRole);
+    navigate(routeForRole(nextRole));
   };
 
   const handleGoogleSignIn = async () => {
@@ -362,6 +371,26 @@ function LoginPage() {
 
         {error ? <p className="form-error">{error}</p> : null}
         {infoMessage ? <p className="form-info">{infoMessage}</p> : null}
+
+        <div className="dev-access">
+          <span className="dev-access-label">Quick access · for testing</span>
+          <div className="dev-access-btns">
+            <button
+              type="button"
+              className="dev-access-btn"
+              onClick={() => enterAs("new_hire")}
+            >
+              Enter as New Hire
+            </button>
+            <button
+              type="button"
+              className="dev-access-btn"
+              onClick={() => enterAs("manager")}
+            >
+              Enter as Manager
+            </button>
+          </div>
+        </div>
       </section>
     </main>
   );
