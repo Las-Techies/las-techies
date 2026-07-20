@@ -3,11 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import AppNav from "../components/navigation/AppNav";
 import StepTabs from "../components/navigation/StepTabs";
 import { streamQuizGeneration } from "../api/client";
-import {
-  loadUploadedDocuments,
-  saveGeneratedQuizId,
-  saveQuizConfig,
-} from "../features/quiz/storage";
+import { loadUploadedDocuments, saveQuizConfig } from "../features/quiz/storage";
 import type { QuizDifficulty } from "../features/quiz/types";
 import { QUIZ_WORKFLOW_ROUTES, QUIZ_WORKFLOW_STEPS } from "../features/quiz/workflow";
 
@@ -104,7 +100,6 @@ function ConfigureQuizPage() {
 
       const generated = quiz.questionsPayload.map((question) => question.prompt);
       setGeneratedQuestions(generated);
-      saveGeneratedQuizId(quiz.id);
       saveQuizConfig({
         moduleTitle: form.moduleTitle.trim(),
         topic: form.topic.trim(),

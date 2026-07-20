@@ -1,6 +1,7 @@
 import type { Request, Response, NextFunction } from "express";
 import {
   createQuiz,
+  findLatestQuizForUser,
   findQuizById,
   isValidQuizStatus,
   updateQuizStatus,
@@ -15,6 +16,20 @@ export async function getQuiz(req: Request, res: Response, next: NextFunction) {
     const quiz = await findQuizById(id);
     if (!quiz) return res.status(404).json({ error: { message: "Quiz not found" } });
     res.json(quiz);
+  } catch (err) {
+    next(err);
+  }
+}
+
+// Lets the frontend resume "my most recently generated quiz" on any device,
+// instead of remembering a quizId in this browser's localStorage. Responds
+// 200 with null (not 404) when the user has no quiz yet, since "no quiz" is
+// a normal state here, not an error.
+export async function getLatestQuiz(req: Request, res: Response, next: NextFunction) {
+  try {
+    const user = (req as any).user;
+    const quiz = await findLatestQuizForUser(user.id, user.teamId);
+    res.json(quiz ?? null);
   } catch (err) {
     next(err);
   }

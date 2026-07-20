@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import AppNav from "../components/navigation/AppNav";
 import StepTabs from "../components/navigation/StepTabs";
 import { apiFetch } from "../api/client";
-import { loadGeneratedQuizId, loadQuizConfig } from "../features/quiz/storage";
+import { loadQuizConfig } from "../features/quiz/storage";
 import {
   DEFAULT_QUIZ_CONFIG,
   type GeneratedQuiz,
@@ -84,14 +84,14 @@ function ReviewPublishPage() {
     }, 160);
   }
 
+  // Fetches "my most recently generated quiz" from the backend rather than
+  // relying on a quizId cached in this browser, so the same account sees the
+  // same in-progress quiz whichever device it logs in from.
   useEffect(() => {
     setQuizConfig(loadQuizConfig());
 
-    const quizId = loadGeneratedQuizId();
-    if (quizId === null) return;
-
     setIsLoadingQuiz(true);
-    apiFetch<GeneratedQuiz>(`/api/quizzes/${quizId}`)
+    apiFetch<GeneratedQuiz | null>("/api/quizzes/mine/latest")
       .then((data) => setQuiz(data))
       .catch(() => setQuiz(null))
       .finally(() => setIsLoadingQuiz(false));
