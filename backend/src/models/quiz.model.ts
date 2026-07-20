@@ -9,6 +9,15 @@ export function findQuizByIdForTeam(id: number, teamId: number) {
   return prisma.quiz.findFirst({ where: { id, teamId } });
 }
 
+// Backs "resume my most recent quiz" so the frontend can follow the account
+// across devices instead of relying on a quizId cached in localStorage.
+export function findLatestQuizForUser(userId: number, teamId: number) {
+  return prisma.quiz.findFirst({
+    where: { createdByUserId: userId, teamId },
+    orderBy: { createdAt: "desc" },
+  });
+}
+
 export function createQuiz(input: {
   teamId: number;
   createdByUserId: number;

@@ -2,7 +2,7 @@ import type { CSSProperties } from "react";
 import { useEffect, useRef, useState } from "react";
 import AppNav from "../components/navigation/AppNav";
 import { apiFetch } from "../api/client";
-import { loadGeneratedQuizId, loadQuizConfig } from "../features/quiz/storage";
+import { loadQuizConfig } from "../features/quiz/storage";
 import type { GeneratedQuiz } from "../features/quiz/types";
 
 const breakdownRows = [
@@ -102,14 +102,14 @@ function QuizResultsPage() {
     );
   }
 
+  // Fetches "my most recently generated quiz" from the backend rather than
+  // relying on a quizId cached in this browser, so the same account sees the
+  // same quiz whichever device it logs in from.
   useEffect(() => {
     setPassingScore(loadQuizConfig().passingScore);
 
-    const quizId = loadGeneratedQuizId();
-    if (quizId === null) return;
-
     setLoading(true);
-    apiFetch<GeneratedQuiz>(`/api/quizzes/${quizId}`)
+    apiFetch<GeneratedQuiz | null>("/api/quizzes/mine/latest")
       .then((data) => setQuiz(data))
       .catch((err) =>
         setError(err instanceof Error ? err.message : "Failed to load quiz.")
