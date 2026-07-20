@@ -13,7 +13,17 @@ export async function findOrCreateUserFromSupabase(input: {
   teamId: number; // default team for now (GUS import comes later)
 }) {
   const existing = await findUserBySupabaseId(input.supabaseUserId);
-  if (existing) return existing;
+  if (existing) {
+    // Keep an existing user's team in sync with their JWT. Other fields
+    // (name/role) are still only applied on first creation for now.
+    if (existing.teamId !== input.teamId) {
+      return prisma.user.update({
+        where: { id: existing.id },
+        data: { teamId: input.teamId },
+      });
+    }
+    return existing;
+  }
 
   return prisma.user.create({
     data: {
