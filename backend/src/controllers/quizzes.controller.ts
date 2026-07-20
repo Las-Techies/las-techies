@@ -3,12 +3,14 @@ import {
   createQuiz,
   findLatestQuizForUser,
   findQuizById,
+  findQuizByIdForTeam,
   isValidQuizStatus,
+  updateQuizQuestions,
   updateQuizStatus,
 } from "../models/quiz.model";
 import { findDocumentByIdForTeam } from "../models/document.model";
 import { generateQuiz as generateQuizQuestions } from "../services/quizGenerator";
-import type { GenerationConfig } from "../services/quizTypes";
+import type { GenerationConfig, QuizQuestion } from "../services/quizTypes";
 
 export async function getQuiz(req: Request, res: Response, next: NextFunction) {
   try {
@@ -211,5 +213,160 @@ export async function generateQuiz(req: Request, res: Response, next: NextFuncti
     send({ type: "error", message });
   } finally {
     res.end();
+  }
+}
+
+// Mirrors the shape-checks in quizGenerator.ts's validate(), scaled down to a
+// single manually-edited question rather than a whole batch. Keeps the
+// original question's id regardless of what (if anything) the client sends.
+function validateQuestionBody(raw: any, questionId: number): QuizQuestion | null {
+  if (!raw || typeof raw !== "object") return null;
+  if (typeof raw.prompt !== "string" || raw.prompt.trim() === "") return null;
+  if (!Array.isArray(raw.options) || raw.options.length < 2) return null;
+  if (raw.options.some((o: any) => typeof o?.text !== "string" || o.text.trim() === "")) {
+    return null;
+  }
+  const correctCount = raw.options.filter((o: any) => o?.isCorrect === true).length;
+  if (correctCount !== 1) return null;
+  if (typeof raw.explanation !== "string" || raw.explanation.trim() === "") return null;
+
+  const citation = raw.citation;
+  if (
+    !citation ||
+    typeof citation !== "object" ||
+    typeof citation.sourceDocumentId !== "number" ||
+    typeof citation.sourceDocumentTitle !== "string" ||
+    typeof citation.sourceSnippet !== "string"
+  ) {
+    return null;
+  }
+
+  return {
+    id: questionId,
+    prompt: raw.prompt.trim(),
+    type: "multiple_choice",
+    options: raw.options.map((option: any, index: number) => ({
+      id: typeof option.id === "number" ? option.id : index + 1,
+      text: String(option.text).trim(),
+      isCorrect: option.isCorrect === true,
+    })),
+    explanation: raw.explanation.trim(),
+    citation: {
+      sourceDocumentId: citation.sourceDocumentId,
+      sourceDocumentTitle: citation.sourceDocumentTitle,
+      sourceSnippet: citation.sourceSnippet,
+    },
+  };
+}
+
+// Lets a manager hand-edit a single question (prompt/options/correct
+// answer/explanation) without regenerating the whole quiz.
+export async function updateQuestion(req: Request, res: Response, next: NextFunction) {
+  try {
+    const user = (req as any).user;
+    const quizId = Number(req.params.quizId);
+    const questionId = Number(req.params.questionId);
+    if (!Number.isFinite(quizId) || !Number.isFinite(questionId)) {
+      return res.status(400).json({ error: { message: "Invalid quiz or question id" } });
+    }
+
+    const quiz = await findQuizByIdForTeam(quizId, user.teamId);
+    if (!quiz) {
+      return res.status(404).json({ error: { message: "Quiz not found" } });
+    }
+
+    const questions = quiz.questionsPayload as unknown as QuizQuestion[];
+    const index = questions.findIndex((question) => question.id === questionId);
+    if (index === -1) {
+      return res.status(404).json({ error: { message: "Question not found on this quiz" } });
+    }
+
+    const updatedQuestion = validateQuestionBody(req.body, questionId);
+    if (!updatedQuestion) {
+      return res.status(400).json({
+        error: {
+          message:
+            "Invalid question: needs a prompt, at least 2 non-empty options with exactly one marked correct, an explanation, and a citation.",
+        },
+      });
+    }
+
+    const nextQuestions = [...questions];
+    nextQuestions[index] = updatedQuestion;
+
+    await updateQuizQuestions(quizId, user.teamId, nextQuestions);
+    const refreshed = await findQuizById(quizId);
+    res.json(refreshed);
+  } catch (err) {
+    next(err);
+  }
+}
+
+// Removes one question and asks the AI for a single replacement drawn from
+// the same source documents/config the quiz was originally generated with,
+// telling it not to repeat any question still on the quiz.
+export async function regenerateQuestion(req: Request, res: Response, next: NextFunction) {
+  try {
+    const user = (req as any).user;
+    const quizId = Number(req.params.quizId);
+    const questionId = Number(req.params.questionId);
+    if (!Number.isFinite(quizId) || !Number.isFinite(questionId)) {
+      return res.status(400).json({ error: { message: "Invalid quiz or question id" } });
+    }
+
+    const quiz = await findQuizByIdForTeam(quizId, user.teamId);
+    if (!quiz) {
+      return res.status(404).json({ error: { message: "Quiz not found" } });
+    }
+
+    const questions = quiz.questionsPayload as unknown as QuizQuestion[];
+    const index = questions.findIndex((question) => question.id === questionId);
+    if (index === -1) {
+      return res.status(404).json({ error: { message: "Question not found on this quiz" } });
+    }
+
+    const sourceDocumentIds = quiz.sourceDocumentIds as unknown as number[];
+    if (!Array.isArray(sourceDocumentIds) || sourceDocumentIds.length === 0) {
+      return res
+        .status(400)
+        .json({ error: { message: "Quiz has no source documents to regenerate from" } });
+    }
+
+    const baseConfig = quiz.generationConfig as unknown as GenerationConfig | null;
+    if (
+      !baseConfig ||
+      typeof baseConfig.difficulty !== "string" ||
+      !Array.isArray(baseConfig.questionTypes)
+    ) {
+      return res
+        .status(400)
+        .json({ error: { message: "Quiz is missing a valid generation config" } });
+    }
+
+    const sourceDocuments = await Promise.all(
+      sourceDocumentIds.map((id) => getDocumentSource(id, user.teamId))
+    );
+
+    const avoidPrompts = questions
+      .filter((_, i) => i !== index)
+      .map((question) => question.prompt);
+
+    const [replacement] = await generateQuizQuestions(
+      sourceDocuments,
+      { ...baseConfig, numQuestions: 1 },
+      { avoidPrompts }
+    );
+    if (!replacement) {
+      throw new Error("AI did not return a replacement question");
+    }
+
+    const nextQuestions = [...questions];
+    nextQuestions[index] = { ...replacement, id: questionId };
+
+    await updateQuizQuestions(quizId, user.teamId, nextQuestions);
+    const refreshed = await findQuizById(quizId);
+    res.json(refreshed);
+  } catch (err) {
+    next(err);
   }
 }

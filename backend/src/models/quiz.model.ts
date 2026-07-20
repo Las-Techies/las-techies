@@ -61,6 +61,19 @@ export function updateQuizStatus(id: number, teamId: number, status: QuizStatus)
   });
 }
 
+// Persists a full replacement of questionsPayload — used after editing or
+// regenerating a single question in place.
+export function updateQuizQuestions(
+  id: number,
+  teamId: number,
+  questionsPayload: QuizQuestion[]
+) {
+  return prisma.quiz.updateMany({
+    where: { id, teamId },
+    data: { questionsPayload: questionsPayload as unknown as object },
+  });
+}
+
 // sourceDocumentIds is a plain JSON array, not a real foreign key, so this
 // checks in application code rather than relying on a DB-level JSON query
 // (keeps it correct regardless of the Postgres/Prisma JSON operator used).

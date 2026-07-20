@@ -26,6 +26,12 @@ export type GeneratedQuiz = {
   passingScore: number | null;
   timeLimitMinutes: number | null;
   dueDate: string | null;
+  generationConfig?: {
+    numQuestions: number;
+    difficulty: string;
+    questionTypes: string[];
+    topic?: string;
+  } | null;
 };
 
 export type UploadedDocument = {

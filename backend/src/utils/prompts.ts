@@ -6,7 +6,11 @@ type PromptDocument = {
   rawText: string;
 };
 
-export function buildPrompt(documents: PromptDocument[], config: GenerationConfig): string {
+export function buildPrompt(
+  documents: PromptDocument[],
+  config: GenerationConfig,
+  avoidPrompts?: string[]
+): string {
   const sourceDocs = documents
     .map(
       (doc) => `DOCUMENT ID: ${doc.id}
@@ -29,8 +33,17 @@ ${doc.rawText}
     difficultyGuide[config.difficulty.toLowerCase()] ??
     "Match the requested difficulty level as closely as possible.";
 
+  // Used when regenerating a single replacement question, so the new one
+  // doesn't just repeat a question still sitting on the quiz.
+  const avoidSection =
+    avoidPrompts && avoidPrompts.length > 0
+      ? `\n\nDo not repeat or closely paraphrase any of these existing questions:\n${avoidPrompts
+          .map((prompt) => `- ${prompt}`)
+          .join("\n")}`
+      : "";
+
   return `Generate exactly ${config.numQuestions} ${config.difficulty} quiz questions
-from the SOURCE DOCUMENTS below.
+from the SOURCE DOCUMENTS below.${avoidSection}
 
 Rules:
 - Types allowed: ${config.questionTypes.join(", ")}.
