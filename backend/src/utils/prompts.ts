@@ -6,6 +6,71 @@ type PromptDocument = {
   rawText: string;
 };
 
+type RetrievedChunk = {
+  documentId: number;
+  documentTitle: string;
+  content: string;
+};
+
+type ChatHistoryTurn = {
+  role: "user" | "assistant";
+  content: string;
+};
+
+// Builds the user-turn content for the Library AI Chatbot: retrieved
+// document chunks (the RAG context), then recent conversation turns (the
+// persisted memory), then the new question, with strict output-shape rules
+// so answers stay grounded and citable — mirrors buildPrompt()'s "only use
+// the source, cite it" approach for quiz generation.
+export function buildChatPrompt(
+  retrievedChunks: RetrievedChunk[],
+  history: ChatHistoryTurn[],
+  question: string
+): string {
+  const context = retrievedChunks
+    .map(
+      (chunk) => `DOCUMENT ID: ${chunk.documentId}
+DOCUMENT TITLE: ${chunk.documentTitle}
+EXCERPT:
+"""
+${chunk.content}
+"""`
+    )
+    .join("\n\n---\n\n");
+
+  const historySection =
+    history.length > 0
+      ? `\n\nRECENT CONVERSATION (oldest first, for context only):\n${history
+          .map((turn) => `${turn.role === "user" ? "User" : "Assistant"}: ${turn.content}`)
+          .join("\n")}`
+      : "";
+
+  return `You are answering an onboarding question using ONLY the DOCUMENT EXCERPTS below.${historySection}
+
+Rules:
+- Base your answer only on the excerpts; never invent facts not present in them.
+- If the excerpts don't contain enough information to answer, say so plainly in "answer" instead of guessing.
+- "sources" must only include documents you actually used, with a short verbatim "snippet" (a sentence or phrase) from that document supporting the answer.
+- sources[].documentId MUST match one of the DOCUMENT ID values below; sources[].documentTitle MUST exactly match the paired DOCUMENT TITLE.
+- "followUps" is up to 3 short, natural next questions the user might ask, grounded in the same excerpts (empty array if none make sense).
+- Keep "answer" conversational and concise (a few sentences), not a document dump.
+
+Return ONLY valid JSON (no markdown, no prose) in this exact shape:
+{
+  "answer": "string",
+  "sources": [
+    { "documentId": 12, "documentTitle": "Team Onboarding Guide", "snippet": "..." }
+  ],
+  "followUps": ["string"]
+}
+
+DOCUMENT EXCERPTS:
+${context}
+
+QUESTION:
+${question}`;
+}
+
 export function buildPrompt(
   documents: PromptDocument[],
   config: GenerationConfig,
