@@ -29,7 +29,8 @@ type SourceDocument = {
 async function callGatewayStream(
   documents: SourceDocument[],
   config: GenerationConfig,
-  onDelta: (accumulated: string) => void
+  onDelta: (accumulated: string) => void,
+  avoidPrompts?: string[]
 ): Promise<string> {
   if (!env.llmGatewayUrl || !env.llmKey) {
     throw new QuizGenerationError(
@@ -55,7 +56,7 @@ async function callGatewayStream(
             "understanding of the source material, not just keyword-matching. You only output valid JSON " +
             "with no markdown fences and no prose before or after the JSON.",
         },
-        { role: "user", content: buildPrompt(documents, config) },
+        { role: "user", content: buildPrompt(documents, config, avoidPrompts) },
       ],
     }),
   });
@@ -189,19 +190,30 @@ function countDetectedQuestions(accumulated: string): number {
 export async function generateQuiz(
   documents: SourceDocument[],
   config: GenerationConfig,
-  options?: { maxRetries?: number; onProgress?: (progress: GenerationProgress) => void }
+  options?: {
+    maxRetries?: number;
+    onProgress?: (progress: GenerationProgress) => void;
+    // Prompts of questions already on the quiz, so a single-question
+    // regeneration doesn't just repeat one that's still there.
+    avoidPrompts?: string[];
+  }
 ): Promise<QuizQuestion[]> {
   const maxRetries = options?.maxRetries ?? 1;
   let lastError: unknown;
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
-      const raw = await callGatewayStream(documents, config, (accumulated) => {
-        options?.onProgress?.({
-          attempt: attempt + 1,
-          questionsDetected: Math.min(countDetectedQuestions(accumulated), config.numQuestions),
-        });
-      });
+      const raw = await callGatewayStream(
+        documents,
+        config,
+        (accumulated) => {
+          options?.onProgress?.({
+            attempt: attempt + 1,
+            questionsDetected: Math.min(countDetectedQuestions(accumulated), config.numQuestions),
+          });
+        },
+        options?.avoidPrompts
+      );
       return validate(extractJson(raw), config);
     } catch (err) {
       lastError = err;

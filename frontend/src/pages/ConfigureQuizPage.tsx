@@ -1,11 +1,19 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import AppNav from "../components/navigation/AppNav";
 import StepTabs from "../components/navigation/StepTabs";
-import { streamQuizGeneration } from "../api/client";
+import { apiFetch, streamQuizGeneration } from "../api/client";
 import { loadUploadedDocuments, saveQuizConfig } from "../features/quiz/storage";
-import type { QuizDifficulty } from "../features/quiz/types";
+import type { GeneratedQuiz, QuizDifficulty, QuizQuestion } from "../features/quiz/types";
 import { QUIZ_WORKFLOW_ROUTES, QUIZ_WORKFLOW_STEPS } from "../features/quiz/workflow";
+import { PencilIcon, RegenerateIcon } from "../components/icons/QuizIcons";
+
+const DIFFICULTY_VALUES: QuizDifficulty[] = ["Easy", "Medium", "Hard"];
+
+function toDifficultyLabel(value: unknown): QuizDifficulty | null {
+  if (typeof value !== "string") return null;
+  return DIFFICULTY_VALUES.find((d) => d.toLowerCase() === value.toLowerCase()) ?? null;
+}
 
 type QuizFormState = {
   moduleTitle: string;
@@ -38,15 +46,81 @@ function ConfigureQuizPage() {
     difficulty: "Medium",
   });
   const [isGenerating, setIsGenerating] = useState(false);
-  const [generatedQuestions, setGeneratedQuestions] = useState<string[]>([]);
+  const [quiz, setQuiz] = useState<GeneratedQuiz | null>(null);
+  // Whether we're still checking the backend for a previously generated
+  // quiz to restore, on first mount only.
+  const [isLoadingQuiz, setIsLoadingQuiz] = useState(true);
   const [generationStatus, setGenerationStatus] = useState("");
   const [error, setError] = useState("");
+  // Inline click-to-edit: at most one field (a question's prompt, or a
+  // single option's text) is being edited at a time. Editing a field saves
+  // automatically on blur/Enter — there's no separate edit form/Save button.
+  const [editingField, setEditingField] = useState<
+    | { questionId: number; kind: "prompt" }
+    | { questionId: number; kind: "option"; optionId: number }
+    | null
+  >(null);
+  const [fieldDraft, setFieldDraft] = useState("");
+  const [savingQuestionId, setSavingQuestionId] = useState<number | null>(null);
+  const [fieldErrorByQuestionId, setFieldErrorByQuestionId] = useState<Record<number, string>>(
+    {}
+  );
+  const [regeneratingQuestionId, setRegeneratingQuestionId] = useState<number | null>(null);
+  const [regenerateErrorByQuestionId, setRegenerateErrorByQuestionId] = useState<
+    Record<number, string>
+  >({});
+  // Questions start collapsed (prompt only). Clicking the pencil icon
+  // expands a question to show its options for viewing/editing.
+  const [expandedQuestionIds, setExpandedQuestionIds] = useState<Set<number>>(new Set());
   const navigate = useNavigate();
   const todayIso = useMemo(() => new Date().toISOString().split("T")[0], []);
 
   const updateForm = <K extends keyof QuizFormState>(field: K, value: QuizFormState[K]) => {
     setForm((current) => ({ ...current, [field]: value }));
   };
+
+  // Restore whatever this manager most recently generated, so navigating
+  // away (e.g. to Upload Content to add more documents) and back doesn't
+  // wipe the settings and preview. The quiz is already saved server-side
+  // the moment "Done" is clicked — this just looks it up, the same way
+  // ReviewPublishPage and QuizResultsPage resume "my latest quiz".
+  useEffect(() => {
+    let isMounted = true;
+
+    (async () => {
+      try {
+        const latest = await apiFetch<GeneratedQuiz | null>("/api/quizzes/mine/latest");
+        if (!isMounted || !latest) return;
+
+        setQuiz(latest);
+        setForm((current) => ({
+          moduleTitle: latest.title || current.moduleTitle,
+          topic: latest.generationConfig?.topic ?? current.topic,
+          passingScore:
+            latest.passingScore != null ? String(latest.passingScore) : current.passingScore,
+          timeLimit:
+            latest.timeLimitMinutes != null
+              ? String(latest.timeLimitMinutes)
+              : current.timeLimit,
+          questionCount:
+            latest.questionsPayload.length > 0
+              ? String(latest.questionsPayload.length)
+              : current.questionCount,
+          dueDate: latest.dueDate ? latest.dueDate.slice(0, 10) : current.dueDate,
+          difficulty: toDifficultyLabel(latest.generationConfig?.difficulty) ?? current.difficulty,
+        }));
+      } catch {
+        // Best-effort restore — no quiz yet, or the request failed. Either
+        // way, just leave the form at its blank starting state.
+      } finally {
+        if (isMounted) setIsLoadingQuiz(false);
+      }
+    })();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // Topic Focus is intentionally excluded here — it's optional. Leaving it
   // blank just means the AI pulls questions from the whole document instead
@@ -73,14 +147,14 @@ function ConfigureQuizPage() {
     }
 
     setError("");
-    setGeneratedQuestions([]);
+    setQuiz(null);
     setGenerationStatus("Starting generation…");
     setIsGenerating(true);
 
     const count = Number.parseInt(form.questionCount, 10) || 3;
 
     try {
-      const quiz = await streamQuizGeneration(
+      const generatedQuiz = await streamQuizGeneration(
         {
           documentIds,
           config: {
@@ -110,8 +184,7 @@ function ConfigureQuizPage() {
         }
       );
 
-      const generated = quiz.questionsPayload.map((question) => question.prompt);
-      setGeneratedQuestions(generated);
+      setQuiz(generatedQuiz);
       saveQuizConfig({
         moduleTitle: form.moduleTitle.trim(),
         topic: form.topic.trim(),
@@ -120,7 +193,7 @@ function ConfigureQuizPage() {
         questionCount: count,
         dueDate: form.dueDate,
         difficulty: form.difficulty,
-        generatedQuestions: generated,
+        generatedQuestions: generatedQuiz.questionsPayload.map((question) => question.prompt),
       });
     } catch (err) {
       setError(
@@ -132,14 +205,186 @@ function ConfigureQuizPage() {
     }
   };
 
+  const isMutatingQuestion = savingQuestionId !== null || regeneratingQuestionId !== null;
+
   const handleNext = () => {
-    if (generatedQuestions.length === 0) {
+    if (!quiz || quiz.questionsPayload.length === 0) {
       setError("Please click Done and generate questions before continuing.");
+      return;
+    }
+    if (isMutatingQuestion) {
+      setError("Please wait for your question edit to finish saving before continuing.");
       return;
     }
     setError("");
     navigate("/review-publish");
   };
+
+  function startEditPrompt(question: QuizQuestion) {
+    setEditingField({ questionId: question.id, kind: "prompt" });
+    setFieldDraft(question.prompt);
+  }
+
+  function startEditOption(question: QuizQuestion, optionId: number, currentText: string) {
+    setEditingField({ questionId: question.id, kind: "option", optionId });
+    setFieldDraft(currentText);
+  }
+
+  function cancelFieldEdit() {
+    setEditingField(null);
+    setFieldDraft("");
+  }
+
+  // Sends the whole question object back (prompt + options + explanation +
+  // citation) since that's what the PATCH endpoint expects, but only the one
+  // field the user clicked into actually changes.
+  //
+  // Applies the change to local state immediately (optimistic update) so the
+  // UI doesn't flicker back to the old value while the request is in
+  // flight — this matters especially for the "mark correct" radio, since a
+  // controlled input would otherwise visibly snap back to the old selection
+  // for a moment. Rolls back to `previousQuiz` if the save fails.
+  async function saveQuestion(previousQuiz: GeneratedQuiz, updatedQuestion: QuizQuestion) {
+    setQuiz({
+      ...previousQuiz,
+      questionsPayload: previousQuiz.questionsPayload.map((existing) =>
+        existing.id === updatedQuestion.id ? updatedQuestion : existing
+      ),
+    });
+
+    setSavingQuestionId(updatedQuestion.id);
+    setFieldErrorByQuestionId((prev) => {
+      const next = { ...prev };
+      delete next[updatedQuestion.id];
+      return next;
+    });
+    try {
+      const updated = await apiFetch<GeneratedQuiz>(
+        `/api/quizzes/${previousQuiz.id}/questions/${updatedQuestion.id}`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({
+            prompt: updatedQuestion.prompt,
+            options: updatedQuestion.options,
+            explanation: updatedQuestion.explanation,
+            citation: updatedQuestion.citation,
+          }),
+        }
+      );
+      setQuiz(updated);
+    } catch (err) {
+      setQuiz(previousQuiz);
+      setFieldErrorByQuestionId((prev) => ({
+        ...prev,
+        [updatedQuestion.id]: err instanceof Error ? err.message : "Failed to save.",
+      }));
+    } finally {
+      setSavingQuestionId(null);
+    }
+  }
+
+  async function commitFieldEdit(question: QuizQuestion) {
+    if (!quiz || !editingField || editingField.questionId !== question.id) return;
+
+    const trimmed = fieldDraft.trim();
+    if (trimmed === "") {
+      cancelFieldEdit();
+      return;
+    }
+
+    let updatedQuestion: QuizQuestion;
+    if (editingField.kind === "prompt") {
+      if (trimmed === question.prompt) {
+        cancelFieldEdit();
+        return;
+      }
+      updatedQuestion = { ...question, prompt: trimmed };
+    } else {
+      const original = question.options.find((option) => option.id === editingField.optionId);
+      if (!original || trimmed === original.text) {
+        cancelFieldEdit();
+        return;
+      }
+      updatedQuestion = {
+        ...question,
+        options: question.options.map((option) =>
+          option.id === editingField.optionId ? { ...option, text: trimmed } : option
+        ),
+      };
+    }
+
+    cancelFieldEdit();
+    await saveQuestion(quiz, updatedQuestion);
+  }
+
+  async function setCorrectOption(question: QuizQuestion, optionId: number) {
+    if (!quiz || question.options.find((option) => option.id === optionId)?.isCorrect) return;
+
+    const updatedQuestion: QuizQuestion = {
+      ...question,
+      options: question.options.map((option) => ({
+        ...option,
+        isCorrect: option.id === optionId,
+      })),
+    };
+    await saveQuestion(quiz, updatedQuestion);
+  }
+
+  function toggleExpanded(questionId: number) {
+    setExpandedQuestionIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(questionId)) {
+        next.delete(questionId);
+      } else {
+        next.add(questionId);
+      }
+      return next;
+    });
+  }
+
+  // Pressing Enter while editing a field means "I'm done" — collapse the
+  // whole card back to its compact view, not just close the text box.
+  function collapseQuestion(questionId: number) {
+    setExpandedQuestionIds((prev) => {
+      if (!prev.has(questionId)) return prev;
+      const next = new Set(prev);
+      next.delete(questionId);
+      return next;
+    });
+  }
+
+  async function handleRegenerate(questionId: number) {
+    if (!quiz) return;
+
+    // Regeneration replaces the question outright with no undo, so confirm
+    // first — unlike the inline text edits, this isn't a quick "click to
+    // fix a typo" action.
+    const confirmed = window.confirm(
+      "Replace this question with a new AI-generated one? This can't be undone."
+    );
+    if (!confirmed) return;
+
+    setRegenerateErrorByQuestionId((prev) => {
+      const next = { ...prev };
+      delete next[questionId];
+      return next;
+    });
+    setRegeneratingQuestionId(questionId);
+    try {
+      const updated = await apiFetch<GeneratedQuiz>(
+        `/api/quizzes/${quiz.id}/questions/${questionId}/regenerate`,
+        { method: "POST" }
+      );
+      setQuiz(updated);
+    } catch (err) {
+      setRegenerateErrorByQuestionId((prev) => ({
+        ...prev,
+        [questionId]: err instanceof Error ? err.message : "Failed to regenerate question.",
+      }));
+    } finally {
+      setRegeneratingQuestionId(null);
+    }
+  }
 
   return (
     <div className="app-shell">
@@ -260,13 +505,143 @@ function ConfigureQuizPage() {
                   <div className="loading-line short" />
                   <p className="ai-loading-status">{generationStatus}</p>
                 </div>
-              ) : generatedQuestions.length > 0 ? (
-                <div className="generated-questions">
-                  {generatedQuestions.map((question) => (
-                    <button key={question} type="button" className="question-chip selected">
-                      {question}
-                    </button>
-                  ))}
+              ) : isLoadingQuiz ? (
+                <p className="ai-loading-status">Checking for your last generated quiz…</p>
+              ) : quiz && quiz.questionsPayload.length > 0 ? (
+                <div className="review-list">
+                  {quiz.questionsPayload.map((question, index) => {
+                    const isEditingPrompt =
+                      editingField?.questionId === question.id &&
+                      editingField.kind === "prompt";
+                    const isRegeneratingThisQuestion = regeneratingQuestionId === question.id;
+                    const isSavingThisQuestion = savingQuestionId === question.id;
+                    const isExpanded = expandedQuestionIds.has(question.id);
+
+                    return (
+                      <article className="review-question-card" key={question.id}>
+                        <div className="review-question-header">
+                          {isEditingPrompt ? (
+                            <textarea
+                              className="inline-edit-input prompt-edit-input"
+                              autoFocus
+                              value={fieldDraft}
+                              onChange={(event) => setFieldDraft(event.target.value)}
+                              onBlur={() => void commitFieldEdit(question)}
+                              onKeyDown={(event) => {
+                                if (event.key === "Enter" && !event.shiftKey) {
+                                  event.preventDefault();
+                                  void commitFieldEdit(question);
+                                  collapseQuestion(question.id);
+                                } else if (event.key === "Escape") {
+                                  cancelFieldEdit();
+                                }
+                              }}
+                            />
+                          ) : isExpanded ? (
+                            <h3
+                              className="editable-text"
+                              title="Click to edit"
+                              onClick={() => startEditPrompt(question)}
+                            >
+                              Q{index + 1}. {question.prompt}
+                            </h3>
+                          ) : (
+                            <h3>
+                              Q{index + 1}. {question.prompt}
+                            </h3>
+                          )}
+                          <div className="review-question-actions">
+                            <button
+                              type="button"
+                              className="icon-btn"
+                              title={isExpanded ? "Collapse" : "Edit question"}
+                              aria-label={isExpanded ? "Collapse question" : "Edit question"}
+                              onClick={() => toggleExpanded(question.id)}
+                            >
+                              <PencilIcon aria-hidden />
+                            </button>
+                            <button
+                              type="button"
+                              className={`icon-btn ${isRegeneratingThisQuestion ? "spinning" : ""}`}
+                              title="Regenerate question"
+                              aria-label="Regenerate question"
+                              disabled={isRegeneratingThisQuestion}
+                              onClick={() => void handleRegenerate(question.id)}
+                            >
+                              <RegenerateIcon aria-hidden />
+                            </button>
+                          </div>
+                        </div>
+
+                        {regenerateErrorByQuestionId[question.id] ? (
+                          <p className="form-error">{regenerateErrorByQuestionId[question.id]}</p>
+                        ) : null}
+                        {fieldErrorByQuestionId[question.id] ? (
+                          <p className="form-error">{fieldErrorByQuestionId[question.id]}</p>
+                        ) : null}
+
+                        {isExpanded ? (
+                          <>
+                            <p className="options-hint">
+                              Click <span aria-hidden>○</span> to mark the correct answer · click
+                              the text to edit its wording
+                            </p>
+                            <ul className="editable-options">
+                              {question.options.map((option) => {
+                                const isEditingThisOption =
+                                  editingField?.questionId === question.id &&
+                                  editingField.kind === "option" &&
+                                  editingField.optionId === option.id;
+
+                                return (
+                                  <li className="editable-option-row" key={option.id}>
+                                    <input
+                                      type="radio"
+                                      name={`correct-option-${question.id}`}
+                                      checked={option.isCorrect}
+                                      title="Mark as the correct answer"
+                                      aria-label="Mark as the correct answer"
+                                      onChange={() => void setCorrectOption(question, option.id)}
+                                    />
+                                    {isEditingThisOption ? (
+                                      <input
+                                        type="text"
+                                        className="inline-edit-input"
+                                        autoFocus
+                                        value={fieldDraft}
+                                        onChange={(event) => setFieldDraft(event.target.value)}
+                                        onBlur={() => void commitFieldEdit(question)}
+                                        onKeyDown={(event) => {
+                                          if (event.key === "Enter") {
+                                            event.preventDefault();
+                                            void commitFieldEdit(question);
+                                            collapseQuestion(question.id);
+                                          } else if (event.key === "Escape") {
+                                            cancelFieldEdit();
+                                          }
+                                        }}
+                                      />
+                                    ) : (
+                                      <span
+                                        className="editable-text"
+                                        title="Click to edit"
+                                        onClick={() =>
+                                          startEditOption(question, option.id, option.text)
+                                        }
+                                      >
+                                        {option.text}
+                                      </span>
+                                    )}
+                                  </li>
+                                );
+                              })}
+                            </ul>
+                          </>
+                        ) : null}
+                        {isSavingThisQuestion ? <p className="subtle">Saving…</p> : null}
+                      </article>
+                    );
+                  })}
                 </div>
               ) : null}
             </div>
@@ -277,8 +652,14 @@ function ConfigureQuizPage() {
           <Link className="secondary-btn btn-link" to="/upload-content">
             Back
           </Link>
-          <button className="primary-btn btn-link" type="button" onClick={handleNext}>
-            Next: Review &amp; Publish
+          <button
+            className="primary-btn btn-link"
+            type="button"
+            disabled={isMutatingQuestion}
+            title={isMutatingQuestion ? "Waiting for your question edit to save…" : undefined}
+            onClick={handleNext}
+          >
+            {isMutatingQuestion ? "Saving…" : "Next: Review & Publish"}
           </button>
         </div>
       </main>
