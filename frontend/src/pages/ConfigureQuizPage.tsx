@@ -38,9 +38,11 @@ function ConfigureQuizPage() {
     setForm((current) => ({ ...current, [field]: value }));
   };
 
+  // Topic Focus is intentionally excluded here — it's optional. Leaving it
+  // blank just means the AI pulls questions from the whole document instead
+  // of narrowing in on one topic.
   const isFormValid = Boolean(
     form.moduleTitle.trim() &&
-      form.topic.trim() &&
       form.passingScore &&
       form.timeLimit &&
       form.questionCount &&
@@ -203,11 +205,11 @@ function ConfigureQuizPage() {
               </label>
 
               <label>
-                Topic Focus
+                Topic Focus (optional)
                 <input
                   value={form.topic}
                   onChange={(event) => updateForm("topic", event.target.value)}
-                  placeholder="Quiz should focus on..."
+                  placeholder="Leave blank for a general quiz, or e.g. &quot;password policy&quot;"
                 />
               </label>
 
