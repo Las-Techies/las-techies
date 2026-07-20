@@ -39,6 +39,53 @@ model Document {
   status           String   @default("processing")
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
+
+  chunks DocumentChunk[]
+}
+
+// Embedding column is added/typed via raw SQL in the migration (pgvector's
+// `vector` type isn't representable in the Prisma schema), so Prisma Client
+// treats it as Unsupported and all similarity search goes through
+// documentChunk.model.ts's raw queries instead of the normal query builder.
+model DocumentChunk {
+  id         Int      @id @default(autoincrement())
+  documentId Int
+  teamId     Int
+  chunkIndex Int
+  content    String
+  embedding  Unsupported("vector(384)")
+  createdAt  DateTime @default(now())
+
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@unique([documentId, chunkIndex])
+  @@index([teamId])
+}
+
+model ChatConversation {
+  id        Int      @id @default(autoincrement())
+  teamId    Int
+  userId    Int
+  title     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  messages ChatMessage[]
+
+  @@index([userId, teamId, updatedAt])
+}
+
+model ChatMessage {
+  id             Int      @id @default(autoincrement())
+  conversationId Int
+  role           String
+  content        String
+  sources        Json?
+  createdAt      DateTime @default(now())
+
+  conversation ChatConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
 }
 
 model Quiz {

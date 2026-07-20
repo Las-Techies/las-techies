@@ -85,6 +85,26 @@ npx prisma generate
 npm run seed   # optional — seeds a demo team, manager user, and sample onboarding docs
 ```
 
+`prisma migrate deploy` enables the `vector` Postgres extension for you (via
+`CREATE EXTENSION IF NOT EXISTS vector;` in the migration) as long as your
+Supabase connection has permission to create extensions — true by default
+for the standard `postgres` role. This powers the Library AI Chatbot's
+document search (`backend/src/services/embeddings.ts` +
+`backend/src/models/documentChunk.model.ts`). If it fails, enable `vector`
+manually first from the Supabase dashboard: **Database → Extensions → search
+"vector" → Enable**, then re-run the command above.
+
+If you already have documents from before this feature existed (e.g. the
+seeded demo docs), backfill their chat search index once with:
+
+```bash
+npm run backfill-embeddings
+```
+
+The first embedding call downloads a small (~90MB) local model via
+Transformers.js — no API key needed, it's cached under `backend/.cache/`
+afterwards.
+
 ## 6. Run the app
 
 In one terminal:

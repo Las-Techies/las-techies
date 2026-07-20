@@ -7,3 +7,9 @@ CLAUDE.md
 
 # Local Python deps used for tooling/scripts
 .pydeps/
+.DS_Store
+# Local Python virtual environment
+.venv/
+
+# Downloaded Transformers.js embedding model weights (see backend/src/services/embeddings.ts)
+backend/.cache/
