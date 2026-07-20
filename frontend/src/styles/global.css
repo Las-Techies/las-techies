@@ -514,6 +514,43 @@ label {
   border-color: #f3b9b3;
 }
 
+.upload-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.delete-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid #f3b9b3;
+  background: #fff;
+  border-radius: 999px;
+  font-size: 11px;
+  color: #ba0517;
+  padding: 0;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.delete-icon-btn:hover:not(:disabled) {
+  background: #fdeceb;
+}
+
+.delete-icon-btn:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.delete-icon {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+}
+
 .page-actions {
   margin-top: 16px;
   display: flex;

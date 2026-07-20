@@ -36,3 +36,11 @@ export function findDocumentsForUser(userId: number, teamId: number) {
     },
   });
 }
+
+// Scoped to the uploader (not just the team) so a manager can only delete
+// documents they personally uploaded, not a teammate's.
+export function deleteDocumentForUser(id: number, userId: number, teamId: number) {
+  return prisma.document.deleteMany({
+    where: { id, uploadedByUserId: userId, teamId },
+  });
+}

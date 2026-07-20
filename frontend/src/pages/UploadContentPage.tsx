@@ -6,6 +6,7 @@ import StepTabs from "../components/navigation/StepTabs";
 import { apiFetch } from "../api/client";
 import { loadUploadedDocuments, saveUploadedDocuments } from "../features/quiz/storage";
 import { QUIZ_WORKFLOW_ROUTES, QUIZ_WORKFLOW_STEPS } from "../features/quiz/workflow";
+import trashIcon from "../assets/trash-icon.png";
 
 type UploadStatus = "Processing..." | "Ready" | "Failed";
 
@@ -55,6 +56,7 @@ function UploadContentPage() {
   const [uploads, setUploads] = useState<UploadedItem[]>([]);
   const [isLoadingDocuments, setIsLoadingDocuments] = useState(true);
   const [error, setError] = useState("");
+  const [deletingKeys, setDeletingKeys] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const hydrateUploads = async () => {
@@ -153,6 +155,42 @@ function UploadContentPage() {
 
   };
 
+  const handleDelete = async (upload: UploadedItem) => {
+    if (upload.documentId === null) return;
+    if (!window.confirm(`Delete "${upload.name}"? This can't be undone.`)) return;
+
+    setError("");
+    setDeletingKeys((prev) => new Set(prev).add(upload.key));
+
+    try {
+      await apiFetch(`/api/documents/${upload.documentId}`, { method: "DELETE" });
+
+      setUploads((prev) => {
+        const nextUploads = prev.filter((item) => item.key !== upload.key);
+
+        const readyDocs = nextUploads
+          .filter((item) => item.status === "Ready" && item.documentId !== null)
+          .map((item) => ({
+            id: item.documentId as number,
+            title: item.name,
+            status: "ready",
+            createdAt: item.createdAt,
+          }));
+        saveUploadedDocuments(readyDocs);
+
+        return nextUploads;
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete document.");
+    } finally {
+      setDeletingKeys((prev) => {
+        const next = new Set(prev);
+        next.delete(upload.key);
+        return next;
+      });
+    }
+  };
+
   const onFileChange: ChangeEventHandler<HTMLInputElement> = (event) => {
     if (event.target.files) {
       void uploadFiles(event.target.files);
@@ -223,17 +261,35 @@ function UploadContentPage() {
                     <p>Added {formatAddedDate(upload.createdAt)}</p>
                   ) : null}
                 </div>
-                <span
-                  className={`status ${
-                    upload.status === "Ready"
-                      ? "success"
-                      : upload.status === "Failed"
-                        ? "fail"
-                        : "warning"
-                  }`}
-                >
-                  {upload.status}
-                </span>
+                <div className="upload-row-actions">
+                  <span
+                    className={`status ${
+                      upload.status === "Ready"
+                        ? "success"
+                        : upload.status === "Failed"
+                          ? "fail"
+                          : "warning"
+                    }`}
+                  >
+                    {upload.status}
+                  </span>
+                  {upload.documentId !== null ? (
+                    <button
+                      type="button"
+                      className="delete-icon-btn"
+                      aria-label={`Delete ${upload.name}`}
+                      title="Delete"
+                      disabled={deletingKeys.has(upload.key)}
+                      onClick={() => void handleDelete(upload)}
+                    >
+                      {deletingKeys.has(upload.key) ? (
+                        "Deleting…"
+                      ) : (
+                        <img src={trashIcon} alt="" className="delete-icon" />
+                      )}
+                    </button>
+                  ) : null}
+                </div>
               </div>
             ))
           )}

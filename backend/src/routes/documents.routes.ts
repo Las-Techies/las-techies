@@ -2,6 +2,7 @@ import { Router } from "express";
 import { upload } from "../middleware/upload";
 // import { requireAuth } from "../middleware/requireAuth"; // optional if you want route-level auth
 import {
+  deleteDocument,
   getMyDocuments,
   uploadDocument,
   getDocumentById,
@@ -14,5 +15,6 @@ const router = Router();
 router.post("/upload", upload.single("file"), uploadDocument);
 router.get("/mine", getMyDocuments);
 router.get("/:documentId", getDocumentById);
+router.delete("/:documentId", deleteDocument);
 
 export default router;
