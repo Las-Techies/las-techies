@@ -540,6 +540,36 @@ label {
   color: #706e6b;
 }
 
+.link-import-zone {
+  display: grid;
+  gap: 10px;
+  text-align: left;
+}
+
+.link-import-zone h2 {
+  margin-bottom: 0;
+}
+
+.link-import-zone p {
+  margin: 0;
+  color: #706e6b;
+}
+
+.link-import-connection-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.link-import-zone input {
+  margin-top: 0;
+}
+
+.link-import-zone .secondary-btn {
+  justify-self: center;
+}
+
 .uploads-table h3 {
   font-size: 12px;
   color: #706e6b;

@@ -35,6 +35,7 @@ model Document {
   uploadedByUserId Int
   title            String
   sourceType       String   @default("upload")
+  source_url       String?
   rawText          String?
   status           String   @default("processing")
   createdAt        DateTime @default(now())
