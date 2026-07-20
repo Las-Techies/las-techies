@@ -36,24 +36,41 @@ export function countChunksForDocument(documentId: number) {
 // Replaces all chunks for a document (delete + insert) so re-processing a
 // document (e.g. via the backfill script) never leaves stale/duplicate
 // chunks behind. Prisma Client can't create rows with an Unsupported vector
-// column, so each insert goes through $executeRaw with the value cast to
+// column, so the insert goes through $executeRaw with each value cast to
 // `vector` on the Postgres side.
+//
+// Deliberately a single multi-row INSERT (not one $executeRaw per chunk
+// inside an interactive $transaction callback): this project's DATABASE_URL
+// goes through Supabase's transaction-mode pgbouncer pooler, which can drop
+// a long-lived interactive transaction that holds a connection open across
+// many sequential round-trips (observed in practice on documents with 20+
+// chunks). Batching into one INSERT plus the array form of $transaction
+// keeps this to two statements total.
 export async function replaceChunksForDocument(
   documentId: number,
   teamId: number,
   chunks: ChunkWithEmbedding[]
 ): Promise<void> {
-  await prisma.$transaction(async (tx) => {
-    await tx.documentChunk.deleteMany({ where: { documentId } });
+  const deleteExisting = prisma.documentChunk.deleteMany({ where: { documentId } });
 
-    for (const [i, chunk] of chunks.entries()) {
+  if (chunks.length === 0) {
+    await deleteExisting;
+    return;
+  }
+
+  const rows = await Promise.all(
+    chunks.map(async (chunk, i) => {
       const vectorSql = await vectorToSql(chunk.embedding);
-      await tx.$executeRaw`
-        INSERT INTO "DocumentChunk" ("documentId", "teamId", "chunkIndex", "content", "embedding")
-        VALUES (${documentId}, ${teamId}, ${i}, ${chunk.content}, ${vectorSql}::vector)
-      `;
-    }
-  });
+      return Prisma.sql`(${documentId}, ${teamId}, ${i}, ${chunk.content}, ${vectorSql}::vector)`;
+    })
+  );
+
+  const insertChunks = prisma.$executeRaw(Prisma.sql`
+    INSERT INTO "DocumentChunk" ("documentId", "teamId", "chunkIndex", "content", "embedding")
+    VALUES ${Prisma.join(rows)}
+  `);
+
+  await prisma.$transaction([deleteExisting, insertChunks]);
 }
 
 // Cosine-distance nearest-neighbor search via pgvector's `<=>` operator,
