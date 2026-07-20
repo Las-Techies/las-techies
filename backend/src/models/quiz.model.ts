@@ -60,3 +60,25 @@ export function updateQuizStatus(id: number, teamId: number, status: QuizStatus)
     data: { status },
   });
 }
+
+// sourceDocumentIds is a plain JSON array, not a real foreign key, so this
+// checks in application code rather than relying on a DB-level JSON query
+// (keeps it correct regardless of the Postgres/Prisma JSON operator used).
+// Scoped to the whole team, not just the requesting user, since a document
+// can be referenced by a quiz any manager on the team generated.
+export async function findQuizzesReferencingDocument(
+  documentId: number,
+  teamId: number
+): Promise<{ id: number; title: string }[]> {
+  const quizzes = await prisma.quiz.findMany({
+    where: { teamId },
+    select: { id: true, title: true, sourceDocumentIds: true },
+  });
+
+  return quizzes
+    .filter((quiz) => {
+      const ids = quiz.sourceDocumentIds;
+      return Array.isArray(ids) && ids.includes(documentId);
+    })
+    .map((quiz) => ({ id: quiz.id, title: quiz.title }));
+}

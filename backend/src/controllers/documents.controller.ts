@@ -1,10 +1,12 @@
 import type { NextFunction, Request, Response } from "express";
 import {
   createDocument,
+  deleteDocumentForUser,
   findDocumentsForUser,
   findDocumentByIdForTeam,
 } from "../models/document.model";
 import { extractTextFromDocument } from "../services/documentProcessor";
+import { findQuizzesReferencingDocument } from "../models/quiz.model";
 
 type AuthUser = {
   id: number;
@@ -95,6 +97,45 @@ export async function getDocumentById(
     }
 
     return res.json({ data: document });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function deleteDocument(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  try {
+    const documentId = Number(req.params.documentId);
+    if (!Number.isInteger(documentId) || documentId <= 0) {
+      return res
+        .status(400)
+        .json({ error: { message: "Invalid documentId" } });
+    }
+
+    const user = (req as any).user as AuthUser | undefined;
+    if (!user?.id || !user?.teamId) {
+      return res.status(401).json({ error: { message: "Unauthorized" } });
+    }
+
+    const referencingQuizzes = await findQuizzesReferencingDocument(documentId, user.teamId);
+    if (referencingQuizzes.length > 0) {
+      const quizTitles = referencingQuizzes.map((quiz) => quiz.title).join(", ");
+      return res.status(409).json({
+        error: {
+          message: `This document is used in an existing quiz (${quizTitles}) and can't be deleted. Delete the quiz first, or leave the document as-is.`,
+        },
+      });
+    }
+
+    const result = await deleteDocumentForUser(documentId, user.id, user.teamId);
+    if (result.count === 0) {
+      return res.status(404).json({ error: { message: "Document not found" } });
+    }
+
+    return res.status(204).send();
   } catch (error) {
     next(error);
   }
