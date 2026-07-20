@@ -17,6 +17,16 @@ type QuizFormState = {
   difficulty: QuizDifficulty;
 };
 
+// Mirrors the difficulty guidance the backend gives the AI (see buildPrompt
+// in backend/src/utils/prompts.ts), reworded for a manager reading it here
+// instead of an AI following it.
+const DIFFICULTY_DESCRIPTIONS: Record<QuizDifficulty, string> = {
+  Easy: "Straightforward, fact-based questions about a single detail stated directly in the document — a name, step, tool, or definition.",
+  Medium:
+    "Questions that test understanding of how or why something works — connecting two steps, or applying a rule to a described scenario.",
+  Hard: "Questions requiring reasoning across multiple parts of the document — edge cases, or the consequence of doing something incorrectly.",
+};
+
 function ConfigureQuizPage() {
   const [form, setForm] = useState<QuizFormState>({
     moduleTitle: "",
@@ -214,14 +224,18 @@ function ConfigureQuizPage() {
               <label>Difficulty Mix</label>
               <div className="difficulty-chips">
                 {(["Easy", "Medium", "Hard"] as const).map((value) => (
-                  <button
-                    key={value}
-                    type="button"
-                    className={form.difficulty === value ? "selected" : ""}
-                    onClick={() => updateForm("difficulty", value)}
-                  >
-                    {value}
-                  </button>
+                  <span className="difficulty-chip-wrap" key={value}>
+                    <button
+                      type="button"
+                      className={form.difficulty === value ? "selected" : ""}
+                      onClick={() => updateForm("difficulty", value)}
+                    >
+                      {value}
+                    </button>
+                    <span className="difficulty-tooltip" role="tooltip">
+                      {DIFFICULTY_DESCRIPTIONS[value]}
+                    </span>
+                  </span>
                 ))}
               </div>
             </div>
