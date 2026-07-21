@@ -1,7 +1,15 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import AppNav from "../components/navigation/AppNav";
-import { apiFetch } from "../api/client";
+import {
+  apiFetch,
+  deleteChatConversation,
+  getChatConversation,
+  listChatConversations,
+  sendChatMessage,
+  type ChatConversationSummary,
+  type ChatSource,
+} from "../api/client";
 import { saveModuleProgress } from "../features/quiz/storage";
 import type { GeneratedQuiz } from "../features/quiz/types";
 import {
@@ -29,7 +37,7 @@ type DisplayDoc = {
   highlight?: string;
 };
 
-type ChatMessage = { role: "assistant" | "user"; text: string };
+type ChatMessage = { role: "assistant" | "user"; text: string; sources?: ChatSource[] };
 
 const fileTypeLabel = (title: string): string => {
   const ext = title.split(".").pop()?.toLowerCase() ?? "";
@@ -48,6 +56,21 @@ const relativeAddedLabel = (createdAt?: string | null): string => {
   if (days <= 0) return "Added today";
   if (days === 1) return "Added yesterday";
   return `Added ${days} days ago`;
+};
+
+// Short relative timestamp for chat history entries, e.g. "5m ago", "Yesterday".
+const relativeTimeLabel = (isoDate: string): string => {
+  const date = new Date(isoDate);
+  if (Number.isNaN(date.getTime())) return "";
+  const minutes = Math.floor((Date.now() - date.getTime()) / 60_000);
+  if (minutes < 1) return "Just now";
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days === 1) return "Yesterday";
+  if (days < 7) return `${days}d ago`;
+  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 };
 
 function renderDocParagraphs(content: string, highlight?: string) {
@@ -71,17 +94,10 @@ function renderDocParagraphs(content: string, highlight?: string) {
   });
 }
 
-const INITIAL_CHAT: ChatMessage[] = [
-  {
-    role: "assistant",
-    text: "Hello! I can answer questions about these materials. What would you like to know?",
-  },
-  { role: "user", text: "What PPE is needed in Zone A?" },
-  {
-    role: "assistant",
-    text: "In Zone A, you are required to wear a hard hat, safety glasses with side shields, gloves appropriate to the task, steel-toe boots, and a hi-vis vest. If noise levels exceed 85 dB, you must also wear hearing protection.",
-  },
-];
+const GREETING: ChatMessage = {
+  role: "assistant",
+  text: "Hi, I'm Sage! I can answer questions about these materials. What would you like to know?",
+};
 
 function DocIcon({ kind }: { kind: SourceKind }) {
   if (kind === "confluence") {
@@ -136,16 +152,83 @@ function Sparkle() {
   );
 }
 
+function NewChatIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="18"
+      height="18"
+      fill="none"
+      stroke="#001a66"
+      strokeWidth="2.25"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <rect width="18" height="18" x="3" y="3" rx="2" />
+      <path d="M8 12h8" />
+      <path d="M12 8v8" />
+    </svg>
+  );
+}
+
+function HistoryIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="18"
+      height="18"
+      fill="none"
+      stroke="#001a66"
+      strokeWidth="2.25"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+      <path d="M3 3v5h5" />
+      <path d="M12 7v5l4 2" />
+    </svg>
+  );
+}
+
+function DeleteChatIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="16"
+      height="16"
+      fill="none"
+      stroke="#001a66"
+      strokeWidth="2.25"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719" />
+      <path d="m15 9-6 6" />
+      <path d="m9 9 6 6" />
+    </svg>
+  );
+}
+
 function LearnerModulePage() {
   const navigate = useNavigate();
   const [activeFilter, setActiveFilter] = useState<Filter>("All");
   const [readIds, setReadIds] = useState<Set<string>>(() => new Set());
   const [openDoc, setOpenDoc] = useState<DisplayDoc | null>(null);
-  const [messages, setMessages] = useState<ChatMessage[]>(INITIAL_CHAT);
+  const [messages, setMessages] = useState<ChatMessage[]>([GREETING]);
+  const [conversationId, setConversationId] = useState<number | null>(null);
+  const [isConversationLoading, setIsConversationLoading] = useState(true);
+  const [conversations, setConversations] = useState<ChatConversationSummary[]>([]);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [isHistoryLoading, setIsHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState("");
+  const [deletingConversationId, setDeletingConversationId] = useState<number | null>(null);
+  const historyRef = useRef<HTMLDivElement>(null);
   const [draft, setDraft] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const messagesRef = useRef<HTMLDivElement>(null);
-  const typingTimerRef = useRef<number | null>(null);
   const [moduleTitle, setModuleTitle] = useState(learnerModule.title);
   const [recentVisible, setRecentVisible] = useState(5);
   const [remoteFiles, setRemoteFiles] = useState<DisplayDoc[] | null>(null);
@@ -187,6 +270,59 @@ function LearnerModulePage() {
       cancelled = true;
     };
   }, []);
+
+  // Hydrate the chat panel from the user's most recently active thread, if
+  // any. Conversations already come back sorted by updatedAt desc, so the
+  // first one is the latest. Any failure (or no threads yet) leaves the
+  // plain greeting in place, same "fail quietly" pattern as above. While
+  // this is in flight we show a "loading last session" placeholder instead
+  // of letting the greeting flash before the real history swaps in (e.g.
+  // when returning to this tab).
+  useEffect(() => {
+    let cancelled = false;
+    setIsConversationLoading(true);
+    listChatConversations()
+      .then((list) => {
+        if (cancelled) return;
+        setConversations(list);
+        const latest = list[0];
+        if (!latest) return;
+        return getChatConversation(latest.id).then((res) => {
+          if (cancelled) return;
+          if (res.messages.length === 0) return;
+          setMessages(
+            res.messages.map((m) => ({
+              role: m.role,
+              text: m.content,
+              sources: m.sources ?? undefined,
+            }))
+          );
+          setConversationId(res.conversation.id);
+        });
+      })
+      .catch(() => {
+        /* keep the greeting-only fallback */
+      })
+      .finally(() => {
+        if (!cancelled) setIsConversationLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Close the history dropdown on outside click, same lightweight pattern
+  // as the doc-source modal's backdrop click-to-close.
+  useEffect(() => {
+    if (!isHistoryOpen) return;
+    const handleClick = (event: MouseEvent) => {
+      if (historyRef.current && !historyRef.current.contains(event.target as Node)) {
+        setIsHistoryOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [isHistoryOpen]);
 
   const filterToKind: Record<Exclude<Filter, "All">, SourceKind> = {
     Files: "file",
@@ -259,24 +395,109 @@ function LearnerModulePage() {
     if (doc.remoteId != null) loadSource(doc.remoteId);
   };
 
+  // Refreshes the history list in the background (e.g. after sending a
+  // message, so a brand-new thread or a bumped updatedAt shows up next time
+  // the panel is opened). Failures are silently ignored — the list will
+  // just be slightly stale until the next successful refresh.
+  const refreshConversations = () => {
+    listChatConversations()
+      .then((list) => setConversations(list))
+      .catch(() => {
+        /* keep the existing list */
+      });
+  };
+
   const sendMessage = () => {
     const text = draft.trim();
-    if (!text) return;
+    if (!text || isTyping || isConversationLoading) return;
     setMessages((prev) => [...prev, { role: "user", text }]);
     setDraft("");
     setIsTyping(true);
-    if (typingTimerRef.current !== null) window.clearTimeout(typingTimerRef.current);
-    typingTimerRef.current = window.setTimeout(() => {
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          text: "Based on this module's documents, here's what I found. Open a source with \u201cView source\u201d to read the exact passage this comes from.",
-        },
-      ]);
-      setIsTyping(false);
-      typingTimerRef.current = null;
-    }, 1100);
+    sendChatMessage({ message: text, conversationId: conversationId ?? undefined })
+      .then((res) => {
+        setConversationId(res.conversationId);
+        setMessages((prev) => [
+          ...prev,
+          { role: "assistant", text: res.answer, sources: res.sources },
+        ]);
+        refreshConversations();
+      })
+      .catch(() => {
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            text: "Sorry, I couldn't reach Sage. Please try again.",
+          },
+        ]);
+      })
+      .finally(() => setIsTyping(false));
+  };
+
+  const toggleHistory = () => {
+    setIsHistoryOpen((open) => {
+      const next = !open;
+      if (next) {
+        setHistoryError("");
+        setIsHistoryLoading(true);
+        listChatConversations()
+          .then((list) => setConversations(list))
+          .catch(() => setHistoryError("Couldn't load chat history."))
+          .finally(() => setIsHistoryLoading(false));
+      }
+      return next;
+    });
+  };
+
+  // Starts a fresh thread locally; the backend doesn't create a row for it
+  // until the first message is actually sent (conversationId omitted).
+  const startNewChat = () => {
+    if (isTyping || isConversationLoading) return;
+    setIsHistoryOpen(false);
+    setConversationId(null);
+    setMessages([GREETING]);
+  };
+
+  const switchConversation = (id: number) => {
+    setIsHistoryOpen(false);
+    if (id === conversationId) return;
+    setIsConversationLoading(true);
+    getChatConversation(id)
+      .then((res) => {
+        setMessages(
+          res.messages.length > 0
+            ? res.messages.map((m) => ({
+                role: m.role,
+                text: m.content,
+                sources: m.sources ?? undefined,
+              }))
+            : [GREETING]
+        );
+        setConversationId(res.conversation.id);
+      })
+      .catch(() => {
+        setMessages((prev) => [
+          ...prev,
+          { role: "assistant", text: "Sorry, I couldn't load that conversation. Please try again." },
+        ]);
+      })
+      .finally(() => setIsConversationLoading(false));
+  };
+
+  const handleDeleteConversation = (id: number, event: ReactMouseEvent) => {
+    event.stopPropagation();
+    setHistoryError("");
+    setDeletingConversationId(id);
+    deleteChatConversation(id)
+      .then(() => {
+        setConversations((prev) => prev.filter((c) => c.id !== id));
+        if (id === conversationId) {
+          setConversationId(null);
+          setMessages([GREETING]);
+        }
+      })
+      .catch(() => setHistoryError("Couldn't delete that conversation."))
+      .finally(() => setDeletingConversationId(null));
   };
 
   // Keep the newest message (or the typing indicator) in view as the chat grows.
@@ -284,12 +505,6 @@ function LearnerModulePage() {
     const node = messagesRef.current;
     if (node) node.scrollTop = node.scrollHeight;
   }, [messages, isTyping]);
-
-  useEffect(() => {
-    return () => {
-      if (typingTimerRef.current !== null) window.clearTimeout(typingTimerRef.current);
-    };
-  }, []);
 
   const docsForKind = (kind: SourceKind) => allDocs.filter((doc) => doc.kind === kind);
 
@@ -389,34 +604,125 @@ function LearnerModulePage() {
           </div>
 
           <div className="card ai-card">
-            <div className="ai-head">
+            <div className="ai-head" ref={historyRef}>
               <Sparkle />
-              <h2>AI Assistant</h2>
+              <h2>Ask Sage</h2>
               <span className="ai-pill">AI</span>
-            </div>
-            <div className="ai-messages" ref={messagesRef}>
-              {messages.map((message, index) => (
-                <div key={index} className={`bubble-row ${message.role}`}>
-                  {message.role === "assistant" ? (
-                    <span className="bubble-avatar">
-                      <Sparkle />
-                    </span>
-                  ) : null}
-                  <div className={`bubble ${message.role}`}>{message.text}</div>
-                </div>
-              ))}
-              {isTyping ? (
-                <div className="bubble-row assistant">
-                  <span className="bubble-avatar">
-                    <Sparkle />
-                  </span>
-                  <div className="bubble assistant typing" aria-label="AI is typing">
-                    <span className="typing-dot" />
-                    <span className="typing-dot" />
-                    <span className="typing-dot" />
+              <div className="ai-head-actions">
+                <button
+                  type="button"
+                  className="ai-head-btn"
+                  title="New chat"
+                  aria-label="Start a new chat"
+                  onClick={startNewChat}
+                  disabled={isTyping || isConversationLoading}
+                >
+                  <NewChatIcon />
+                </button>
+                <button
+                  type="button"
+                  className="ai-head-btn"
+                  title="Chat history"
+                  aria-label="View chat history"
+                  onClick={toggleHistory}
+                >
+                  <HistoryIcon />
+                </button>
+              </div>
+
+              {isHistoryOpen ? (
+                <div className="ai-history-panel" role="menu">
+                  <div className="ai-history-head">
+                    <span>Chat history</span>
+                    <button
+                      type="button"
+                      className="ai-history-close"
+                      aria-label="Close history"
+                      onClick={() => setIsHistoryOpen(false)}
+                    >
+                      ✕
+                    </button>
                   </div>
+                  {isHistoryLoading ? (
+                    <p className="subtle ai-history-empty">Loading…</p>
+                  ) : conversations.length === 0 ? (
+                    <p className="subtle ai-history-empty">No past conversations yet.</p>
+                  ) : (
+                    <ul className="ai-history-list">
+                      {conversations.map((conv) => (
+                        <li key={conv.id}>
+                          <button
+                            type="button"
+                            className={`ai-history-item ${conv.id === conversationId ? "active" : ""}`}
+                            onClick={() => switchConversation(conv.id)}
+                          >
+                            <span className="ai-history-title">
+                              {conv.title ?? "Untitled conversation"}
+                            </span>
+                            <span className="ai-history-time">
+                              {relativeTimeLabel(conv.updatedAt)}
+                            </span>
+                          </button>
+                          <button
+                            type="button"
+                            className="ai-history-delete"
+                            title="Delete conversation"
+                            aria-label="Delete conversation"
+                            onClick={(event) => handleDeleteConversation(conv.id, event)}
+                            disabled={deletingConversationId === conv.id}
+                          >
+                            {deletingConversationId === conv.id ? "…" : <DeleteChatIcon />}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {historyError ? <p className="form-error ai-history-empty">{historyError}</p> : null}
                 </div>
               ) : null}
+            </div>
+            <div className="ai-messages" ref={messagesRef}>
+              {isConversationLoading ? (
+                <div className="ai-loading" aria-live="polite">
+                  <span className="ai-loading-spinner" aria-hidden />
+                  Loading Sage's last session…
+                </div>
+              ) : (
+                <>
+                  {messages.map((message, index) => {
+                    const sourceTitles = message.sources
+                      ? Array.from(new Set(message.sources.map((s) => s.documentTitle)))
+                      : [];
+                    return (
+                      <div key={index} className={`bubble-row ${message.role}`}>
+                        {message.role === "assistant" ? (
+                          <span className="bubble-avatar">
+                            <Sparkle />
+                          </span>
+                        ) : null}
+                        <div>
+                          <div className={`bubble ${message.role}`}>{message.text}</div>
+                          {sourceTitles.length > 0 ? (
+                            <p className="bubble-sources">Sources: {sourceTitles.join(", ")}</p>
+                          ) : null}
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {isTyping ? (
+                    <div className="bubble-row assistant">
+                      <span className="bubble-avatar">
+                        <Sparkle />
+                      </span>
+                      <div className="bubble assistant typing" aria-label="Sage is typing">
+                        <span className="typing-dot" />
+                        <span className="typing-dot" />
+                        <span className="typing-dot" />
+                      </div>
+                    </div>
+                  ) : null}
+                </>
+              )}
             </div>
             <div className="ai-input-row">
               <input
@@ -426,8 +732,14 @@ function LearnerModulePage() {
                   if (event.key === "Enter") sendMessage();
                 }}
                 placeholder="Ask a question…"
+                disabled={isTyping || isConversationLoading}
               />
-              <button type="button" className="primary-btn" onClick={sendMessage}>
+              <button
+                type="button"
+                className="primary-btn"
+                onClick={sendMessage}
+                disabled={isTyping || isConversationLoading}
+              >
                 Send
               </button>
             </div>
