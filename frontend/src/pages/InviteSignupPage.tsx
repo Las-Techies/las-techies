@@ -3,8 +3,10 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import mascotLogo from "../assets/sageforce-mascot-transparent.png";
 import { useAuth } from "../context/AuthContext";
 import { apiFetch } from "../api/client";
+import { supabase } from "../lib/supabaseClient";
 
 type InvitePreview = { email: string; teamName: string | null };
+type Mode = "signup" | "login";
 
 /**
  * Landing page for an invite link (/signup?invite=<token>).
@@ -27,6 +29,7 @@ function InviteSignupPage() {
   const [loadingPreview, setLoadingPreview] = useState(true);
   const [previewError, setPreviewError] = useState("");
 
+  const [mode, setMode] = useState<Mode>("signup");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [password, setPassword] = useState("");
@@ -48,6 +51,14 @@ function InviteSignupPage() {
       )
       .finally(() => setLoadingPreview(false));
   }, [token]);
+
+  // Shared final step: call accept (assigns team + new_hire role server-side),
+  // refresh the session so the new team_id is in the JWT, then enter the app.
+  const acceptAndEnter = async () => {
+    await apiFetch(`/api/invites/${token}/accept`, { method: "POST" });
+    await supabase.auth.refreshSession();
+    navigate("/home", { replace: true });
+  };
 
   const handleSignup = async () => {
     if (!preview) return;
@@ -75,19 +86,44 @@ function InviteSignupPage() {
         const signedIn = await signIn(preview.email, password).catch(() => null);
         if (!signedIn) {
           setError(
-            "Account created. Please confirm your email, then open this invite link again to finish joining your team."
+            'Account created. Please confirm your email, then open this invite link again and use "Log in to accept" to finish joining your team.'
           );
           setSubmitting(false);
           return;
         }
       }
 
-      // Assign the team server-side from the invite, then enter the new-hire UI.
-      await apiFetch(`/api/invites/${token}/accept`, { method: "POST" });
-      navigate("/home", { replace: true });
+      await acceptAndEnter();
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Unable to finish signing up. Please try again."
+      );
+      setSubmitting(false);
+    }
+  };
+
+  // For someone who already has a SageForce account (clicked the link twice, or
+  // is being moved onto a new team): log them in, then accept the invite.
+  const handleLoginAndAccept = async () => {
+    if (!preview) return;
+    if (!password.trim()) {
+      setError("Please enter your password.");
+      return;
+    }
+
+    setError("");
+    setSubmitting(true);
+    try {
+      const signedIn = await signIn(preview.email, password).catch(() => null);
+      if (!signedIn) {
+        setError("Incorrect password for this email. Please try again.");
+        setSubmitting(false);
+        return;
+      }
+      await acceptAndEnter();
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Unable to accept the invite. Please try again."
       );
       setSubmitting(false);
     }
@@ -114,30 +150,33 @@ function InviteSignupPage() {
           <>
             <h2>Join {preview?.teamName ?? "your team"}</h2>
             <p className="role-setup-intro">
-              You've been invited to take your onboarding quiz. Create your account to get
-              started.
+              {mode === "signup"
+                ? "You've been invited to take your onboarding quiz. Create your account to get started."
+                : "Log in to your existing account to join this team."}
             </p>
 
-            <div className="name-row">
-              <label>
-                First Name
-                <input
-                  type="text"
-                  placeholder="Frida"
-                  value={firstName}
-                  onChange={(event) => setFirstName(event.target.value)}
-                />
-              </label>
-              <label>
-                Last Name
-                <input
-                  type="text"
-                  placeholder="Arriaga"
-                  value={lastName}
-                  onChange={(event) => setLastName(event.target.value)}
-                />
-              </label>
-            </div>
+            {mode === "signup" ? (
+              <div className="name-row">
+                <label>
+                  First Name
+                  <input
+                    type="text"
+                    placeholder="Frida"
+                    value={firstName}
+                    onChange={(event) => setFirstName(event.target.value)}
+                  />
+                </label>
+                <label>
+                  Last Name
+                  <input
+                    type="text"
+                    placeholder="Arriaga"
+                    value={lastName}
+                    onChange={(event) => setLastName(event.target.value)}
+                  />
+                </label>
+              </div>
+            ) : null}
 
             <label>
               Work Email
@@ -155,13 +194,30 @@ function InviteSignupPage() {
             </label>
 
             <div className="login-actions">
+              <a
+                className="help-link"
+                href="#"
+                onClick={(event) => {
+                  event.preventDefault();
+                  setError("");
+                  setMode(mode === "signup" ? "login" : "signup");
+                }}
+              >
+                {mode === "signup"
+                  ? "Already have an account? Log in to accept"
+                  : "Need an account? Sign up instead"}
+              </a>
               <button
                 className="primary-btn btn-link"
                 type="button"
-                onClick={handleSignup}
+                onClick={mode === "signup" ? handleSignup : handleLoginAndAccept}
                 disabled={submitting}
               >
-                {submitting ? "Joining…" : "Create account & join"}
+                {submitting
+                  ? "Joining…"
+                  : mode === "signup"
+                    ? "Create account & join"
+                    : "Log in & join"}
               </button>
             </div>
             {error ? <p className="form-error">{error}</p> : null}
