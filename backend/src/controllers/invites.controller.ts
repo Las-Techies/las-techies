@@ -141,6 +141,17 @@ export async function acceptInviteHandler(
       return res.status(401).json({ error: { message: "Unauthorized" } });
     }
 
+    // Invites are for onboarding new hires. Refuse to convert a manager (who
+    // owns their own team) into a new_hire on someone else's team.
+    if (user.role === "manager") {
+      return res.status(409).json({
+        error: {
+          message:
+            "This account is a manager and can't join a team as a new hire. Use a different email for the invite.",
+        },
+      });
+    }
+
     const token = String(req.params.token ?? "");
     const invite = await findInviteByToken(token);
     if (!invite || invite.usedAt || invite.expiresAt < new Date()) {

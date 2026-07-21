@@ -4,6 +4,8 @@ import mascotLogo from "../assets/sageforce-mascot-transparent.png";
 import { useAuth } from "../context/AuthContext";
 import { setPreviewRole } from "../features/auth/previewRole";
 import type { UserRole } from "../context/AuthContext";
+import { apiFetch } from "../api/client";
+import { supabase } from "../lib/supabaseClient";
 
 type Mode = "login" | "signup";
 
@@ -115,6 +117,11 @@ function LoginPage() {
       return;
     }
 
+    if (role === "manager" && !teamName.trim()) {
+      setError("Please name the team you'll be managing.");
+      return;
+    }
+
     setError("");
     setInfoMessage("");
     setSubmitting(true);
@@ -133,6 +140,19 @@ function LoginPage() {
         switchMode("login");
         return;
       }
+
+      // A manager names their team at signup. Create it now — the backend
+      // assigns the manager to the new team and updates their Supabase
+      // metadata, so we refresh the session to pull the new team_id into the
+      // JWT before any team-scoped requests run.
+      if (role === "manager") {
+        await apiFetch("/api/teams", {
+          method: "POST",
+          body: JSON.stringify({ name: teamName.trim() }),
+        });
+        await supabase.auth.refreshSession();
+      }
+
       navigate(routeForRole(role));
     } catch (err) {
       setError(
