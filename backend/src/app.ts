@@ -11,7 +11,7 @@ import teamsRouter from "./routes/teams.routes";
 
 export const app = express();
 
-app.use(cors());
+app.use(cors({ origin: process.env.CORS_ORIGIN || /^http:\/\/localhost:\d+$/ }))
 app.use(express.json());
 
 app.get("/health", (_req, res) => res.json({ ok: true }));
