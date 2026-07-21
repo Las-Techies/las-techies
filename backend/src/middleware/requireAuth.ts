@@ -57,6 +57,7 @@ export async function requireAuth(
       id: user.id,
       teamId: user.teamId,
       role: user.role,
+      supabaseUserId: supabaseUser.id,
     };
     next();
   } catch (err) {
