@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "seed": "tsx src/db/seeds/seed.ts",
+    "backfill-embeddings": "tsx src/scripts/backfillEmbeddings.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -13,6 +14,7 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@huggingface/transformers": "^4.2.0",
     "@prisma/client": "^6.19.3",
     "@supabase/supabase-js": "^2.110.1",
     "cors": "^2.8.6",
@@ -21,7 +23,8 @@
     "mammoth": "^1.12.0",
     "multer": "^2.2.0",
     "nodemailer": "^9.0.3",
-    "pdf-parse": "^2.4.5"
+    "pdf-parse": "^2.4.5",
+    "pgvector": "^0.3.0"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",

@@ -39,20 +39,12 @@ const questionBankDefault = [
   },
 ];
 
-const learnerPool = [
-  "Ariana Lopez",
-  "Daniel Torres",
-  "Mia Gonzalez",
-  "Carlos Rivera",
-  "Sofia Martinez",
-  "Isabella Cruz",
-];
-
 function ReviewPublishPage() {
   const [quizConfig, setQuizConfig] = useState<QuizConfig>(DEFAULT_QUIZ_CONFIG);
   const [quiz, setQuiz] = useState<GeneratedQuiz | null>(null);
   const [isLoadingQuiz, setIsLoadingQuiz] = useState(false);
   const [selectedLearners, setSelectedLearners] = useState<string[]>([]);
+  const [learnerEmail, setLearnerEmail] = useState("");
   const [isPublishModalOpen, setIsPublishModalOpen] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
   const [publishError, setPublishError] = useState("");
@@ -135,10 +127,15 @@ function ReviewPublishPage() {
     });
   }, [quiz, quizConfig.generatedQuestions, quizConfig.questionCount]);
 
-  const toggleLearner = (name: string) => {
-    setSelectedLearners((prev) =>
-      prev.includes(name) ? prev.filter((value) => value !== name) : [...prev, name]
-    );
+  const addLearnerEmail = () => {
+    const email = learnerEmail.trim().toLowerCase();
+    if (!email) return;
+    setSelectedLearners((prev) => (prev.includes(email) ? prev : [...prev, email]));
+    setLearnerEmail("");
+  };
+
+  const removeLearner = (email: string) => {
+    setSelectedLearners((prev) => prev.filter((value) => value !== email));
   };
 
   // Prefer values actually persisted on the quiz record; only fall back to
@@ -187,8 +184,6 @@ function ReviewPublishPage() {
       setIsPublishing(false);
     }
   }
-
-  const selectedLearnerSet = useMemo(() => new Set(selectedLearners), [selectedLearners]);
 
   async function loadSourceText(documentId: number) {
     if (sourceTextByDocumentId[documentId] || sourceLoadingByDocumentId[documentId]) return;
@@ -462,18 +457,39 @@ function ReviewPublishPage() {
 
           <div className="assign-learners">
             <h3>Assign Learners</h3>
-            <div className="learner-select-box">
-              {learnerPool.map((name) => (
-                <button
-                  key={name}
-                  type="button"
-                  className={selectedLearnerSet.has(name) ? "selected" : ""}
-                  onClick={() => toggleLearner(name)}
-                >
-                  {name}
-                </button>
-              ))}
+            <div className="learner-email-input">
+              <input
+                type="email"
+                placeholder="Enter learner's email"
+                value={learnerEmail}
+                onChange={(event) => setLearnerEmail(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    addLearnerEmail();
+                  }
+                }}
+              />
+              <button type="button" className="secondary-btn" onClick={addLearnerEmail}>
+                Add
+              </button>
             </div>
+            {selectedLearners.length > 0 ? (
+              <div className="learner-chips">
+                {selectedLearners.map((email) => (
+                  <span key={email} className="learner-chip">
+                    {email}
+                    <button
+                      type="button"
+                      aria-label={`Remove ${email}`}
+                      onClick={() => removeLearner(email)}
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
+            ) : null}
           </div>
 
           <div className="review-actions">

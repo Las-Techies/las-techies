@@ -5,18 +5,25 @@ export function createDocument(input: {
   uploadedByUserId: number;
   title: string;
   sourceType: string;
+  sourceUrl?: string | null;
   rawText: string | null;
   status: string;
 }) {
+  const data = {
+    teamId: input.teamId,
+    uploadedByUserId: input.uploadedByUserId,
+    title: input.title,
+    sourceType: input.sourceType,
+    rawText: input.rawText,
+    status: input.status,
+  } as any;
+
+  if (typeof input.sourceUrl !== "undefined") {
+    data.source_url = input.sourceUrl ?? null;
+  }
+
   return prisma.document.create({
-    data: {
-      teamId: input.teamId,
-      uploadedByUserId: input.uploadedByUserId,
-      title: input.title,
-      sourceType: input.sourceType,
-      rawText: input.rawText,
-      status: input.status,
-    },
+    data,
   });
 }
 
@@ -44,3 +51,4 @@ export function deleteDocumentForUser(id: number, userId: number, teamId: number
     where: { id, uploadedByUserId: userId, teamId },
   });
 }
+

@@ -1,17 +1,17 @@
 import type { CSSProperties } from "react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import AppNav from "../components/navigation/AppNav";
 import { apiFetch } from "../api/client";
-import { loadQuizConfig } from "../features/quiz/storage";
-import type { GeneratedQuiz } from "../features/quiz/types";
-
-const breakdownRows = [
-  { topic: "PPE Requirements", wrong: "0 / 3", ringPercent: 100, dotClass: "dot-1" },
-  { topic: "Fire Safety", wrong: "1 / 3", ringPercent: 66, dotClass: "dot-2" },
-  { topic: "Hazmat Procedures", wrong: "1 / 4", ringPercent: 75, dotClass: "dot-3" },
-];
+import { loadQuizAttempt, loadQuizConfig } from "../features/quiz/storage";
+import type { GeneratedQuiz, QuizQuestion } from "../features/quiz/types";
 
 function QuizResultsPage() {
+  const navigate = useNavigate();
+  // The submitted attempt (questions + chosen answers) is the source of truth
+  // for scoring. If it's missing (e.g. opened directly), we fall back to the
+  // latest generated quiz and just show the answer key without a score.
+  const attempt = useMemo(() => loadQuizAttempt(), []);
   const [passingScore, setPassingScore] = useState(70);
   const [quiz, setQuiz] = useState<GeneratedQuiz | null>(null);
   const [loading, setLoading] = useState(false);
@@ -25,7 +25,6 @@ function QuizResultsPage() {
   const [sourceErrorByDocumentId, setSourceErrorByDocumentId] = useState<Record<number, string>>({});
   const highlightRefs = useRef<Record<string, HTMLElement | null>>({});
   const closePopoverTimerRef = useRef<number | null>(null);
-  const score = 80;
 
   function openCitationPopover(questionId: number) {
     if (closePopoverTimerRef.current !== null) {
@@ -108,6 +107,10 @@ function QuizResultsPage() {
   useEffect(() => {
     setPassingScore(loadQuizConfig().passingScore);
 
+    // With an attempt we already have the questions the new hire answered, so
+    // only reach out for the answer key when we don't have one.
+    if (attempt) return;
+
     setLoading(true);
     apiFetch<GeneratedQuiz | null>("/api/quizzes/mine/latest")
       .then((data) => setQuiz(data))
@@ -115,11 +118,32 @@ function QuizResultsPage() {
         setError(err instanceof Error ? err.message : "Failed to load quiz.")
       )
       .finally(() => setLoading(false));
-  }, []);
+  }, [attempt]);
+
+  const reviewQuestions: QuizQuestion[] =
+    attempt?.questions ?? quiz?.questionsPayload ?? [];
+  const userAnswers = attempt?.answers ?? {};
+  const totalQuestions = reviewQuestions.length;
+  const correctCount = reviewQuestions.reduce((count, question) => {
+    const correctOption = question.options.find((option) => option.isCorrect);
+    return count + (correctOption && userAnswers[question.id] === correctOption.id ? 1 : 0);
+  }, 0);
+  const incorrectCount = Math.max(totalQuestions - correctCount, 0);
+  const score =
+    attempt && totalQuestions > 0 ? Math.round((correctCount / totalQuestions) * 100) : 0;
+  const didPass = score >= passingScore;
+  const submittedLabel = attempt
+    ? new Date(attempt.submittedAt).toLocaleDateString(undefined, {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      })
+    : "—";
+  const resultTitle = attempt?.title ?? quiz?.title ?? "OSHA Basics 2026";
 
   useEffect(() => {
-    if (expandedCitationQuestionId === null || !quiz) return;
-    const expandedQuestion = quiz.questionsPayload.find(
+    if (expandedCitationQuestionId === null) return;
+    const expandedQuestion = reviewQuestions.find(
       (question) => question.id === expandedCitationQuestionId
     );
     const documentId = expandedQuestion?.citation?.sourceDocumentId;
@@ -131,7 +155,7 @@ function QuizResultsPage() {
         block: "center",
       });
     });
-  }, [expandedCitationQuestionId, quiz, sourceLoadingByDocumentId, sourceTextByDocumentId]);
+  }, [expandedCitationQuestionId, reviewQuestions, sourceLoadingByDocumentId, sourceTextByDocumentId]);
 
   useEffect(() => {
     return () => {
@@ -141,23 +165,32 @@ function QuizResultsPage() {
     };
   }, []);
 
-  const didPass = score >= passingScore;
-
   return (
     <div className="app-shell">
       <AppNav />
       <main className="page-wrap">
         <h1>Quiz Results</h1>
-        <p className="subtle">{quiz?.title ?? "OSHA Basics 2026"} • Submitted Jul 2, 2026</p>
+        <p className="subtle">
+          {resultTitle} • {attempt ? `Submitted ${submittedLabel}` : "Not yet submitted"}
+        </p>
 
         <section className="results-top">
           <div className="card score-card">
             <h3>SCORE</h3>
-            <div className="score-value">{score}%</div>
-            <span className={`status ${didPass ? "success" : "fail"}`}>
-              {didPass ? "PASSED" : "FAILED"}
-            </span>
-            <p>Passing threshold: {passingScore}%</p>
+            {attempt ? (
+              <>
+                <div className="score-value">{score}%</div>
+                <span className={`status ${didPass ? "success" : "fail"}`}>
+                  {didPass ? "PASSED" : "FAILED"}
+                </span>
+                <p>Passing threshold: {passingScore}%</p>
+              </>
+            ) : (
+              <>
+                <div className="score-value">—</div>
+                <p>Take the quiz to see your score.</p>
+              </>
+            )}
           </div>
 
           <div className="card breakdown-card">
@@ -165,39 +198,34 @@ function QuizResultsPage() {
             <div className="breakdown-layout">
               <div className="topic-table">
                 <div className="topic-header">
-                  <span>Topic</span>
-                  <span>Wrong</span>
+                  <span>Result</span>
+                  <span>Questions</span>
                 </div>
-                {breakdownRows.map((row) => (
-                  <div className="topic-row" key={row.topic}>
-                    <span className="topic-cell">
-                      <i className={`topic-dot ${row.dotClass}`} />
-                      {row.topic}
-                    </span>
-                    <span className="wrong-cell">{row.wrong}</span>
-                  </div>
-                ))}
+                <div className="topic-row">
+                  <span className="topic-cell">
+                    <i className="topic-dot dot-1" />
+                    Answered correctly
+                  </span>
+                  <span className="wrong-cell">
+                    {correctCount} / {totalQuestions}
+                  </span>
+                </div>
+                <div className="topic-row">
+                  <span className="topic-cell">
+                    <i className="topic-dot dot-3" />
+                    Needs review
+                  </span>
+                  <span className="wrong-cell">
+                    {incorrectCount} / {totalQuestions}
+                  </span>
+                </div>
               </div>
 
               <div className="multi-donut">
                 <div
                   className="ring ring-1"
-                  style={{ "--pct": `${breakdownRows[0].ringPercent}%` } as CSSProperties}
-                >
-                  <span className="ring-label">100%</span>
-                </div>
-                <div
-                  className="ring ring-2"
-                  style={{ "--pct": `${breakdownRows[1].ringPercent}%` } as CSSProperties}
-                >
-                  <span className="ring-label">66%</span>
-                </div>
-                <div
-                  className="ring ring-3"
-                  style={{ "--pct": `${breakdownRows[2].ringPercent}%` } as CSSProperties}
-                >
-                  <span className="ring-label">75%</span>
-                </div>
+                  style={{ "--pct": `${score}%` } as CSSProperties}
+                />
                 <div className="donut-core">
                   <span>{score}%</span>
                 </div>
@@ -211,22 +239,38 @@ function QuizResultsPage() {
           {loading ? <p className="subtle">Loading quiz…</p> : null}
           {error ? <p className="form-error">{error}</p> : null}
 
-          {quiz ? (
+          {reviewQuestions.length > 0 ? (
             <div className="review-list">
-              {quiz.questionsPayload.map((question, index) => {
+              {reviewQuestions.map((question, index) => {
                 const correct = question.options.find((option) => option.isCorrect);
+                const chosenId = userAnswers[question.id];
+                const gotItRight = Boolean(correct && chosenId === correct.id);
                 return (
                   <article className="review-question-card" key={question.id}>
                     <h3>
                       Q{index + 1}. {question.prompt}
+                      {attempt ? (
+                        <span className={`review-status ${gotItRight ? "ok" : "bad"}`}>
+                          {gotItRight ? "Correct" : "Incorrect"}
+                        </span>
+                      ) : null}
                     </h3>
                     <ul>
-                      {question.options.map((option) => (
-                        <li key={option.id}>
-                          {option.isCorrect ? "✓ " : ""}
-                          {option.text}
-                        </li>
-                      ))}
+                      {question.options.map((option) => {
+                        const chosen = chosenId === option.id;
+                        const optionClass = option.isCorrect
+                          ? "opt-correct"
+                          : chosen
+                            ? "opt-wrong"
+                            : "";
+                        return (
+                          <li key={option.id} className={optionClass}>
+                            {option.isCorrect ? "✓ " : chosen ? "✗ " : ""}
+                            {option.text}
+                            {chosen ? " — your answer" : ""}
+                          </li>
+                        );
+                      })}
                     </ul>
                     <p>
                       <strong>Correct Answer:</strong> {correct?.text ?? "N/A"}
@@ -382,11 +426,19 @@ function QuizResultsPage() {
         </section>
 
         <div className="page-actions">
-          <button className="secondary-btn" type="button">
+          <button
+            className="secondary-btn"
+            type="button"
+            onClick={() => navigate("/quiz-taking")}
+          >
             Retake Quiz
           </button>
-          <button className="primary-btn" type="button">
-            Download Certificate
+          <button
+            className="primary-btn"
+            type="button"
+            onClick={() => navigate("/learner-module")}
+          >
+            Back to Module
           </button>
         </div>
       </main>

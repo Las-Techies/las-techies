@@ -4,6 +4,7 @@ import { requireAuth } from "./middleware/requireAuth";
 import { errorHandler } from "./middleware/errorHandler";
 import quizzesRouter from "./routes/quizzes.routes";
 import documentsRouter from "./routes/documents.routes";
+import libraryRouter from "./routes/library.routes";
 
 export const app = express();
 
@@ -15,5 +16,6 @@ app.get("/health", (_req, res) => res.json({ ok: true }));
 app.use("/api", requireAuth);
 app.use("/api/quizzes", quizzesRouter);
 app.use("/api/documents", documentsRouter);
+app.use("/api/library", libraryRouter);
 
 app.use(errorHandler);

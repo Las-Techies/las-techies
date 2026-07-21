@@ -37,6 +37,10 @@ export async function apiFetch<T>(
     throw new Error(message);
   }
 
+  if (res.status === 204) {
+    return undefined as T;
+  }
+
   return res.json() as Promise<T>;
 }
 
@@ -111,4 +115,67 @@ export async function streamQuizGeneration(
   if (streamError) throw new Error(streamError);
   if (!result) throw new Error("Quiz generation ended without a result");
   return result;
+}
+
+export type ChatSource = {
+  documentId: number;
+  documentTitle: string;
+  snippet: string;
+};
+
+export type ChatMessageDto = {
+  id: number;
+  role: "user" | "assistant";
+  content: string;
+  sources: ChatSource[] | null;
+  createdAt: string;
+};
+
+export type ChatResponse = {
+  conversationId: number;
+  answer: string;
+  sources: ChatSource[];
+  confidence: "high" | "medium" | "low";
+  followUps: string[];
+};
+
+export type ChatConversationSummary = {
+  id: number;
+  title: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+// Sends a message to Sage, the library AI chatbot; omit conversationId to
+// start a new thread (the backend returns the new thread's id for follow-ups).
+export function sendChatMessage(input: {
+  message: string;
+  conversationId?: number;
+}): Promise<ChatResponse> {
+  return apiFetch<ChatResponse>("/api/library/chat", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function listChatConversations(): Promise<ChatConversationSummary[]> {
+  const res = await apiFetch<{ data: ChatConversationSummary[] }>(
+    "/api/library/chat/conversations"
+  );
+  return res.data;
+}
+
+export async function getChatConversation(
+  conversationId: number
+): Promise<{ conversation: ChatConversationSummary; messages: ChatMessageDto[] }> {
+  const res = await apiFetch<{
+    data: { conversation: ChatConversationSummary; messages: ChatMessageDto[] };
+  }>(`/api/library/chat/conversations/${conversationId}`);
+  return res.data;
+}
+
+export function deleteChatConversation(conversationId: number): Promise<void> {
+  return apiFetch<void>(`/api/library/chat/conversations/${conversationId}`, {
+    method: "DELETE",
+  });
 }

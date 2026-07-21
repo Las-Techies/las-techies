@@ -60,7 +60,19 @@ export type QuizCitation = {
 
 
 
+// A new hire's submitted attempt. Persisted client-side because the backend
+// has no attempt/scoring endpoint — we snapshot the exact questions answered
+// plus the chosen option per question so the results page can score locally.
+export type QuizAttempt = {
+  quizId: number | null;
+  title: string;
+  submittedAt: string;
+  questions: QuizQuestion[];
+  answers: Record<number, number>;
+};
+
 export const QUIZ_CONFIG_STORAGE_KEY = "sageforce_configure_quiz";
+export const QUIZ_ATTEMPT_STORAGE_KEY = "sageforce_quiz_attempt";
 
 export const DEFAULT_QUIZ_CONFIG: QuizConfig = {
   moduleTitle: "OSHA Basics 2026",

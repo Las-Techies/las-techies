@@ -1,6 +1,8 @@
 import {
   DEFAULT_QUIZ_CONFIG,
+  QUIZ_ATTEMPT_STORAGE_KEY,
   QUIZ_CONFIG_STORAGE_KEY,
+  type QuizAttempt,
   type QuizConfig,
   type UploadedDocument,
 } from "./types";
@@ -56,5 +58,41 @@ export const loadUploadedDocuments = (): UploadedDocument[] => {
     return Array.isArray(parsed) ? (parsed as UploadedDocument[]) : [];
   } catch {
     return [];
+  }
+};
+
+export const saveQuizAttempt = (attempt: QuizAttempt) => {
+  localStorage.setItem(QUIZ_ATTEMPT_STORAGE_KEY, JSON.stringify(attempt));
+};
+
+export const loadQuizAttempt = (): QuizAttempt | null => {
+  const raw = localStorage.getItem(QUIZ_ATTEMPT_STORAGE_KEY);
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as QuizAttempt;
+    return parsed && Array.isArray(parsed.questions) ? parsed : null;
+  } catch {
+    return null;
+  }
+};
+
+const MODULE_PROGRESS_STORAGE_KEY = "sageforce_module_progress";
+
+export type ModuleProgress = { read: number; total: number };
+
+export const saveModuleProgress = (progress: ModuleProgress) => {
+  localStorage.setItem(MODULE_PROGRESS_STORAGE_KEY, JSON.stringify(progress));
+};
+
+export const loadModuleProgress = (): ModuleProgress | null => {
+  const raw = localStorage.getItem(MODULE_PROGRESS_STORAGE_KEY);
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as ModuleProgress;
+    return typeof parsed?.read === "number" && typeof parsed?.total === "number"
+      ? parsed
+      : null;
+  } catch {
+    return null;
   }
 };
