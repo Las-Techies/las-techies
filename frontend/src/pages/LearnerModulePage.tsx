@@ -209,7 +209,7 @@ function LearnerModulePage() {
   const [draft, setDraft] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const messagesRef = useRef<HTMLDivElement>(null);
-  const [moduleTitle, setModuleTitle] = useState(learnerModule.title);
+  const [moduleTitle, setModuleTitle] = useState("");
   const [recentVisible, setRecentVisible] = useState(5);
   const [docs, setDocs] = useState<DisplayDoc[]>([]);
   const [loading, setLoading] = useState(true);
@@ -490,8 +490,6 @@ function LearnerModulePage() {
     const node = messagesRef.current;
     if (node) node.scrollTop = node.scrollHeight;
   }, [messages, isTyping]);
-
-  const docsForKind = (kind: SourceKind) => allDocs.filter((doc) => doc.kind === kind);
 
   return (
     <div className="app-shell">
