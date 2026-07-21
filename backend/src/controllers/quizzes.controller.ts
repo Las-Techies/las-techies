@@ -1,21 +1,33 @@
 import type { Request, Response, NextFunction } from "express";
 import {
   createQuiz,
+  createQuizAssignments,
+  findAssignedQuizzesForUser,
   findLatestQuizForUser,
   findQuizById,
   findQuizByIdForTeam,
   isValidQuizStatus,
+  markAssignmentComplete,
   updateQuizQuestions,
   updateQuizStatus,
 } from "../models/quiz.model";
 import { findDocumentByIdForTeam } from "../models/document.model";
+import { findUsersByIdsForTeam } from "../models/user.model";
 import { generateQuiz as generateQuizQuestions } from "../services/quizGenerator";
 import type { GenerationConfig, QuizQuestion } from "../services/quizTypes";
 
+// Team-scoped (not a bare findQuizById) so one team can't fetch another
+// team's quiz by guessing an id — this is the primary fetch path once a
+// new hire loads a specific assigned quiz by id from their list.
 export async function getQuiz(req: Request, res: Response, next: NextFunction) {
   try {
+    const user = (req as any).user;
     const id = Number(req.params.quizId);
-    const quiz = await findQuizById(id);
+    if (!Number.isFinite(id)) {
+      return res.status(400).json({ error: { message: "Invalid quiz id" } });
+    }
+
+    const quiz = await findQuizByIdForTeam(id, user.teamId);
     if (!quiz) return res.status(404).json({ error: { message: "Quiz not found" } });
     res.json(quiz);
   } catch (err) {
@@ -366,6 +378,90 @@ export async function regenerateQuestion(req: Request, res: Response, next: Next
     await updateQuizQuestions(quizId, user.teamId, nextQuestions);
     const refreshed = await findQuizById(quizId);
     res.json(refreshed);
+  } catch (err) {
+    next(err);
+  }
+}
+
+// Assigns a quiz to a set of new hires on the manager's own team. Validates
+// both that the quiz belongs to the manager's team and that every target id
+// is actually a new_hire on that same team, so a manager can't assign work
+// across teams or to another manager.
+export async function assignQuiz(req: Request, res: Response, next: NextFunction) {
+  try {
+    const user = (req as any).user;
+    const quizId = Number(req.params.quizId);
+    if (!Number.isFinite(quizId)) {
+      return res.status(400).json({ error: { message: "Invalid quiz id" } });
+    }
+
+    const { userIds } = req.body ?? {};
+    if (!Array.isArray(userIds) || userIds.length === 0 || !userIds.every((id) => Number.isFinite(id))) {
+      return res
+        .status(400)
+        .json({ error: { message: "userIds must be a non-empty array of user ids" } });
+    }
+
+    const quiz = await findQuizByIdForTeam(quizId, user.teamId);
+    if (!quiz) {
+      return res.status(404).json({ error: { message: "Quiz not found" } });
+    }
+
+    const teamMembers = await findUsersByIdsForTeam(userIds, user.teamId);
+    const validUserIds = teamMembers.map((member) => member.id);
+    if (validUserIds.length === 0) {
+      return res
+        .status(400)
+        .json({ error: { message: "None of the provided user ids belong to your team" } });
+    }
+
+    await createQuizAssignments(quizId, validUserIds, user.id);
+    res.status(201).json({
+      data: { quizId, assignedTo: teamMembers },
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// "Assigned to me" — the real per-learner counterpart to `mine/latest`
+// (which only ever returns quizzes the caller *created*, so it's always
+// empty for a new hire). Returns every published quiz assigned to the
+// caller, soonest-due-and-still-pending first.
+export async function getAssignedQuizzes(req: Request, res: Response, next: NextFunction) {
+  try {
+    const user = (req as any).user;
+    const entries = await findAssignedQuizzesForUser(user.id);
+    res.json(
+      entries.map(({ assignment, quiz }) => ({
+        assignmentId: assignment.id,
+        quizId: quiz.id,
+        title: quiz.title,
+        description: quiz.description,
+        dueDate: quiz.dueDate,
+        status: assignment.status,
+      }))
+    );
+  } catch (err) {
+    next(err);
+  }
+}
+
+// Marks the caller's own assignment for this quiz complete. Best-effort by
+// design: if no assignment row exists (e.g. the quiz was reached without a
+// formal assignment), it still returns 200 so it never blocks the learner
+// from seeing their results.
+export async function completeAssignment(req: Request, res: Response, next: NextFunction) {
+  try {
+    const user = (req as any).user;
+    const quizId = Number(req.params.quizId);
+    if (!Number.isFinite(quizId)) {
+      return res.status(400).json({ error: { message: "Invalid quiz id" } });
+    }
+
+    const score = typeof req.body?.score === "number" ? req.body.score : undefined;
+    const result = await markAssignmentComplete(quizId, user.id, score);
+    res.json({ updated: result.count > 0 });
   } catch (err) {
     next(err);
   }

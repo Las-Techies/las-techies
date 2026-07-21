@@ -5,6 +5,7 @@ import { errorHandler } from "./middleware/errorHandler";
 import quizzesRouter from "./routes/quizzes.routes";
 import documentsRouter from "./routes/documents.routes";
 import libraryRouter from "./routes/library.routes";
+import usersRouter from "./routes/users.routes";
 import invitesRouter from "./routes/invites.routes";
 import teamsRouter from "./routes/teams.routes";
 
@@ -19,6 +20,7 @@ app.use("/api", requireAuth);
 app.use("/api/quizzes", quizzesRouter);
 app.use("/api/documents", documentsRouter);
 app.use("/api/library", libraryRouter);
+app.use("/api/users", usersRouter);
 app.use("/api/invites", invitesRouter);
 app.use("/api/teams", teamsRouter);
 

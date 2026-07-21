@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import AppNav from "../components/navigation/AppNav";
 import StepTabs from "../components/navigation/StepTabs";
-import { apiFetch } from "../api/client";
+import { apiFetch, listTeamDocuments } from "../api/client";
 import { loadUploadedDocuments, saveUploadedDocuments } from "../features/quiz/storage";
 import { QUIZ_WORKFLOW_ROUTES, QUIZ_WORKFLOW_STEPS } from "../features/quiz/workflow";
 import trashIcon from "../assets/trash-icon.png";
@@ -18,14 +18,12 @@ type UploadedItem = {
   meta: string;
   status: UploadStatus;
   createdAt: string | null;
+  attribution: string | null;
+  isMine: boolean;
 };
 
 type UploadResponse = {
   data: { id: number; title: string; status: string; createdAt: string };
-};
-
-type MyDocumentsResponse = {
-  data: Array<{ id: number; title: string; status: string; createdAt: string }>;
 };
 
 type GoogleDriveFolderImportResponse = {
@@ -144,14 +142,19 @@ function UploadContentPage() {
     const hydrateUploads = async () => {
       try {
         await refreshGithubConnectionStatus();
-        const res = await apiFetch<MyDocumentsResponse>("/api/documents/mine");
-        const serverUploads: UploadedItem[] = res.data.map((document) => ({
+        // Team-wide, not just this manager's own uploads, so teammates'
+        // documents show up here too (with attribution) and can be reused
+        // for a new quiz.
+        const documents = await listTeamDocuments();
+        const serverUploads: UploadedItem[] = documents.map((document) => ({
           key: `saved-${document.id}`,
           documentId: document.id,
           name: document.title,
           meta: "SAVED",
           status: mapStoredStatus(document.status),
           createdAt: document.createdAt ?? null,
+          attribution: document.isMine ? null : document.uploadedByName,
+          isMine: document.isMine,
         }));
         setUploads(serverUploads);
         persistReadyDocs(serverUploads);
@@ -166,6 +169,8 @@ function UploadContentPage() {
           meta: "SAVED",
           status: mapStoredStatus(document.status),
           createdAt: document.createdAt ?? null,
+          attribution: null,
+          isMine: true,
         }));
         setUploads(hydratedUploads);
       } finally {
@@ -207,7 +212,16 @@ function UploadContentPage() {
       const meta = `${fileTypeLabel(file)} • ${formatBytes(file.size)}`;
 
       setUploads((prev) => [
-        { key, documentId: null, name: file.name, meta, status: "Processing...", createdAt: null },
+        {
+          key,
+          documentId: null,
+          name: file.name,
+          meta,
+          status: "Processing...",
+          createdAt: null,
+          attribution: null,
+          isMine: true,
+        },
         ...prev,
       ]);
 
@@ -259,6 +273,8 @@ function UploadContentPage() {
         meta: "GOOGLE DRIVE",
         status: "Processing...",
         createdAt: null,
+        attribution: null,
+        isMine: true,
       },
       ...prev,
     ]);
@@ -336,6 +352,8 @@ function UploadContentPage() {
         meta: "GOOGLE DRIVE FOLDER",
         status: item.status === "ready" ? "Ready" : "Failed",
         createdAt: item.createdAt,
+        attribution: null,
+        isMine: true,
       }));
 
       setUploads((prev) => {
@@ -383,6 +401,8 @@ function UploadContentPage() {
         meta: "GITHUB REPO",
         status: item.status === "ready" ? "Ready" : "Failed",
         createdAt: item.createdAt,
+        attribution: null,
+        isMine: true,
       }));
 
       setUploads((prev) => {
@@ -552,9 +572,10 @@ function UploadContentPage() {
                 <div>
                   <strong>{upload.name}</strong>
                   <p>{upload.meta}</p>
-                  {formatAddedDate(upload.createdAt) ? (
-                    <p>Added {formatAddedDate(upload.createdAt)}</p>
-                  ) : null}
+                  <p className="upload-attribution">
+                    {upload.isMine ? "Uploaded by you" : `Uploaded by ${upload.attribution ?? "a teammate"}`}
+                    {formatAddedDate(upload.createdAt) ? ` · ${formatAddedDate(upload.createdAt)}` : ""}
+                  </p>
                 </div>
                 <div className="upload-row-actions">
                   <span
@@ -568,7 +589,7 @@ function UploadContentPage() {
                   >
                     {upload.status}
                   </span>
-                  {upload.documentId !== null ? (
+                  {upload.documentId !== null && upload.isMine ? (
                     <button
                       type="button"
                       className="delete-icon-btn"
