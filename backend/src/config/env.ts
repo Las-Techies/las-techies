@@ -13,4 +13,6 @@ export const env = {
   llmKey: process.env.ENG_AI_MODEL_GW_KEY ?? "",
   supabaseUrl: process.env.SUPABASE_URL ?? "",
   supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY ?? "",
+  gmailUser: required("GMAIL_USER"),
+  gmailAppPassword: required("GMAIL_APP_PASSWORD"),
 };
