@@ -4,6 +4,19 @@ export function findUserBySupabaseId(supabaseUserId: string) {
   return prisma.user.findUnique({ where: { supabaseUserId } });
 }
 
+// Used when a new hire accepts an invite: assign them to the inviting
+// manager's team and lock their role to new_hire, server-side.
+export function assignUserTeamAndRole(input: {
+  supabaseUserId: string;
+  teamId: number;
+  role: string;
+}) {
+  return prisma.user.update({
+    where: { supabaseUserId: input.supabaseUserId },
+    data: { teamId: input.teamId, role: input.role },
+  });
+}
+
 export async function findOrCreateUserFromSupabase(input: {
   supabaseUserId: string;
   email: string;

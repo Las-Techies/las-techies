@@ -174,6 +174,26 @@ function ReviewPublishPage() {
         method: "PATCH",
         body: JSON.stringify({ status: "published" }),
       });
+
+      // Email each assigned learner an invite link. Each invite is tied to the
+      // manager's team server-side, so accepting it puts the new hire on this
+      // team as a new_hire. Failures are collected rather than aborting the
+      // whole publish (the quiz is already published at this point).
+      const inviteResults = await Promise.allSettled(
+        selectedLearners.map((email) =>
+          apiFetch("/api/invites", {
+            method: "POST",
+            body: JSON.stringify({ email }),
+          })
+        )
+      );
+      const failed = inviteResults.filter((r) => r.status === "rejected");
+      if (failed.length > 0) {
+        setPublishError(
+          `Quiz published, but ${failed.length} of ${selectedLearners.length} invite email(s) could not be sent.`
+        );
+      }
+
       setQuiz(updated);
       setIsPublishModalOpen(false);
     } catch (err) {

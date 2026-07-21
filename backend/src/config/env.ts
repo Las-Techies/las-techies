@@ -16,4 +16,10 @@ export const env = {
   githubToken: process.env.GITHUB_TOKEN ?? "",
   gmailUser: required("GMAIL_USER"),
   gmailAppPassword: required("GMAIL_APP_PASSWORD"),
+  // Where the invite link should send the new hire to sign up.
+  appUrl: process.env.APP_URL ?? "http://localhost:5173",
+  // Optional: restrict invited emails to a single domain (e.g. salesforce.com).
+  allowedEmailDomain: process.env.ALLOWED_EMAIL_DOMAIN ?? "",
+  // How long an invite link stays valid.
+  inviteExpiryHours: Number(process.env.INVITE_EXPIRY_HOURS ?? 168), // 7 days
 };

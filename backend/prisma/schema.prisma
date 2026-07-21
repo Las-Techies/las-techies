@@ -89,6 +89,18 @@ model ChatMessage {
   @@index([conversationId, createdAt])
 }
 
+model Invite {
+  id              Int       @id @default(autoincrement())
+  token           String    @unique
+  teamId          Int
+  email           String
+  createdByUserId Int
+  expiresAt       DateTime
+  usedAt          DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
 model Quiz {
   id                Int       @id @default(autoincrement())
   teamId            Int
