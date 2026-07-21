@@ -1359,6 +1359,57 @@ label {
   color: #014486;
 }
 
+.learner-email-input {
+  display: flex;
+  gap: 8px;
+}
+
+.learner-email-input input {
+  flex: 1;
+  border: 1px solid #d8dde6;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 13px;
+}
+
+.learner-email-input .secondary-btn {
+  white-space: nowrap;
+}
+
+.learner-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.learner-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid #0176d3;
+  border-radius: 999px;
+  padding: 4px 6px 4px 12px;
+  background: #edf5ff;
+  color: #014486;
+  font-size: 13px;
+}
+
+.learner-chip button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: none;
+  border-radius: 999px;
+  background: #d3e6fb;
+  color: #014486;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+
 .modal-backdrop {
   position: fixed;
   inset: 0;
