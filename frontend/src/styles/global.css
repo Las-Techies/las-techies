@@ -1536,7 +1536,7 @@ label {
 .module-grid {
   margin-top: 16px;
   display: grid;
-  grid-template-columns: 1.6fr 1fr;
+  grid-template-columns: 1fr;
   gap: 16px;
   align-items: start;
 }
@@ -1723,6 +1723,74 @@ label {
 
 .view-source:hover {
   text-decoration: underline;
+}
+
+/* ===== Sage floating chat widget ===== */
+.chat-fab {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  width: 56px;
+  height: 56px;
+  border-radius: 999px;
+  border: none;
+  background: #0b4f94;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 10px 24px rgba(11, 79, 148, 0.35);
+  z-index: 60;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.chat-fab:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 28px rgba(11, 79, 148, 0.42);
+}
+
+.chat-fab:active {
+  transform: scale(0.95);
+}
+
+.chat-fab-close {
+  color: #fff;
+  font-size: 20px;
+  line-height: 1;
+}
+
+/* Doubled-up class selector (rather than plain .chat-widget-panel) so this
+   reliably wins over .ai-card's `position: relative` regardless of the two
+   rules' order in the file — same specificity single-class selectors would
+   otherwise let whichever is declared last silently take over `position`. */
+.ai-card.chat-widget-panel {
+  position: fixed;
+  bottom: 92px;
+  right: 24px;
+  width: 360px;
+  height: min(540px, calc(100vh - 120px));
+  z-index: 59;
+  animation: chatWidgetPopIn 0.18s ease;
+}
+
+@keyframes chatWidgetPopIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (max-width: 480px) {
+  .ai-card.chat-widget-panel {
+    left: 16px;
+    right: 16px;
+    bottom: 88px;
+    width: auto;
+  }
 }
 
 /* ===== Sage chat panel ===== */

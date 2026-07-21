@@ -172,6 +172,24 @@ function HistoryIcon() {
   );
 }
 
+function ChatBubbleIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="26"
+      height="26"
+      fill="none"
+      stroke="#fff"
+      strokeWidth="2.25"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5Z" />
+    </svg>
+  );
+}
+
 function DeleteChatIcon() {
   return (
     <svg
@@ -218,6 +236,7 @@ function LearnerModulePage() {
   const [sourceError, setSourceError] = useState("");
   const [timeLimit, setTimeLimit] = useState<number | null>(null);
   const [confirmStart, setConfirmStart] = useState(false);
+  const [isChatOpen, setIsChatOpen] = useState(false);
 
   // Load the team's real uploaded documents (and the assigned quiz's title +
   // time limit) from the backend. A loading skeleton shows while the request is
@@ -611,148 +630,6 @@ function LearnerModulePage() {
               </>
             )}
           </div>
-
-          <div className="card ai-card">
-            <div className="ai-head" ref={historyRef}>
-              <Sparkle />
-              <h2>Ask Sage</h2>
-              <span className="ai-pill">AI</span>
-              <div className="ai-head-actions">
-                <button
-                  type="button"
-                  className="ai-head-btn"
-                  title="New chat"
-                  aria-label="Start a new chat"
-                  onClick={startNewChat}
-                  disabled={isTyping || isConversationLoading}
-                >
-                  <NewChatIcon />
-                </button>
-                <button
-                  type="button"
-                  className="ai-head-btn"
-                  title="Chat history"
-                  aria-label="View chat history"
-                  onClick={toggleHistory}
-                >
-                  <HistoryIcon />
-                </button>
-              </div>
-
-              {isHistoryOpen ? (
-                <div className="ai-history-panel" role="menu">
-                  <div className="ai-history-head">
-                    <span>Chat history</span>
-                    <button
-                      type="button"
-                      className="ai-history-close"
-                      aria-label="Close history"
-                      onClick={() => setIsHistoryOpen(false)}
-                    >
-                      ✕
-                    </button>
-                  </div>
-                  {isHistoryLoading ? (
-                    <p className="subtle ai-history-empty">Loading…</p>
-                  ) : conversations.length === 0 ? (
-                    <p className="subtle ai-history-empty">No past conversations yet.</p>
-                  ) : (
-                    <ul className="ai-history-list">
-                      {conversations.map((conv) => (
-                        <li key={conv.id}>
-                          <button
-                            type="button"
-                            className={`ai-history-item ${conv.id === conversationId ? "active" : ""}`}
-                            onClick={() => switchConversation(conv.id)}
-                          >
-                            <span className="ai-history-title">
-                              {conv.title ?? "Untitled conversation"}
-                            </span>
-                            <span className="ai-history-time">
-                              {relativeTimeLabel(conv.updatedAt)}
-                            </span>
-                          </button>
-                          <button
-                            type="button"
-                            className="ai-history-delete"
-                            title="Delete conversation"
-                            aria-label="Delete conversation"
-                            onClick={(event) => handleDeleteConversation(conv.id, event)}
-                            disabled={deletingConversationId === conv.id}
-                          >
-                            {deletingConversationId === conv.id ? "…" : <DeleteChatIcon />}
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                  {historyError ? <p className="form-error ai-history-empty">{historyError}</p> : null}
-                </div>
-              ) : null}
-            </div>
-            <div className="ai-messages" ref={messagesRef}>
-              {isConversationLoading ? (
-                <div className="ai-loading" aria-live="polite">
-                  <span className="ai-loading-spinner" aria-hidden />
-                  Loading Sage's last session…
-                </div>
-              ) : (
-                <>
-                  {messages.map((message, index) => {
-                    const sourceTitles = message.sources
-                      ? Array.from(new Set(message.sources.map((s) => s.documentTitle)))
-                      : [];
-                    return (
-                      <div key={index} className={`bubble-row ${message.role}`}>
-                        {message.role === "assistant" ? (
-                          <span className="bubble-avatar">
-                            <Sparkle />
-                          </span>
-                        ) : null}
-                        <div>
-                          <div className={`bubble ${message.role}`}>{message.text}</div>
-                          {sourceTitles.length > 0 ? (
-                            <p className="bubble-sources">Sources: {sourceTitles.join(", ")}</p>
-                          ) : null}
-                        </div>
-                      </div>
-                    );
-                  })}
-                  {isTyping ? (
-                    <div className="bubble-row assistant">
-                      <span className="bubble-avatar">
-                        <Sparkle />
-                      </span>
-                      <div className="bubble assistant typing" aria-label="Sage is typing">
-                        <span className="typing-dot" />
-                        <span className="typing-dot" />
-                        <span className="typing-dot" />
-                      </div>
-                    </div>
-                  ) : null}
-                </>
-              )}
-            </div>
-            <div className="ai-input-row">
-              <input
-                value={draft}
-                onChange={(event) => setDraft(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") sendMessage();
-                }}
-                placeholder="Ask a question…"
-                disabled={isTyping || isConversationLoading}
-              />
-              <button
-                type="button"
-                className="primary-btn"
-                onClick={sendMessage}
-                disabled={isTyping || isConversationLoading}
-              >
-                Send
-              </button>
-            </div>
-          </div>
         </section>
 
         <div className="page-actions">
@@ -768,6 +645,159 @@ function LearnerModulePage() {
           </button>
         </div>
       </main>
+
+      <button
+        type="button"
+        className={`chat-fab ${isChatOpen ? "open" : ""}`}
+        onClick={() => setIsChatOpen((open) => !open)}
+        aria-label={isChatOpen ? "Close Ask Sage chat" : "Open Ask Sage chat"}
+      >
+        {isChatOpen ? <span className="chat-fab-close" aria-hidden>✕</span> : <ChatBubbleIcon />}
+      </button>
+
+      {isChatOpen ? (
+        <div className="card ai-card chat-widget-panel">
+          <div className="ai-head" ref={historyRef}>
+            <Sparkle />
+            <h2>Ask Sage</h2>
+            <span className="ai-pill">AI</span>
+            <div className="ai-head-actions">
+              <button
+                type="button"
+                className="ai-head-btn"
+                title="New chat"
+                aria-label="Start a new chat"
+                onClick={startNewChat}
+                disabled={isTyping || isConversationLoading}
+              >
+                <NewChatIcon />
+              </button>
+              <button
+                type="button"
+                className="ai-head-btn"
+                title="Chat history"
+                aria-label="View chat history"
+                onClick={toggleHistory}
+              >
+                <HistoryIcon />
+              </button>
+            </div>
+
+            {isHistoryOpen ? (
+              <div className="ai-history-panel" role="menu">
+                <div className="ai-history-head">
+                  <span>Chat history</span>
+                  <button
+                    type="button"
+                    className="ai-history-close"
+                    aria-label="Close history"
+                    onClick={() => setIsHistoryOpen(false)}
+                  >
+                    ✕
+                  </button>
+                </div>
+                {isHistoryLoading ? (
+                  <p className="subtle ai-history-empty">Loading…</p>
+                ) : conversations.length === 0 ? (
+                  <p className="subtle ai-history-empty">No past conversations yet.</p>
+                ) : (
+                  <ul className="ai-history-list">
+                    {conversations.map((conv) => (
+                      <li key={conv.id}>
+                        <button
+                          type="button"
+                          className={`ai-history-item ${conv.id === conversationId ? "active" : ""}`}
+                          onClick={() => switchConversation(conv.id)}
+                        >
+                          <span className="ai-history-title">
+                            {conv.title ?? "Untitled conversation"}
+                          </span>
+                          <span className="ai-history-time">
+                            {relativeTimeLabel(conv.updatedAt)}
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          className="ai-history-delete"
+                          title="Delete conversation"
+                          aria-label="Delete conversation"
+                          onClick={(event) => handleDeleteConversation(conv.id, event)}
+                          disabled={deletingConversationId === conv.id}
+                        >
+                          {deletingConversationId === conv.id ? "…" : <DeleteChatIcon />}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {historyError ? <p className="form-error ai-history-empty">{historyError}</p> : null}
+              </div>
+            ) : null}
+          </div>
+          <div className="ai-messages" ref={messagesRef}>
+            {isConversationLoading ? (
+              <div className="ai-loading" aria-live="polite">
+                <span className="ai-loading-spinner" aria-hidden />
+                Loading Sage's last session…
+              </div>
+            ) : (
+              <>
+                {messages.map((message, index) => {
+                  const sourceTitles = message.sources
+                    ? Array.from(new Set(message.sources.map((s) => s.documentTitle)))
+                    : [];
+                  return (
+                    <div key={index} className={`bubble-row ${message.role}`}>
+                      {message.role === "assistant" ? (
+                        <span className="bubble-avatar">
+                          <Sparkle />
+                        </span>
+                      ) : null}
+                      <div>
+                        <div className={`bubble ${message.role}`}>{message.text}</div>
+                        {sourceTitles.length > 0 ? (
+                          <p className="bubble-sources">Sources: {sourceTitles.join(", ")}</p>
+                        ) : null}
+                      </div>
+                    </div>
+                  );
+                })}
+                {isTyping ? (
+                  <div className="bubble-row assistant">
+                    <span className="bubble-avatar">
+                      <Sparkle />
+                    </span>
+                    <div className="bubble assistant typing" aria-label="Sage is typing">
+                      <span className="typing-dot" />
+                      <span className="typing-dot" />
+                      <span className="typing-dot" />
+                    </div>
+                  </div>
+                ) : null}
+              </>
+            )}
+          </div>
+          <div className="ai-input-row">
+            <input
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") sendMessage();
+              }}
+              placeholder="Ask a question…"
+              disabled={isTyping || isConversationLoading}
+            />
+            <button
+              type="button"
+              className="primary-btn"
+              onClick={sendMessage}
+              disabled={isTyping || isConversationLoading}
+            >
+              Send
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       {openDoc ? (
         <div
