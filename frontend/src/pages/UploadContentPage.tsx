@@ -7,6 +7,7 @@ import { apiFetch } from "../api/client";
 import { loadUploadedDocuments, saveUploadedDocuments } from "../features/quiz/storage";
 import { QUIZ_WORKFLOW_ROUTES, QUIZ_WORKFLOW_STEPS } from "../features/quiz/workflow";
 import trashIcon from "../assets/trash-icon.png";
+import { supabase } from "../lib/supabaseClient";
 
 type UploadStatus = "Processing..." | "Ready" | "Failed";
 
@@ -26,6 +27,40 @@ type UploadResponse = {
 type MyDocumentsResponse = {
   data: Array<{ id: number; title: string; status: string; createdAt: string }>;
 };
+
+type GoogleDriveFolderImportResponse = {
+  data: {
+    folderId: string;
+    imported: number;
+    failed: number;
+    skipped: number;
+    items: Array<{
+      documentId: number | null;
+      title: string;
+      status: "ready" | "failed";
+      createdAt: string | null;
+    }>;
+  };
+};
+
+type GithubRepoImportResponse = {
+  data: {
+    owner: string;
+    repo: string;
+    branch: string;
+    imported: number;
+    failed: number;
+    skipped: number;
+    items: Array<{
+      documentId: number | null;
+      title: string;
+      status: "ready" | "failed";
+      createdAt: string | null;
+    }>;
+  };
+};
+
+type LinkKind = "google_doc" | "google_folder" | "github_repo" | "unsupported";
 
 const formatBytes = (size: number) => {
   if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
@@ -50,6 +85,28 @@ const formatAddedDate = (value: string | null) => {
   });
 };
 
+const detectLinkKind = (value: string): LinkKind => {
+  const trimmed = value.trim();
+  if (!trimmed) return "unsupported";
+
+  if (/^https:\/\/docs\.google\.com\/document\/d\/[^/]+/i.test(trimmed)) {
+    return "google_doc";
+  }
+
+  if (
+    /^https:\/\/drive\.google\.com\/drive\/folders\/[^/]+/i.test(trimmed) ||
+    /^[A-Za-z0-9_-]{10,}$/.test(trimmed)
+  ) {
+    return "google_folder";
+  }
+
+  if (/^https:\/\/github\.com\/[^/]+\/[^/]+\/?$/i.test(trimmed)) {
+    return "github_repo";
+  }
+
+  return "unsupported";
+};
+
 function UploadContentPage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [isDragActive, setIsDragActive] = useState(false);
@@ -57,10 +114,36 @@ function UploadContentPage() {
   const [isLoadingDocuments, setIsLoadingDocuments] = useState(true);
   const [error, setError] = useState("");
   const [deletingKeys, setDeletingKeys] = useState<Set<string>>(new Set());
+  const [linkInput, setLinkInput] = useState("");
+  const [isImportingLink, setIsImportingLink] = useState(false);
+  const [isGithubConnected, setIsGithubConnected] = useState(false);
+  const [isConnectingGithub, setIsConnectingGithub] = useState(false);
+
+  const persistReadyDocs = (items: UploadedItem[]) => {
+    const readyDocs = items
+      .filter((item) => item.status === "Ready" && item.documentId !== null)
+      .map((item) => ({
+        id: item.documentId as number,
+        title: item.name,
+        status: "ready",
+        createdAt: item.createdAt,
+      }));
+    saveUploadedDocuments(readyDocs);
+  };
+
+  const refreshGithubConnectionStatus = async () => {
+    const { data } = await supabase.auth.getSession();
+    const identities = data.session?.user?.identities ?? [];
+    const hasGithubIdentity = identities.some(
+      (identity) => identity.provider === "github"
+    );
+    setIsGithubConnected(hasGithubIdentity);
+  };
 
   useEffect(() => {
     const hydrateUploads = async () => {
       try {
+        await refreshGithubConnectionStatus();
         const res = await apiFetch<MyDocumentsResponse>("/api/documents/mine");
         const serverUploads: UploadedItem[] = res.data.map((document) => ({
           key: `saved-${document.id}`,
@@ -71,14 +154,7 @@ function UploadContentPage() {
           createdAt: document.createdAt ?? null,
         }));
         setUploads(serverUploads);
-        saveUploadedDocuments(
-          res.data.map((document) => ({
-            id: document.id,
-            title: document.title,
-            status: document.status,
-            createdAt: document.createdAt,
-          }))
-        );
+        persistReadyDocs(serverUploads);
       } catch {
         // Fallback to local cache if the API request fails.
         const savedDocuments = loadUploadedDocuments();
@@ -99,6 +175,25 @@ function UploadContentPage() {
 
     void hydrateUploads();
   }, []);
+
+  const handleConnectGithub = async () => {
+    try {
+      setError("");
+      setIsConnectingGithub(true);
+      const { error: oauthError } = await supabase.auth.signInWithOAuth({
+        provider: "github",
+        options: {
+          redirectTo: window.location.origin,
+        },
+      });
+      if (oauthError) {
+        throw oauthError;
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to connect GitHub.");
+      setIsConnectingGithub(false);
+    }
+  };
 
   const onPickFile = () => fileInputRef.current?.click();
 
@@ -130,17 +225,7 @@ function UploadContentPage() {
               ? { ...item, documentId: res.data.id, status: "Ready" as const, createdAt: res.data.createdAt }
               : item
           );
-
-          const readyDocs = nextUploads
-            .filter((item) => item.status === "Ready" && item.documentId !== null)
-            .map((item) => ({
-              id: item.documentId as number,
-              title: item.name,
-              status: "ready",
-              createdAt: item.createdAt,
-            }));
-
-          saveUploadedDocuments(readyDocs);
+          persistReadyDocs(nextUploads);
           return nextUploads;
         });
       } catch (err) {
@@ -155,6 +240,189 @@ function UploadContentPage() {
 
   };
 
+  const handleGoogleDriveImport = async (url: string) => {
+    const trimmedUrl = url.trim();
+    if (!trimmedUrl) {
+      setError("Please paste a Google Docs link.");
+      return;
+    }
+
+    setError("");
+    setIsImportingLink(true);
+
+    const key = `gdrive-${Date.now()}-${Math.random()}`;
+    setUploads((prev) => [
+      {
+        key,
+        documentId: null,
+        name: "Google Drive Import",
+        meta: "GOOGLE DRIVE",
+        status: "Processing...",
+        createdAt: null,
+      },
+      ...prev,
+    ]);
+
+    try {
+      const res = await apiFetch<UploadResponse>("/api/documents/import/google-drive", {
+        method: "POST",
+        body: JSON.stringify({ url: trimmedUrl }),
+      });
+
+      setUploads((prev) => {
+        const nextUploads: UploadedItem[] = prev.map((item) =>
+          item.key === key
+            ? {
+                ...item,
+                documentId: res.data.id,
+                name: res.data.title,
+                status: "Ready" as const,
+                createdAt: res.data.createdAt,
+              }
+            : item
+        );
+
+        persistReadyDocs(nextUploads);
+        return nextUploads;
+      });
+      setLinkInput("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Google Drive import failed.");
+      setUploads((prev) =>
+        prev.map((item) =>
+          item.key === key ? { ...item, status: "Failed" } : item
+        )
+      );
+    } finally {
+      setIsImportingLink(false);
+    }
+  };
+
+  const handleGoogleDriveFolderImport = async (folderInputRaw: string) => {
+    const folderInput = folderInputRaw.trim();
+    if (!folderInput) {
+      setError("Please paste a Google Drive folder URL or folder ID.");
+      return;
+    }
+
+    setError("");
+    setIsImportingLink(true);
+
+    try {
+      const { data } = await supabase.auth.getSession();
+      const googleAccessToken = data.session?.provider_token;
+      if (!googleAccessToken) {
+        throw new Error(
+          "Missing Google provider token. Please sign out and sign in with Google again."
+        );
+      }
+
+      const res = await apiFetch<GoogleDriveFolderImportResponse>(
+        "/api/documents/import/google-drive-folder",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            folderId: folderInput,
+            googleAccessToken,
+            maxFiles: 25,
+          }),
+        }
+      );
+
+      const importedItems: UploadedItem[] = res.data.items.map((item, index) => ({
+        key: `gdrive-folder-${Date.now()}-${index}-${Math.random()}`,
+        documentId: item.documentId,
+        name: item.title,
+        meta: "GOOGLE DRIVE FOLDER",
+        status: item.status === "ready" ? "Ready" : "Failed",
+        createdAt: item.createdAt,
+      }));
+
+      setUploads((prev) => {
+        const nextUploads = [...importedItems, ...prev];
+        persistReadyDocs(nextUploads);
+        return nextUploads;
+      });
+
+      setLinkInput("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Google Drive folder import failed.");
+    } finally {
+      setIsImportingLink(false);
+    }
+  };
+
+  const handleGithubRepoImport = async (repoUrlRaw: string) => {
+    const repoUrl = repoUrlRaw.trim();
+    if (!repoUrl) {
+      setError("Please paste a GitHub repository URL.");
+      return;
+    }
+
+    setError("");
+    setIsImportingLink(true);
+
+    try {
+      const { data } = await supabase.auth.getSession();
+      const res = await apiFetch<GithubRepoImportResponse>(
+        "/api/documents/import/github-repo",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            repoUrl,
+            githubAccessToken: data.session?.provider_token,
+            maxFiles: 25,
+          }),
+        }
+      );
+
+      const importedItems: UploadedItem[] = res.data.items.map((item, index) => ({
+        key: `github-repo-${Date.now()}-${index}-${Math.random()}`,
+        documentId: item.documentId,
+        name: item.title,
+        meta: "GITHUB REPO",
+        status: item.status === "ready" ? "Ready" : "Failed",
+        createdAt: item.createdAt,
+      }));
+
+      setUploads((prev) => {
+        const nextUploads = [...importedItems, ...prev];
+        persistReadyDocs(nextUploads);
+        return nextUploads;
+      });
+
+      setLinkInput("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "GitHub repository import failed.");
+    } finally {
+      setIsImportingLink(false);
+    }
+  };
+
+  const handleImportFromLink = async () => {
+    const link = linkInput.trim();
+    const kind = detectLinkKind(link);
+
+    if (kind === "google_doc") {
+      await handleGoogleDriveImport(link);
+      return;
+    }
+
+    if (kind === "google_folder") {
+      await handleGoogleDriveFolderImport(link);
+      return;
+    }
+
+    if (kind === "github_repo") {
+      await handleGithubRepoImport(link);
+      return;
+    }
+
+    setError(
+      "Unsupported link. Paste a Google Doc URL, Google Drive folder URL/ID, or GitHub repo URL."
+    );
+  };
+
   const handleDelete = async (upload: UploadedItem) => {
     if (upload.documentId === null) return;
     if (!window.confirm(`Delete "${upload.name}"? This can't be undone.`)) return;
@@ -167,17 +435,7 @@ function UploadContentPage() {
 
       setUploads((prev) => {
         const nextUploads = prev.filter((item) => item.key !== upload.key);
-
-        const readyDocs = nextUploads
-          .filter((item) => item.status === "Ready" && item.documentId !== null)
-          .map((item) => ({
-            id: item.documentId as number,
-            title: item.name,
-            status: "ready",
-            createdAt: item.createdAt,
-          }));
-        saveUploadedDocuments(readyDocs);
-
+        persistReadyDocs(nextUploads);
         return nextUploads;
       });
     } catch (err) {
@@ -243,6 +501,43 @@ function UploadContentPage() {
             accept=".pdf,.doc,.docx,.txt,.md"
             multiple
           />
+        </section>
+
+        <section className="card link-import-zone">
+          <h2>Import from Link</h2>
+          <p>Paste a Google Doc, Drive folder, or GitHub repo link.</p>
+          <div className="link-import-connection-row">
+            <span>
+              GitHub: {isGithubConnected ? "Connected" : "Not connected"}
+            </span>
+            <button
+              className="secondary-btn"
+              type="button"
+              onClick={() => void handleConnectGithub()}
+              disabled={isGithubConnected || isConnectingGithub}
+            >
+              {isGithubConnected
+                ? "Connected"
+                : isConnectingGithub
+                  ? "Connecting..."
+                  : "Connect GitHub"}
+            </button>
+          </div>
+          <input
+            type="text"
+            value={linkInput}
+            onChange={(event) => setLinkInput(event.target.value)}
+            placeholder="https://docs.google.com/... or https://drive.google.com/drive/folders/... or https://github.com/org/repo"
+            className="text-input"
+          />
+          <button
+            className="secondary-btn"
+            type="button"
+            onClick={() => void handleImportFromLink()}
+            disabled={isImportingLink}
+          >
+            {isImportingLink ? "Importing..." : "Import Link"}
+          </button>
         </section>
 
         <section className="card uploads-table">

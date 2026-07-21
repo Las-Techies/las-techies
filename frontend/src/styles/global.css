@@ -540,6 +540,36 @@ label {
   color: #706e6b;
 }
 
+.link-import-zone {
+  display: grid;
+  gap: 10px;
+  text-align: left;
+}
+
+.link-import-zone h2 {
+  margin-bottom: 0;
+}
+
+.link-import-zone p {
+  margin: 0;
+  color: #706e6b;
+}
+
+.link-import-connection-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.link-import-zone input {
+  margin-top: 0;
+}
+
+.link-import-zone .secondary-btn {
+  justify-self: center;
+}
+
 .uploads-table h3 {
   font-size: 12px;
   color: #706e6b;
@@ -1516,6 +1546,25 @@ label {
   min-width: 0;
 }
 
+.lib-loading {
+  display: grid;
+  gap: 12px;
+  padding: 16px 0 4px;
+}
+
+.lib-empty {
+  margin: 0;
+  padding: 40px 16px;
+  text-align: center;
+  color: #706e6b;
+  font-size: 14px;
+}
+
+.title-loading {
+  height: 34px;
+  margin: 6px 0 4px;
+}
+
 .lib-tabs {
   display: flex;
   gap: 8px;
@@ -2104,7 +2153,7 @@ label {
 .doc-modal-foot {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   padding: 12px 18px;
   border-top: 1px solid #e6e6e6;
 }
@@ -2125,6 +2174,60 @@ label {
   background: #fff;
   cursor: pointer;
   color: #555;
+}
+
+/* ===== Start-quiz confirmation ===== */
+.confirm-modal {
+  width: min(440px, calc(100vw - 32px));
+  background: #fff;
+  border-radius: 14px;
+  padding: 28px 26px 22px;
+  box-shadow: 0 24px 60px rgba(2, 42, 84, 0.28);
+  text-align: center;
+}
+
+.confirm-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: #eaf4fe;
+  margin-bottom: 6px;
+}
+
+.confirm-modal h2 {
+  margin: 6px 0 0;
+  font-size: 22px;
+  color: #032d60;
+}
+
+.confirm-lead {
+  margin: 12px 0 0;
+  font-size: 15px;
+  color: #3d3d3d;
+}
+
+.confirm-warn {
+  margin: 10px 0 0;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: #706e6b;
+  background: #fef6e6;
+  border: 1px solid #f4e2b8;
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.confirm-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 22px;
+}
+
+.confirm-actions button {
+  flex: 1;
 }
 
 /* ===== Quiz Taking ===== */

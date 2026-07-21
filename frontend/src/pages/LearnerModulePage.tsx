@@ -12,29 +12,20 @@ import {
 } from "../api/client";
 import { saveModuleProgress } from "../features/quiz/storage";
 import type { GeneratedQuiz } from "../features/quiz/types";
-import {
-  learnerModule,
-  libraryDocs,
-  recentlyAdded,
-  type SourceKind,
-} from "../features/learner/data";
+import { type SourceKind } from "../features/learner/data";
 
 type Filter = "All" | "Files" | "Confluence" | "Repos";
 const FILTERS: Filter[] = ["All", "Files", "Confluence", "Repos"];
 
-// A document as rendered in the library. Real backend uploads carry a
-// `remoteId` (so "View source" can fetch their extracted text on demand);
-// demo entries carry inline `content` instead.
+// A document as rendered in the library. Backed by a real uploaded document;
+// `remoteId` lets "View source" fetch its extracted text on demand.
 type DisplayDoc = {
   id: string;
-  remoteId?: number;
+  remoteId: number;
   title: string;
   kind: SourceKind;
   typeLabel: string;
   addedLabel: string;
-  pages?: number;
-  content?: string;
-  highlight?: string;
 };
 
 type ChatMessage = { role: "assistant" | "user"; text: string; sources?: ChatSource[] };
@@ -79,17 +70,6 @@ function renderDocParagraphs(content: string, highlight?: string) {
     const isHeading = /^\d+(\.\d+)?\.?\s/.test(paragraph) && paragraph.length < 80;
     if (isTitle) return <h3 key={index}>{paragraph}</h3>;
     if (isHeading) return <h4 key={index}>{paragraph}</h4>;
-
-    if (highlight && paragraph.includes(highlight)) {
-      const [before, after] = paragraph.split(highlight);
-      return (
-        <p key={index}>
-          {before}
-          <mark>{highlight}</mark>
-          {after}
-        </p>
-      );
-    }
     return <p key={index}>{paragraph}</p>;
   });
 }
@@ -231,16 +211,21 @@ function LearnerModulePage() {
   const messagesRef = useRef<HTMLDivElement>(null);
   const [moduleTitle, setModuleTitle] = useState(learnerModule.title);
   const [recentVisible, setRecentVisible] = useState(5);
-  const [remoteFiles, setRemoteFiles] = useState<DisplayDoc[] | null>(null);
+  const [docs, setDocs] = useState<DisplayDoc[]>([]);
+  const [loading, setLoading] = useState(true);
   const [sourceText, setSourceText] = useState<Record<number, string>>({});
   const [sourceLoadingId, setSourceLoadingId] = useState<number | null>(null);
   const [sourceError, setSourceError] = useState("");
+  const [timeLimit, setTimeLimit] = useState<number | null>(null);
+  const [confirmStart, setConfirmStart] = useState(false);
 
-  // Pull the team's real uploaded documents (and the assigned quiz title) from
-  // the backend. Falls back silently to the demo library if unauthenticated or
-  // empty, so the module is always presentable.
+  // Load the team's real uploaded documents (and the assigned quiz's title +
+  // time limit) from the backend. A loading skeleton shows while the request is
+  // in flight; if it fails or returns nothing we land on a clean empty state —
+  // never demo/fake data.
   useEffect(() => {
     let cancelled = false;
+    setLoading(true);
     apiFetch<{ data: { id: number; title: string; status: string; createdAt?: string }[] }>(
       "/api/documents/mine"
     )
@@ -254,14 +239,19 @@ function LearnerModulePage() {
           typeLabel: fileTypeLabel(doc.title),
           addedLabel: relativeAddedLabel(doc.createdAt),
         }));
-        if (files.length > 0) setRemoteFiles(files);
+        setDocs(files);
       })
       .catch(() => {
-        /* keep demo library */
+        /* land on the empty state rather than showing fake data */
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
       });
     apiFetch<GeneratedQuiz | null>("/api/quizzes/mine/latest")
       .then((quiz) => {
-        if (!cancelled && quiz?.title) setModuleTitle(quiz.title);
+        if (cancelled || !quiz) return;
+        if (quiz.title) setModuleTitle(quiz.title);
+        if (quiz.timeLimitMinutes) setTimeLimit(quiz.timeLimitMinutes);
       })
       .catch(() => {
         /* keep default title */
@@ -341,28 +331,23 @@ function LearnerModulePage() {
       ? sections
       : sections.filter((section) => section.kind === filterToKind[activeFilter]);
 
-  // Real uploads replace the demo "Files" when available; Confluence/Repo
-  // entries stay as demo sources since the backend only ingests file uploads.
-  const fileDocs = remoteFiles ?? libraryDocs.filter((doc) => doc.kind === "file");
-  const otherDocs = libraryDocs.filter((doc) => doc.kind !== "file");
-  const allDocs = useMemo<DisplayDoc[]>(
-    () => [...fileDocs, ...otherDocs],
-    [fileDocs, otherDocs]
-  );
+  const docsForKind = (kind: SourceKind) => docs.filter((doc) => doc.kind === kind);
 
-  const recentAll = remoteFiles
-    ? remoteFiles.map((doc) => ({
-        id: doc.id,
-        title: doc.title,
-        addedLabel: doc.addedLabel,
-      }))
-    : recentlyAdded;
+  const recentAll = docs.map((doc) => ({
+    id: doc.id,
+    title: doc.title,
+    addedLabel: doc.addedLabel,
+  }));
   const visibleRecent = recentAll.slice(0, recentVisible);
   const hasMoreRecent = recentAll.length > recentVisible;
 
-  const totalDocs = allDocs.length;
+  const totalDocs = docs.length;
   const readCount = readIds.size;
   const progressPercent = totalDocs ? Math.round((readCount / totalDocs) * 100) : 0;
+  const visibleDocCount = visibleSections.reduce(
+    (sum, section) => sum + docsForKind(section.kind).length,
+    0
+  );
 
   useEffect(() => {
     saveModuleProgress({ read: readCount, total: totalDocs });
@@ -392,7 +377,7 @@ function LearnerModulePage() {
       next.add(doc.id);
       return next;
     });
-    if (doc.remoteId != null) loadSource(doc.remoteId);
+    loadSource(doc.remoteId);
   };
 
   // Refreshes the history list in the background (e.g. after sending a
@@ -512,18 +497,23 @@ function LearnerModulePage() {
     <div className="app-shell">
       <AppNav />
       <main className="page-wrap">
-        <h1>{moduleTitle}</h1>
-        <p className="subtle">Assigned by: {learnerModule.assignedBy}</p>
+        {loading && !moduleTitle ? (
+          <div className="title-loading loading-line" style={{ maxWidth: 320 }} />
+        ) : (
+          <h1>{moduleTitle || "Onboarding module"}</h1>
+        )}
 
-        <div className="module-progress">
-          <span className="module-progress-label">Progress</span>
-          <div className="progress-track">
-            <div className="progress-fill" style={{ width: `${progressPercent}%` }} />
+        {!loading && docs.length > 0 ? (
+          <div className="module-progress">
+            <span className="module-progress-label">Progress</span>
+            <div className="progress-track">
+              <div className="progress-fill" style={{ width: `${progressPercent}%` }} />
+            </div>
+            <span className="progress-label">
+              {readCount} / {totalDocs} read
+            </span>
           </div>
-          <span className="progress-label">
-            {readCount} / {totalDocs} read
-          </span>
-        </div>
+        ) : null}
 
         <section className="module-grid">
           <div className="card lib-card">
@@ -540,67 +530,88 @@ function LearnerModulePage() {
               ))}
             </div>
 
-            {activeFilter === "All" ? (
+            {loading ? (
+              <div className="lib-loading" aria-busy="true">
+                <div className="loading-line" />
+                <div className="loading-line" />
+                <div className="loading-line" />
+                <div className="loading-line short" />
+              </div>
+            ) : docs.length === 0 ? (
+              <p className="lib-empty">
+                No documents have been added to this module yet.
+              </p>
+            ) : (
               <>
-                <p className="lib-section-label">Recently added</p>
-                <div className="recent-row">
-                  {visibleRecent.map((item) => (
-                    <div className="recent-card" key={item.id}>
-                      <DocIcon kind="file" />
-                      <div>
-                        <strong>{item.title}</strong>
-                        <span>{item.addedLabel}</span>
-                      </div>
-                    </div>
-                  ))}
-                  {hasMoreRecent ? (
-                    <button
-                      type="button"
-                      className="recent-more"
-                      aria-label="Show more recently added"
-                      title="Show more"
-                      onClick={() => setRecentVisible((count) => count + 5)}
-                    >
-                      →
-                    </button>
-                  ) : null}
-                </div>
-              </>
-            ) : null}
-
-            {visibleSections.map((section) => {
-              const docs = docsForKind(section.kind);
-              if (docs.length === 0) return null;
-              return (
-                <div className="lib-section" key={section.label}>
-                  <p className="lib-section-label">{section.label}</p>
-                  {docs.map((doc) => {
-                    const isRead = readIds.has(doc.id);
-                    return (
-                      <div className="doc-row" key={doc.id}>
-                        <DocIcon kind={doc.kind} />
-                        <div className="doc-info">
-                          <strong className="doc-title">{doc.title}</strong>
-                          <span className="doc-meta">
-                            {doc.typeLabel} · {doc.addedLabel}
-                          </span>
+                {activeFilter === "All" ? (
+                  <>
+                    <p className="lib-section-label">Recently added</p>
+                    <div className="recent-row">
+                      {visibleRecent.map((item) => (
+                        <div className="recent-card" key={item.id}>
+                          <DocIcon kind="file" />
+                          <div>
+                            <strong>{item.title}</strong>
+                            <span>{item.addedLabel}</span>
+                          </div>
                         </div>
-                        <span className={`read-badge ${isRead ? "read" : "unread"}`}>
-                          {isRead ? "✓ Read" : "○ Unread"}
-                        </span>
+                      ))}
+                      {hasMoreRecent ? (
                         <button
                           type="button"
-                          className="view-source"
-                          onClick={() => openSource(doc)}
+                          className="recent-more"
+                          aria-label="Show more recently added"
+                          title="Show more"
+                          onClick={() => setRecentVisible((count) => count + 5)}
                         >
-                          View source
+                          →
                         </button>
-                      </div>
-                    );
-                  })}
-                </div>
-              );
-            })}
+                      ) : null}
+                    </div>
+                  </>
+                ) : null}
+
+                {visibleSections.map((section) => {
+                  const sectionDocs = docsForKind(section.kind);
+                  if (sectionDocs.length === 0) return null;
+                  return (
+                    <div className="lib-section" key={section.label}>
+                      <p className="lib-section-label">{section.label}</p>
+                      {sectionDocs.map((doc) => {
+                        const isRead = readIds.has(doc.id);
+                        return (
+                          <div className="doc-row" key={doc.id}>
+                            <DocIcon kind={doc.kind} />
+                            <div className="doc-info">
+                              <strong className="doc-title">{doc.title}</strong>
+                              <span className="doc-meta">
+                                {doc.typeLabel} · {doc.addedLabel}
+                              </span>
+                            </div>
+                            <span className={`read-badge ${isRead ? "read" : "unread"}`}>
+                              {isRead ? "✓ Read" : "○ Unread"}
+                            </span>
+                            <button
+                              type="button"
+                              className="view-source"
+                              onClick={() => openSource(doc)}
+                            >
+                              View source
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })}
+
+                {visibleDocCount === 0 ? (
+                  <p className="lib-empty">
+                    No {activeFilter.toLowerCase()} documents in this module.
+                  </p>
+                ) : null}
+              </>
+            )}
           </div>
 
           <div className="card ai-card">
@@ -753,7 +764,7 @@ function LearnerModulePage() {
           <button
             className="primary-btn"
             type="button"
-            onClick={() => navigate("/quiz-taking")}
+            onClick={() => setConfirmStart(true)}
           >
             Take Quiz →
           </button>
@@ -773,10 +784,7 @@ function LearnerModulePage() {
               <DocIcon kind={openDoc.kind} />
               <div className="doc-modal-title">
                 <strong>{openDoc.title}</strong>
-                <span>
-                  {openDoc.typeLabel}
-                  {openDoc.pages ? ` · ${openDoc.pages} pages` : ""}
-                </span>
+                <span>{openDoc.typeLabel}</span>
               </div>
               <button
                 type="button"
@@ -789,40 +797,79 @@ function LearnerModulePage() {
             </header>
 
             <div className="doc-modal-body">
-              {openDoc.remoteId != null ? (
-                sourceLoadingId === openDoc.remoteId ? (
-                  <p className="subtle">Loading source…</p>
-                ) : sourceError && !sourceText[openDoc.remoteId] ? (
-                  <p className="form-error">{sourceError}</p>
-                ) : (
-                  <article className="doc-page">
-                    {renderDocParagraphs(
-                      sourceText[openDoc.remoteId] ??
-                        "No extracted text available for this document."
-                    )}
-                  </article>
-                )
+              {sourceLoadingId === openDoc.remoteId ? (
+                <p className="subtle">Loading source…</p>
+              ) : sourceError && !sourceText[openDoc.remoteId] ? (
+                <p className="form-error">{sourceError}</p>
               ) : (
                 <article className="doc-page">
-                  {renderDocParagraphs(openDoc.content ?? "")}
+                  {renderDocParagraphs(
+                    sourceText[openDoc.remoteId] ??
+                      "No extracted text available for this document."
+                  )}
                 </article>
               )}
             </div>
 
             <footer className="doc-modal-foot">
-              <div className="pager">
-                <button type="button" aria-label="Previous page">
-                  ‹
-                </button>
-                <span>Page 1 of {openDoc.pages ?? 1}</span>
-                <button type="button" aria-label="Next page">
-                  ›
-                </button>
-              </div>
               <button type="button" className="primary-btn" onClick={() => setOpenDoc(null)}>
                 Done
               </button>
             </footer>
+          </div>
+        </div>
+      ) : null}
+
+      {confirmStart ? (
+        <div
+          className="doc-modal-backdrop"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Start quiz"
+          onClick={() => setConfirmStart(false)}
+        >
+          <div className="confirm-modal" onClick={(event) => event.stopPropagation()}>
+            <div className="confirm-icon" aria-hidden>
+              <svg viewBox="0 0 24 24" width="26" height="26">
+                <circle cx="12" cy="13" r="8" fill="none" stroke="#0176d3" strokeWidth="1.8" />
+                <path
+                  d="M12 9v4l2.5 2"
+                  fill="none"
+                  stroke="#0176d3"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                />
+                <path d="M9 2h6" stroke="#0176d3" strokeWidth="1.8" strokeLinecap="round" />
+              </svg>
+            </div>
+            <h2>Ready to start the quiz?</h2>
+            <p className="confirm-lead">
+              You'll have <strong>{timeLimit ?? 30} minutes</strong> to complete it once you
+              begin.
+            </p>
+            <p className="confirm-warn">
+              Once you start, you won't be able to return to the learner module until you
+              submit. Make sure you've reviewed the materials.
+            </p>
+            <div className="confirm-actions">
+              <button
+                type="button"
+                className="secondary-btn"
+                onClick={() => setConfirmStart(false)}
+              >
+                Not yet
+              </button>
+              <button
+                type="button"
+                className="primary-btn"
+                onClick={() => {
+                  setConfirmStart(false);
+                  navigate("/quiz-taking");
+                }}
+              >
+                Start quiz →
+              </button>
+            </div>
           </div>
         </div>
       ) : null}
