@@ -16,6 +16,7 @@ function LoginPage() {
   const [role, setRole] = useState<"" | "new_hire" | "manager">("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
+  const [teamName, setTeamName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -324,6 +325,18 @@ function LoginPage() {
                 Manager
               </button>
             </div>
+
+            {role === "manager" ? (
+              <label>
+                Create your team
+                <input
+                  type="text"
+                  placeholder="e.g. Frontline Ops Team"
+                  value={teamName}
+                  onChange={(event) => setTeamName(event.target.value)}
+                />
+              </label>
+            ) : null}
           </>
         ) : null}
 
