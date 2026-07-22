@@ -128,6 +128,7 @@ Writing high-quality questions and options:
 - Never use "All of the above", "None of the above", or options that only differ by a negation (e.g. "X happens" vs "X does not happen").
 - Do not phrase the question so the correct answer simply repeats a distinctive phrase from the source verbatim while the wrong answers use generic language — vary the wording so the question can't be solved by pattern-matching alone.
 - Each question should stand on its own and test one clear idea; avoid compound questions ("...and also...").
+- Vary which option is correct across questions. Do NOT always make the first option the correct one; spread the correct answer roughly evenly across all positions.
 
 Return ONLY valid JSON (no markdown, no prose) in this exact shape:
 {
@@ -137,8 +138,8 @@ Return ONLY valid JSON (no markdown, no prose) in this exact shape:
       "prompt": "string",
       "type": "multiple_choice",
       "options": [
-        { "id": 1, "text": "string", "isCorrect": true },
-        { "id": 2, "text": "string", "isCorrect": false }
+        { "id": 1, "text": "string", "isCorrect": false },
+        { "id": 2, "text": "string", "isCorrect": true }
       ],
       "explanation": "string",
       "citation": {
