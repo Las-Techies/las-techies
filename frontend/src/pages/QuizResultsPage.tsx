@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import AppNav from "../components/navigation/AppNav";
 import { apiFetch } from "../api/client";
+import { findHighlightSpan } from "../features/quiz/citationMatch";
 import { loadQuizAttempt, loadQuizConfig } from "../features/quiz/storage";
 import type { GeneratedQuiz, QuizQuestion } from "../features/quiz/types";
 
@@ -73,17 +74,16 @@ function QuizResultsPage() {
   }
 
   function renderHighlightedSource(sourceText: string, snippet: string, questionId: number) {
-    const normalizedSource = sourceText ?? "";
-    const normalizedSnippet = snippet?.trim() ?? "";
-    if (!normalizedSnippet) return normalizedSource;
+    const source = sourceText ?? "";
+    // Falls back to a fuzzy sentence match when the citation isn't a
+    // verbatim substring (LLM-written quotes often drift slightly), and to
+    // no highlight at all when nothing is close enough to be trustworthy.
+    const span = findHighlightSpan(source, snippet);
+    if (!span) return source;
 
-    const start = normalizedSource.indexOf(normalizedSnippet);
-    if (start === -1) return normalizedSource;
-
-    const end = start + normalizedSnippet.length;
-    const before = normalizedSource.slice(0, start);
-    const match = normalizedSource.slice(start, end);
-    const after = normalizedSource.slice(end);
+    const before = source.slice(0, span.start);
+    const match = source.slice(span.start, span.end);
+    const after = source.slice(span.end);
 
     return (
       <>
@@ -92,7 +92,11 @@ function QuizResultsPage() {
           ref={(el) => {
             highlightRefs.current[String(questionId)] = el;
           }}
-          style={{ background: "#cfe3cf", padding: "0 2px" }}
+          style={{
+            background: span.matchType === "exact" ? "#cfe3cf" : "#dbe7fb",
+            padding: "0 2px",
+          }}
+          title={span.matchType === "fuzzy" ? "Approximate match — wording may differ slightly" : undefined}
         >
           {match}
         </mark>
