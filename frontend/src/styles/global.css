@@ -228,6 +228,53 @@ label {
   color: #ba0517;
 }
 
+.alert-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 14px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(2, 42, 84, 0.05);
+}
+
+.alert-banner-error {
+  background: #fdeceb;
+  border: 1px solid #f6c4c1;
+  color: #8a1a12;
+}
+
+.alert-banner-icon {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.alert-banner-message {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.45;
+  flex: 1;
+}
+
+.alert-banner-dismiss {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.alert-banner-dismiss:hover {
+  background: rgba(138, 26, 18, 0.1);
+}
+
 .form-info {
   margin: 10px 0 0;
   font-size: 13px;
@@ -571,10 +618,9 @@ label {
 }
 
 .uploads-table h3 {
-  font-size: 12px;
-  color: #706e6b;
-  font-weight: 500;
-  margin-bottom: 4px;
+  font-size: 20px;
+  font-weight: 700;
+  margin-bottom: 6px;
 }
 
 .uploads-empty {
@@ -583,12 +629,54 @@ label {
   font-size: 13px;
 }
 
+.uploads-hint {
+  margin: 0 0 10px;
+  color: #5c5c5a;
+  font-size: 15px;
+}
+
 .upload-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   border-top: 1px solid #f0efef;
   padding: 12px 0;
+}
+
+.upload-row-main {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.upload-select-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  margin-top: 2px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: #c9c9c8;
+  cursor: pointer;
+  transition: color 0.15s ease, transform 0.1s ease;
+}
+
+.upload-select-toggle:hover:not(:disabled) {
+  color: #9ac7f2;
+  transform: scale(1.08);
+}
+
+.upload-select-toggle.selected {
+  color: #020061;
+}
+
+.upload-select-toggle:disabled {
+  color: #e5e5e4;
+  cursor: default;
 }
 
 .upload-row p {
@@ -636,31 +724,47 @@ label {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
   width: 30px;
   height: 30px;
+  border-radius: 999px;
   border: 1px solid #f3b9b3;
   background: #fff;
-  border-radius: 999px;
   font-size: 11px;
   color: #ba0517;
   padding: 0;
   cursor: pointer;
-  transition: background 0.15s ease;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
 }
 
 .delete-icon-btn:hover:not(:disabled) {
   background: #fdeceb;
+  transform: scale(1.05);
 }
 
 .delete-icon-btn:disabled {
   cursor: default;
-  opacity: 0.6;
+}
+
+.delete-icon-btn.is-deleting {
+  background: #fdeceb;
+  border-color: #f3b9b3;
+  opacity: 1;
 }
 
 .delete-icon {
   width: 16px;
   height: 16px;
   object-fit: contain;
+}
+
+.delete-spinner {
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  border: 2px solid #f3b9b3;
+  border-top-color: #ba0517;
+  animation: aiLoadingSpin 0.7s linear infinite;
 }
 
 .page-actions {
@@ -782,6 +886,21 @@ label {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+.doc-picker-summary {
+  font-size: 13px;
+  color: #444;
+  background: #f7f7f6;
+  border: 1px solid #e5e5e4;
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin-bottom: 14px;
+}
+
+.doc-picker-manage-link {
+  font-weight: 600;
+  white-space: nowrap;
 }
 
 .difficulty-chips {
@@ -2355,12 +2474,35 @@ label {
   padding: 1px 2px;
 }
 
+/* Fills the modal body edge-to-edge (overriding its padding) so the
+   embedded PDF/DOCX viewer reads as the real document, not a text card. */
+.doc-modal-iframe {
+  width: 100%;
+  height: 100%;
+  margin: -24px;
+  border: none;
+  background: #fff;
+}
+
 .doc-modal-foot {
   display: flex;
   align-items: center;
   justify-content: flex-end;
+  gap: 16px;
   padding: 12px 18px;
   border-top: 1px solid #e6e6e6;
+}
+
+.doc-modal-open-original {
+  margin-right: auto;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #020061;
+  text-decoration: none;
+}
+
+.doc-modal-open-original:hover {
+  text-decoration: underline;
 }
 
 .pager {

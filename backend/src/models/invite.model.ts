@@ -4,6 +4,7 @@ export function createInvite(input: {
   token: string;
   teamId: number;
   email: string;
+  quizId?: number | null;
   createdByUserId: number;
   expiresAt: Date;
 }) {
@@ -12,6 +13,7 @@ export function createInvite(input: {
       token: input.token,
       teamId: input.teamId,
       email: input.email,
+      quizId: input.quizId ?? null,
       createdByUserId: input.createdByUserId,
       expiresAt: input.expiresAt,
     },

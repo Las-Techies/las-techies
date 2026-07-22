@@ -4,6 +4,7 @@
   "description": "Express API for the AI Onboarding Quiz App. Stack: **Node.js + Express**, **Prisma** (Postgres on Supabase), **Supabase Auth**, and the **Salesforce Express LLM Gateway** for AI. TypeScript recommended (see `planning/` for contracts).",
   "main": "index.js",
   "scripts": {
+    "postinstall": "prisma generate",
     "dev": "tsx watch src/index.ts",
     "seed": "tsx src/db/seeds/seed.ts",
     "backfill-embeddings": "tsx src/scripts/backfillEmbeddings.ts",

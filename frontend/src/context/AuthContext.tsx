@@ -7,6 +7,7 @@ import {
 } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "../lib/supabaseClient";
+import { QUIZ_ATTEMPT_STORAGE_KEY } from "../features/quiz/types";
 
 export type UserRole = "new_hire" | "manager";
 
@@ -89,6 +90,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function signOut() {
     await supabase.auth.signOut();
+    // Clear any quiz attempt cached in this browser so the next user to log in
+    // here doesn't inherit a previous person's results (the Results page keys
+    // "have they attempted the quiz?" off this).
+    localStorage.removeItem(QUIZ_ATTEMPT_STORAGE_KEY);
   }
 
   // Sends a password-reset email. Supabase redirects the user back here

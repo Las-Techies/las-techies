@@ -8,6 +8,10 @@ import {
 } from "./types";
 
 const UPLOADED_DOCS_STORAGE_KEY = "sageforce_uploaded_documents";
+// Tracks which documents a manager has *unchecked* for quiz generation on the
+// Upload Content page, rather than which ones are checked — so newly
+// uploaded documents default to selected without any extra bookkeeping.
+const DESELECTED_DOCUMENT_IDS_STORAGE_KEY = "sageforce_deselected_document_ids";
 
 const parsePositiveNumber = (value: unknown, fallback: number) => {
   const parsed = Number.parseInt(String(value ?? ""), 10);
@@ -48,6 +52,23 @@ export const saveQuizConfig = (config: QuizConfig) => {
 
 export const saveUploadedDocuments = (documents: UploadedDocument[]) => {
   localStorage.setItem(UPLOADED_DOCS_STORAGE_KEY, JSON.stringify(documents));
+};
+
+export const loadDeselectedDocumentIds = (): Set<number> => {
+  const raw = localStorage.getItem(DESELECTED_DOCUMENT_IDS_STORAGE_KEY);
+  if (!raw) return new Set();
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed)
+      ? new Set(parsed.filter((id): id is number => typeof id === "number"))
+      : new Set();
+  } catch {
+    return new Set();
+  }
+};
+
+export const saveDeselectedDocumentIds = (ids: Set<number>) => {
+  localStorage.setItem(DESELECTED_DOCUMENT_IDS_STORAGE_KEY, JSON.stringify(Array.from(ids)));
 };
 
 export const loadUploadedDocuments = (): UploadedDocument[] => {

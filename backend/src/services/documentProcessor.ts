@@ -107,6 +107,48 @@ export async function extractTextFromGoogleDriveUrl(url: string): Promise<{
   };
 }
 
+export function extractGoogleDocLinks(rawText: string, maxLinks = 5): string[] {
+  if (!rawText?.trim() || maxLinks <= 0) {
+    return [];
+  }
+
+  const candidates = rawText.match(/https?:\/\/[^\s<>"')\]]+/gi) ?? [];
+  const uniqueLinks = new Set<string>();
+  const links: string[] = [];
+
+  for (const candidate of candidates) {
+    const trimmedCandidate = candidate.replace(/[),.;!?]+$/, "");
+
+    try {
+      const parsed = new URL(trimmedCandidate);
+      if (parsed.hostname !== "docs.google.com") {
+        continue;
+      }
+
+      const docIdMatch = parsed.pathname.match(/\/document\/d\/([^/]+)/);
+      const docId = docIdMatch?.[1];
+      if (!docId) {
+        continue;
+      }
+
+      const normalized = `https://docs.google.com/document/d/${docId}`;
+      if (uniqueLinks.has(normalized)) {
+        continue;
+      }
+
+      uniqueLinks.add(normalized);
+      links.push(normalized);
+      if (links.length >= maxLinks) {
+        break;
+      }
+    } catch {
+      // Ignore invalid URLs and continue parsing.
+    }
+  }
+
+  return links;
+}
+
 function ensureGoogleAccessToken(token: string) {
   if (!token?.trim()) {
     throw new Error("Google access token is required.");

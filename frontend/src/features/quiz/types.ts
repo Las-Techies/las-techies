@@ -45,7 +45,7 @@ export type QuizConfig = {
   moduleTitle: string;
   topic: string;
   passingScore: number;
-  timeLimit: number;
+  timeLimit: number; // minutes; 0 means no time limit
   questionCount: number;
   dueDate: string;
   difficulty: QuizDifficulty;

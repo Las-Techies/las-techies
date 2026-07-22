@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import AppNav from "../components/navigation/AppNav";
 import StepTabs from "../components/navigation/StepTabs";
 import { apiFetch, assignQuiz, listTeamMembers, type TeamMember } from "../api/client";
+import { findHighlightSpan } from "../features/quiz/citationMatch";
 import { loadQuizConfig } from "../features/quiz/storage";
 import {
   DEFAULT_QUIZ_CONFIG,
@@ -213,7 +214,10 @@ function ReviewPublishPage() {
         selectedLearners.map((email) =>
           apiFetch("/api/invites", {
             method: "POST",
-            body: JSON.stringify({ email }),
+            // Tie the invite to this quiz so accepting it auto-creates the
+            // new hire's assignment (otherwise they'd land with nothing on
+            // their onboarding list).
+            body: JSON.stringify({ email, quizId: updated.id }),
           })
         )
       );
@@ -284,17 +288,16 @@ function ReviewPublishPage() {
   }
 
   function renderHighlightedSource(sourceText: string, snippet: string, questionPrompt: string) {
-    const normalizedSource = sourceText ?? "";
-    const normalizedSnippet = snippet?.trim() ?? "";
-    if (!normalizedSnippet) return normalizedSource;
+    const source = sourceText ?? "";
+    // Falls back to a fuzzy sentence match when the citation isn't a
+    // verbatim substring (LLM-written quotes often drift slightly), and to
+    // no highlight at all when nothing is close enough to be trustworthy.
+    const span = findHighlightSpan(source, snippet);
+    if (!span) return source;
 
-    const start = normalizedSource.indexOf(normalizedSnippet);
-    if (start === -1) return normalizedSource;
-
-    const end = start + normalizedSnippet.length;
-    const before = normalizedSource.slice(0, start);
-    const match = normalizedSource.slice(start, end);
-    const after = normalizedSource.slice(end);
+    const before = source.slice(0, span.start);
+    const match = source.slice(span.start, span.end);
+    const after = source.slice(span.end);
 
     return (
       <>
@@ -303,7 +306,11 @@ function ReviewPublishPage() {
           ref={(el) => {
             highlightRefs.current[questionPrompt] = el;
           }}
-          style={{ background: "#cfe3cf", padding: "0 2px" }}
+          style={{
+            background: span.matchType === "exact" ? "#cfe3cf" : "#dbe7fb",
+            padding: "0 2px",
+          }}
+          title={span.matchType === "fuzzy" ? "Approximate match — wording may differ slightly" : undefined}
         >
           {match}
         </mark>
@@ -361,7 +368,7 @@ function ReviewPublishPage() {
               </div>
               <div>
                 <span>Time Limit</span>
-                <strong>{displayTimeLimit || "--"} min</strong>
+                <strong>{displayTimeLimit ? `${displayTimeLimit} min` : "No limit"}</strong>
               </div>
               <div>
                 <span>Topic</span>

@@ -87,10 +87,19 @@ function QuizTakingPage() {
     quizIdParam ? Number(quizIdParam) : null
   );
   const [questions, setQuestions] = useState<QuizQuestion[]>(FALLBACK_QUESTIONS);
+  // Gate rendering until the assigned quiz has loaded, so the fallback (OSHA)
+  // questions never flash before the manager's real quiz swaps in.
+  const [loading, setLoading] = useState(true);
   const [current, setCurrent] = useState(0);
   const [answers, setAnswers] = useState<Record<number, number>>({});
   const [flagged, setFlagged] = useState<Set<number>>(new Set());
-  const [secondsLeft, setSecondsLeft] = useState(() => loadQuizConfig().timeLimit * 60);
+  // null means "no time limit" — the countdown UI stays hidden and no
+  // interval runs. A time limit of 0 (or missing) from either the locally
+  // cached config or the fetched quiz is treated as "no limit".
+  const [secondsLeft, setSecondsLeft] = useState<number | null>(() => {
+    const minutes = loadQuizConfig().timeLimit;
+    return minutes > 0 ? minutes * 60 : null;
+  });
 
   // Loads the specific quiz this page was opened for (from the new-hire's
   // assigned-quiz list); falls back to "my latest quiz" only when no quizId
@@ -108,10 +117,13 @@ function QuizTakingPage() {
         setQuestions(quiz.questionsPayload);
         setQuizId(quiz.id);
         setTitle(quiz.title);
-        if (quiz.timeLimitMinutes) setSecondsLeft(quiz.timeLimitMinutes * 60);
+        setSecondsLeft(quiz.timeLimitMinutes ? quiz.timeLimitMinutes * 60 : null);
       })
       .catch(() => {
         /* keep fallback questions */
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
       });
     return () => {
       cancelled = true;
@@ -119,9 +131,9 @@ function QuizTakingPage() {
   }, [quizIdParam]);
 
   useEffect(() => {
-    if (secondsLeft <= 0) return;
+    if (secondsLeft === null || secondsLeft <= 0) return;
     const timer = window.setInterval(() => {
-      setSecondsLeft((value) => (value <= 1 ? 0 : value - 1));
+      setSecondsLeft((value) => (value === null || value <= 1 ? 0 : value - 1));
     }, 1000);
     return () => window.clearInterval(timer);
   }, [secondsLeft]);
@@ -177,6 +189,17 @@ function QuizTakingPage() {
 
   const dots = useMemo(() => Array.from({ length: total }, (_, index) => index), [total]);
 
+  if (loading) {
+    return (
+      <div className="app-shell">
+        <AppNav />
+        <main className="page-wrap">
+          <p className="uploads-empty">Loading your quiz…</p>
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="app-shell">
       <AppNav />
@@ -198,9 +221,11 @@ function QuizTakingPage() {
           <span className="quiz-progress-count">
             Question {current + 1} of {total}
           </span>
-          <span className={`timer-pill ${secondsLeft <= 60 ? "low" : ""}`}>
-            <span aria-hidden>◷</span> {formatTime(secondsLeft)} left
-          </span>
+          {secondsLeft !== null ? (
+            <span className={`timer-pill ${secondsLeft <= 60 ? "low" : ""}`}>
+              <span aria-hidden>◷</span> {formatTime(secondsLeft)} left
+            </span>
+          ) : null}
         </div>
         <div className="progress-track quiz-progress-track">
           <div className="progress-fill" style={{ width: `${progressPercent}%` }} />
