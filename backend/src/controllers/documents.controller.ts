@@ -8,6 +8,7 @@ import {
 } from "../models/document.model";
 import { findUsersByIds } from "../models/user.model";
 import {
+  extractGoogleDocLinks,
   extractTextFromGoogleDriveFile,
   extractTextFromDocument,
   isSupportedGoogleDriveFile,
@@ -45,6 +46,75 @@ type ImportGithubRepoBody = {
   maxFiles?: number;
 };
 
+type LinkedImportItem = {
+  documentId: number | null;
+  sourceUrl: string;
+  title: string;
+  status: "ready" | "failed";
+  createdAt: Date | null;
+  error?: string;
+};
+
+async function importLinkedGoogleDocs(
+  teamId: number,
+  uploadedByUserId: number,
+  links: string[]
+): Promise<{
+  imported: number;
+  failed: number;
+  items: LinkedImportItem[];
+}> {
+  const items: LinkedImportItem[] = [];
+  let imported = 0;
+  let failed = 0;
+
+  for (const link of links) {
+    try {
+      const linkedDoc = await extractTextFromGoogleDriveUrl(link);
+      const linkedDocument = await createDocument({
+        teamId,
+        uploadedByUserId,
+        title: linkedDoc.title,
+        sourceType: "google_drive",
+        sourceUrl: link,
+        rawText: linkedDoc.rawText,
+        status: "ready",
+      });
+
+      imported += 1;
+      items.push({
+        documentId: linkedDocument.id,
+        sourceUrl: link,
+        title: linkedDocument.title,
+        status: "ready",
+        createdAt: linkedDocument.createdAt,
+      });
+    } catch (error) {
+      const failedLinkedDocument = await createDocument({
+        teamId,
+        uploadedByUserId,
+        title: "Linked Google Doc Import",
+        sourceType: "google_drive",
+        sourceUrl: link,
+        rawText: null,
+        status: "failed",
+      });
+
+      failed += 1;
+      items.push({
+        documentId: failedLinkedDocument.id,
+        sourceUrl: link,
+        title: failedLinkedDocument.title,
+        status: "failed",
+        createdAt: failedLinkedDocument.createdAt,
+        error: (error as Error).message,
+      });
+    }
+  }
+
+  return { imported, failed, items };
+}
+
 export async function uploadDocument(
   req: Request,
   res: Response,
@@ -63,6 +133,7 @@ export async function uploadDocument(
 
     try {
       const rawText = await extractTextFromDocument(file);
+      const linkedGoogleDocUrls = extractGoogleDocLinks(rawText, 5);
 
       const document = await createDocument({
         teamId: user.teamId,
@@ -72,6 +143,12 @@ export async function uploadDocument(
         rawText,
         status: "ready",
       });
+
+      const linkedImport = await importLinkedGoogleDocs(
+        user.teamId,
+        user.id,
+        linkedGoogleDocUrls
+      );
 
       // Best-effort: the chatbot's retrieval index shouldn't block the
       // upload response, and a document is still useful for quiz
@@ -86,6 +163,12 @@ export async function uploadDocument(
           title: document.title,
           status: document.status,
           createdAt: document.createdAt,
+          linkedImportSummary: {
+            totalFound: linkedGoogleDocUrls.length,
+            imported: linkedImport.imported,
+            failed: linkedImport.failed,
+            items: linkedImport.items,
+          },
         },
       });
     } catch (error) {
@@ -255,6 +338,7 @@ export async function importGoogleDriveDocument(//import from google drive url
 
     try {
       const { title, rawText } = await extractTextFromGoogleDriveUrl(url);
+      const linkedGoogleDocUrls = extractGoogleDocLinks(rawText, 5);
 
       const document = await createDocument({
         teamId: user.teamId,
@@ -266,12 +350,24 @@ export async function importGoogleDriveDocument(//import from google drive url
         status: "ready",
       });
 
+      const linkedImport = await importLinkedGoogleDocs(
+        user.teamId,
+        user.id,
+        linkedGoogleDocUrls
+      );
+
       return res.status(201).json({
         data: {
           id: document.id,
           title: document.title,
           status: document.status,
           createdAt: document.createdAt,
+          linkedImportSummary: {
+            totalFound: linkedGoogleDocUrls.length,
+            imported: linkedImport.imported,
+            failed: linkedImport.failed,
+            items: linkedImport.items,
+          },
         },
       });
     } catch (error) {
