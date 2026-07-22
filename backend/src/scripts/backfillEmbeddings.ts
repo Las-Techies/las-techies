@@ -27,6 +27,7 @@ async function main() {
       const { chunkCount } = await embedDocument({
         id: document.id,
         teamId: document.teamId,
+        title: document.title,
         rawText: document.rawText as string,
       });
       console.log(`OK: [${document.id}] ${document.title} -> ${chunkCount} chunk(s)`);
