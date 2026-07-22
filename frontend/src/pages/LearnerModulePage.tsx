@@ -285,8 +285,13 @@ function LearnerModulePage() {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    listTeamDocuments()
-      .then((teamDocs) => {
+    // Team-scoped, not uploader-scoped: the manager uploaded these documents,
+    // so /mine (uploadedByUserId === this user) would be empty for a new hire.
+    // The new hire should see everything on their team.
+    apiFetch<{ data: { id: number; title: string; status: string; createdAt?: string }[] }>(
+      "/api/documents/team"
+    )
+      .then((res) => {
         if (cancelled) return;
         const files = teamDocs
           .filter((doc) => doc.status.toLowerCase() === "ready")

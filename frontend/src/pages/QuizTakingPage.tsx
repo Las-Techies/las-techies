@@ -87,6 +87,9 @@ function QuizTakingPage() {
     quizIdParam ? Number(quizIdParam) : null
   );
   const [questions, setQuestions] = useState<QuizQuestion[]>(FALLBACK_QUESTIONS);
+  // Gate rendering until the assigned quiz has loaded, so the fallback (OSHA)
+  // questions never flash before the manager's real quiz swaps in.
+  const [loading, setLoading] = useState(true);
   const [current, setCurrent] = useState(0);
   const [answers, setAnswers] = useState<Record<number, number>>({});
   const [flagged, setFlagged] = useState<Set<number>>(new Set());
@@ -118,6 +121,9 @@ function QuizTakingPage() {
       })
       .catch(() => {
         /* keep fallback questions */
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
       });
     return () => {
       cancelled = true;
@@ -182,6 +188,17 @@ function QuizTakingPage() {
   const goPrev = () => setCurrent((index) => Math.max(index - 1, 0));
 
   const dots = useMemo(() => Array.from({ length: total }, (_, index) => index), [total]);
+
+  if (loading) {
+    return (
+      <div className="app-shell">
+        <AppNav />
+        <main className="page-wrap">
+          <p className="uploads-empty">Loading your quiz…</p>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="app-shell">

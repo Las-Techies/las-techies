@@ -100,6 +100,10 @@ model Invite {
   token           String    @unique
   teamId          Int
   email           String
+  // The quiz this invite was sent for, if any. Set when a manager invites a
+  // new hire from the publish flow so accepting the invite auto-creates a
+  // QuizAssignment for that quiz. Nullable for plain "join the team" invites.
+  quizId          Int?
   createdByUserId Int
   expiresAt       DateTime
   usedAt          DateTime?
