@@ -189,6 +189,24 @@ function countDetectedQuestions(accumulated: string): number {
   return matches ? matches.length : 0;
 }
 
+// Randomize each question's option order (Fisher-Yates). The model tends to
+// mirror the prompt's example layout and place the correct answer first, so we
+// shuffle server-side as a guarantee that the correct answer is spread across
+// positions. Grading is by option id + isCorrect (never position), so this is
+// safe and does not affect scoring.
+function shuffleQuestionOptions(questions: QuizQuestion[]): QuizQuestion[] {
+  for (const question of questions) {
+    const options = question.options;
+    for (let i = options.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const temp = options[i]!;
+      options[i] = options[j]!;
+      options[j] = temp;
+    }
+  }
+  return questions;
+}
+
 export async function generateQuiz(
   documents: SourceDocument[],
   config: GenerationConfig,
@@ -216,7 +234,7 @@ export async function generateQuiz(
         },
         options?.avoidPrompts
       );
-      return validate(extractJson(raw), config);
+      return shuffleQuestionOptions(validate(extractJson(raw), config));
     } catch (err) {
       lastError = err;
     }
