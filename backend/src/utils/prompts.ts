@@ -118,6 +118,7 @@ Rules:
 - If there are multiple source documents, distribute questions across them as evenly as possible.
 - citation.sourceDocumentId MUST match one of the DOCUMENT ID values provided below.
 - citation.sourceDocumentTitle MUST exactly match the paired DOCUMENT TITLE.
+- citation.sourceSnippet MUST be copied word-for-word (verbatim) from the source document — a single contiguous passage of roughly one to three sentences that the correct answer is based on. Do NOT paraphrase, summarize, combine separate passages, or use "...". Copy the exact wording so it can be located and highlighted in the original document.
 
 Difficulty guidance for "${config.difficulty}":
 ${difficultyNote}
