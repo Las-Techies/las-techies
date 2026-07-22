@@ -2,8 +2,6 @@ import { env } from "../config/env";
 import { buildPrompt } from "../utils/prompts";
 import type { GenerationConfig, QuizQuestion } from "./quizTypes";
 
-const MODEL = "claude-sonnet-4-5-20250929";
-
 export class QuizGenerationError extends Error {
   status = 500;
   constructor(message: string) {
@@ -32,20 +30,24 @@ async function callGatewayStream(
   onDelta: (accumulated: string) => void,
   avoidPrompts?: string[]
 ): Promise<string> {
-  if (!env.llmGatewayUrl || !env.llmKey) {
+  if (!env.resolvedLlmGatewayUrl || !env.resolvedLlmKey) {
     throw new QuizGenerationError(
-      "LLM gateway is not configured. Set LLM_GATEWAY_URL and ENG_AI_MODEL_GW_KEY in backend/.env."
+      env.useOpenRouter
+        ? "OpenRouter is not configured. Set OPENROUTER_API_KEY (and optionally OPENROUTER_GATEWAY_URL / OPENROUTER_MODEL)."
+        : "LLM gateway is not configured. Set LLM_GATEWAY_URL and ENG_AI_MODEL_GW_KEY in backend/.env."
     );
   }
 
-  const res = await fetch(env.llmGatewayUrl, {
+  const res = await fetch(env.resolvedLlmGatewayUrl, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${env.llmKey}`,
+      Authorization: `Bearer ${env.resolvedLlmKey}`,
       "Content-Type": "application/json",
+      ...(env.appUrl ? { "HTTP-Referer": env.appUrl } : {}),
+      ...(env.llmAppName ? { "X-Title": env.llmAppName } : {}),
     },
     body: JSON.stringify({
-      model: MODEL,
+      model: env.resolvedLlmModel,
       stream: true,
       messages: [
         {

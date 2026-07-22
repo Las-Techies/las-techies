@@ -3,8 +3,6 @@ import { buildChatPrompt } from "../utils/prompts";
 import type { SimilarChunk } from "../models/documentChunk.model";
 import type { ChatSource } from "../models/chatMessage.model";
 
-const MODEL = "claude-sonnet-4-5-20250929";
-
 // Cosine similarity thresholds (1 - pgvector cosine distance) used to decide
 // whether retrieved context is good enough to answer from at all. Tuned to
 // be conservative: a "low" result skips the LLM call entirely rather than
@@ -52,20 +50,24 @@ export function computeConfidence(chunks: SimilarChunk[]): Confidence {
 // stream (like quizGenerator.ts uses for multi-question generation) isn't
 // needed here.
 async function callGateway(prompt: string): Promise<string> {
-  if (!env.llmGatewayUrl || !env.llmKey) {
+  if (!env.resolvedLlmGatewayUrl || !env.resolvedLlmKey) {
     throw new ChatGenerationError(
-      "LLM gateway is not configured. Set LLM_GATEWAY_URL and ENG_AI_MODEL_GW_KEY in backend/.env."
+      env.useOpenRouter
+        ? "OpenRouter is not configured. Set OPENROUTER_API_KEY (and optionally OPENROUTER_GATEWAY_URL / OPENROUTER_MODEL)."
+        : "LLM gateway is not configured. Set LLM_GATEWAY_URL and ENG_AI_MODEL_GW_KEY in backend/.env."
     );
   }
 
-  const res = await fetch(env.llmGatewayUrl, {
+  const res = await fetch(env.resolvedLlmGatewayUrl, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${env.llmKey}`,
+      Authorization: `Bearer ${env.resolvedLlmKey}`,
       "Content-Type": "application/json",
+      ...(env.appUrl ? { "HTTP-Referer": env.appUrl } : {}),
+      ...(env.llmAppName ? { "X-Title": env.llmAppName } : {}),
     },
     body: JSON.stringify({
-      model: MODEL,
+      model: env.resolvedLlmModel,
       stream: false,
       messages: [
         {
