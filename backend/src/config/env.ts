@@ -13,6 +13,9 @@ export const env = {
   llmKey: process.env.ENG_AI_MODEL_GW_KEY ?? "",
   supabaseUrl: process.env.SUPABASE_URL ?? "",
   supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY ?? "",
+  // Bucket that holds the original bytes of uploaded documents, so the
+  // learner-facing viewer can show the real file instead of extracted text.
+  documentsStorageBucket: process.env.SUPABASE_DOCUMENTS_BUCKET ?? "documents",
   githubToken: process.env.GITHUB_TOKEN ?? "",
   gmailUser: required("GMAIL_USER"),
   gmailAppPassword: required("GMAIL_APP_PASSWORD"),

@@ -19,6 +19,7 @@ import {
   extractTextFromGoogleDriveUrl,
 } from "../services/documentProcessor";
 import { embedDocument } from "../services/documentEmbedder";
+import { getSignedFileUrl, uploadOriginalFile } from "../services/documentStorage";
 import { findQuizzesReferencingDocument } from "../models/quiz.model";
 
 type AuthUser = {
@@ -64,6 +65,11 @@ export async function uploadDocument(
     try {
       const rawText = await extractTextFromDocument(file);
 
+      // Best-effort: if Storage is unreachable, we still keep the extracted
+      // text so the document is usable (just falls back to the text-only
+      // viewer instead of showing the original file).
+      const stored = await uploadOriginalFile(user.teamId, file);
+
       const document = await createDocument({
         teamId: user.teamId,
         uploadedByUserId: user.id,
@@ -71,6 +77,8 @@ export async function uploadDocument(
         sourceType: "upload",
         rawText,
         status: "ready",
+        storagePath: stored?.storagePath ?? null,
+        mimeType: stored?.mimeType ?? null,
       });
 
       // Best-effort: the chatbot's retrieval index shouldn't block the
@@ -136,6 +144,45 @@ export async function getDocumentById(
     }
 
     return res.json({ data: document });
+  } catch (error) {
+    next(error);
+  }
+}
+
+// Returns a fresh, short-lived signed URL for the original file so the
+// frontend can embed the real document instead of the extracted-text
+// fallback. Documents uploaded before this feature (or imported from
+// Google Drive/GitHub) have no storagePath, so `url` comes back null and
+// the caller should fall back to the rawText viewer.
+export async function getDocumentFileUrl(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  try {
+    const documentId = Number(req.params.documentId);
+    if (!Number.isInteger(documentId) || documentId <= 0) {
+      return res
+        .status(400)
+        .json({ error: { message: "Invalid documentId" } });
+    }
+
+    const user = (req as any).user as AuthUser | undefined;
+    if (!user?.teamId) {
+      return res.status(401).json({ error: { message: "Unauthorized" } });
+    }
+
+    const document = await findDocumentByIdForTeam(documentId, user.teamId);
+    if (!document) {
+      return res.status(404).json({ error: { message: "Document not found" } });
+    }
+
+    if (!document.storagePath) {
+      return res.json({ data: { url: null, mimeType: null } });
+    }
+
+    const url = await getSignedFileUrl(document.storagePath);
+    return res.json({ data: { url, mimeType: document.mimeType } });
   } catch (error) {
     next(error);
   }

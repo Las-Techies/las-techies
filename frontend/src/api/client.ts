@@ -197,6 +197,20 @@ export async function listTeamDocuments(): Promise<TeamDocument[]> {
   return res.data;
 }
 
+export type DocumentFileUrl = {
+  url: string | null;
+  mimeType: string | null;
+};
+
+// A fresh, short-lived signed URL for the document's original file (so the
+// viewer can embed the real PDF/DOCX). `url` is null for documents uploaded
+// before this feature existed, or imported from Google Drive/GitHub — the
+// caller should fall back to showing the extracted text instead.
+export async function getDocumentFileUrl(documentId: number): Promise<DocumentFileUrl> {
+  const res = await apiFetch<{ data: DocumentFileUrl }>(`/api/documents/${documentId}/file-url`);
+  return res.data;
+}
+
 export type TeamMember = {
   id: number;
   firstName: string;
