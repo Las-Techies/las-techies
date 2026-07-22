@@ -2,10 +2,13 @@
 // by the LLM as a "quote" of the source material (see the citation
 // validation in backend/src/services/quizGenerator.ts), but nothing
 // guarantees it's an exact substring — different whitespace/line breaks,
-// smart quotes, or a lightly reworded phrase are enough to break a plain
-// `indexOf`. This finds the best place to highlight even when it isn't a
-// perfect match, and returns null (rather than guessing) when nothing is
-// close enough to be trustworthy.
+// smart quotes, or a reworded/paraphrased phrase are enough to break a plain
+// `indexOf`. This finds the best place to highlight even when the answer isn't
+// verbatim: it scores the snippet against sliding windows of consecutive
+// sentences (so a paraphrase distilled from a whole paragraph still lands on
+// that paragraph) and, since the goal is to always show where the answer came
+// from, returns the best-scoring passage rather than giving up — only bailing
+// out when the overlap is so low the highlight would be actively misleading.
 
 export type HighlightSpan = {
   start: number;
@@ -68,14 +71,23 @@ function sentenceSpans(sourceText: string): Array<{ text: string; start: number;
   return spans;
 }
 
-// Below this, a "match" is more likely coincidental overlap than the actual
-// source sentence — better to show no highlight than a misleading one.
-const MIN_FUZZY_SCORE = 0.45;
+// Largest number of consecutive sentences we'll merge into one candidate
+// passage. A paraphrased answer is usually distilled from a short run of
+// sentences (a paragraph or bullet cluster), so scoring windows up to this size
+// lets the match land on the whole passage instead of missing because no single
+// sentence lines up. Kept small so the highlight stays tight and readable.
+const MAX_WINDOW_SENTENCES = 4;
+
+// Absolute floor for the "always highlight" behavior: below this the two texts
+// share almost nothing, so any highlight would point at an unrelated passage.
+// We still return null in that case rather than mislead the learner.
+const MIN_HIGHLIGHT_SCORE = 0.12;
 
 export function findHighlightSpan(sourceText: string, snippet: string | undefined | null): HighlightSpan | null {
   const trimmedSnippet = snippet?.trim() ?? "";
   if (!trimmedSnippet || !sourceText) return null;
 
+  // Fast path: the snippet is a verbatim substring, so highlight it exactly.
   const exactStart = sourceText.indexOf(trimmedSnippet);
   if (exactStart !== -1) {
     return { start: exactStart, end: exactStart + trimmedSnippet.length, matchType: "exact" };
@@ -84,14 +96,27 @@ export function findHighlightSpan(sourceText: string, snippet: string | undefine
   const normalizedSnippet = normalize(trimmedSnippet);
   if (!normalizedSnippet) return null;
 
+  // Score every window of 1..MAX_WINDOW_SENTENCES consecutive sentences and
+  // keep the best one. Windowing is what lets a paraphrase that draws from a
+  // whole paragraph match that paragraph, instead of failing because it doesn't
+  // line up with any single sentence.
+  const spans = sentenceSpans(sourceText);
   let best: { start: number; end: number; score: number } | null = null;
-  for (const span of sentenceSpans(sourceText)) {
-    const score = similarity(normalize(span.text), normalizedSnippet);
-    if (!best || score > best.score) {
-      best = { start: span.start, end: span.end, score };
+  for (let i = 0; i < spans.length; i++) {
+    for (let size = 1; size <= MAX_WINDOW_SENTENCES && i + size <= spans.length; size++) {
+      const first = spans[i]!;
+      const last = spans[i + size - 1]!;
+      const windowText = sourceText.slice(first.start, last.end);
+      const score = similarity(normalize(windowText), normalizedSnippet);
+      if (!best || score > best.score) {
+        best = { start: first.start, end: last.end, score };
+      }
     }
   }
 
-  if (!best || best.score < MIN_FUZZY_SCORE) return null;
+  // Since the goal is to always show where the answer came from, return the
+  // best passage found rather than giving up — unless overlap is negligible,
+  // where a highlight would be misleading.
+  if (!best || best.score < MIN_HIGHLIGHT_SCORE) return null;
   return { start: best.start, end: best.end, matchType: "fuzzy" };
 }

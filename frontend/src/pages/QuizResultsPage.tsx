@@ -93,7 +93,10 @@ function QuizResultsPage() {
             highlightRefs.current[String(questionId)] = el;
           }}
           style={{
-            background: span.matchType === "exact" ? "#cfe3cf" : "#dbe7fb",
+            // Always blue so the "where this came from" highlight reads
+            // consistently, whether the snippet matched verbatim or was located
+            // by approximate (paraphrase) matching.
+            background: "#dbe7fb",
             padding: "0 2px",
           }}
           title={span.matchType === "fuzzy" ? "Approximate match — wording may differ slightly" : undefined}
