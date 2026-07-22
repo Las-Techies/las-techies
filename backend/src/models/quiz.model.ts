@@ -9,11 +9,21 @@ export function findQuizByIdForTeam(id: number, teamId: number) {
   return prisma.quiz.findFirst({ where: { id, teamId } });
 }
 
-// Backs "resume my most recent quiz" so the frontend can follow the account
-// across devices instead of relying on a quizId cached in localStorage.
+// Backs a manager "resume my most recent quiz" so the frontend can follow the
+// account across devices instead of relying on a quizId cached in localStorage.
 export function findLatestQuizForUser(userId: number, teamId: number) {
   return prisma.quiz.findFirst({
     where: { createdByUserId: userId, teamId },
+    orderBy: { createdAt: "desc" },
+  });
+}
+
+// Backs the new-hire dashboard: the latest *published* quiz on their team.
+// New hires don't author quizzes, so scoping by creator (as above) would never
+// match — they see whatever their manager has published to the team.
+export function findLatestPublishedQuizForTeam(teamId: number) {
+  return prisma.quiz.findFirst({
+    where: { teamId, status: "published" },
     orderBy: { createdAt: "desc" },
   });
 }
