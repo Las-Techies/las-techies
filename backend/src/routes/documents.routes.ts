@@ -10,6 +10,7 @@ import {
   importGithubRepo,
   uploadDocument,
   getDocumentById,
+  getDocumentFileUrl,
 } from "../controllers/documents.controller";
 
 
@@ -22,6 +23,7 @@ router.post("/import/google-drive-folder", requireRole("manager"), importGoogleD
 router.post("/import/github-repo", requireRole("manager"), importGithubRepo);
 router.get("/mine", getMyDocuments);
 router.get("/team", getTeamDocuments);
+router.get("/:documentId/file-url", getDocumentFileUrl);
 router.get("/:documentId", getDocumentById);
 router.delete("/:documentId", deleteDocument);
 

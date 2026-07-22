@@ -8,6 +8,8 @@ export function createDocument(input: {
   sourceUrl?: string | null;
   rawText: string | null;
   status: string;
+  storagePath?: string | null;
+  mimeType?: string | null;
 }) {
   const data = {
     teamId: input.teamId,
@@ -16,6 +18,8 @@ export function createDocument(input: {
     sourceType: input.sourceType,
     rawText: input.rawText,
     status: input.status,
+    storagePath: input.storagePath ?? null,
+    mimeType: input.mimeType ?? null,
   } as any;
 
   if (typeof input.sourceUrl !== "undefined") {
