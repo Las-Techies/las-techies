@@ -215,6 +215,16 @@ function UploadContentPage() {
         provider: "github",
         options: {
           redirectTo: window.location.origin,
+          // `repo` grants read access to private repositories (public-only
+          // access can't clone/read a private repo). Re-running this flow also
+          // lets the user re-authorize to grant access to a different repo —
+          // GitHub re-prompts for which repos/orgs to allow.
+          scopes: "repo",
+          queryParams: {
+            // Force GitHub's authorization screen even when already connected,
+            // so the user can pick/grant access to another repository.
+            prompt: "consent",
+          },
         },
       });
       if (oauthError) {
@@ -575,15 +585,21 @@ function UploadContentPage() {
               className="secondary-btn"
               type="button"
               onClick={() => void handleConnectGithub()}
-              disabled={isGithubConnected || isConnectingGithub}
+              disabled={isConnectingGithub}
             >
-              {isGithubConnected
-                ? "Connected"
-                : isConnectingGithub
-                  ? "Connecting..."
+              {isConnectingGithub
+                ? "Connecting..."
+                : isGithubConnected
+                  ? "Grant access to another repo"
                   : "Connect GitHub"}
             </button>
           </div>
+          {isGithubConnected ? (
+            <p className="subtle">
+              To import a private repository, click "Grant access to another repo" and
+              authorize it on GitHub.
+            </p>
+          ) : null}
           <input
             type="text"
             value={linkInput}

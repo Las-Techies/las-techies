@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "postinstall": "prisma generate",
-    "dev": "tsx watch src/index.ts",
+    "dev": "prisma generate && tsx watch src/index.ts",
     "seed": "tsx src/db/seeds/seed.ts",
     "backfill-embeddings": "tsx src/scripts/backfillEmbeddings.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
