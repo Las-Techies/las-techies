@@ -4,10 +4,16 @@ import { Link } from "react-router-dom";
 import AppNav from "../components/navigation/AppNav";
 import StepTabs from "../components/navigation/StepTabs";
 import { apiFetch, listTeamDocuments } from "../api/client";
-import { loadUploadedDocuments, saveUploadedDocuments } from "../features/quiz/storage";
+import {
+  loadDeselectedDocumentIds,
+  loadUploadedDocuments,
+  saveDeselectedDocumentIds,
+  saveUploadedDocuments,
+} from "../features/quiz/storage";
 import { QUIZ_WORKFLOW_ROUTES, QUIZ_WORKFLOW_STEPS } from "../features/quiz/workflow";
 import trashIcon from "../assets/trash-icon.png";
 import { supabase } from "../lib/supabaseClient";
+import { CircleCheckIcon } from "../components/icons/QuizIcons";
 
 type UploadStatus = "Processing..." | "Ready" | "Failed";
 
@@ -116,6 +122,26 @@ function UploadContentPage() {
   const [isImportingLink, setIsImportingLink] = useState(false);
   const [isGithubConnected, setIsGithubConnected] = useState(false);
   const [isConnectingGithub, setIsConnectingGithub] = useState(false);
+  // Which documents are unchecked for quiz generation. Stored as "deselected"
+  // rather than "selected" so every document — including ones uploaded after
+  // this was first set — defaults to checked. Nothing here ever removes a
+  // document from this page; that only happens via explicit delete.
+  const [deselectedDocumentIds, setDeselectedDocumentIds] = useState<Set<number>>(() =>
+    loadDeselectedDocumentIds()
+  );
+
+  const toggleDocumentSelected = (documentId: number) => {
+    setDeselectedDocumentIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(documentId)) {
+        next.delete(documentId);
+      } else {
+        next.add(documentId);
+      }
+      saveDeselectedDocumentIds(next);
+      return next;
+    });
+  };
 
   const persistReadyDocs = (items: UploadedItem[]) => {
     const readyDocs = items
@@ -458,6 +484,13 @@ function UploadContentPage() {
         persistReadyDocs(nextUploads);
         return nextUploads;
       });
+      setDeselectedDocumentIds((prev) => {
+        if (!prev.has(upload.documentId as number)) return prev;
+        const next = new Set(prev);
+        next.delete(upload.documentId as number);
+        saveDeselectedDocumentIds(next);
+        return next;
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to delete document.");
     } finally {
@@ -494,6 +527,12 @@ function UploadContentPage() {
   };
 
   const hasReadyDocument = uploads.some((item) => item.status === "Ready");
+  const hasSelectedDocument = uploads.some(
+    (item) =>
+      item.status === "Ready" &&
+      item.documentId !== null &&
+      !deselectedDocumentIds.has(item.documentId)
+  );
 
   return (
     <div className="app-shell">
@@ -562,67 +601,92 @@ function UploadContentPage() {
 
         <section className="card uploads-table">
           <h3>Uploaded Files</h3>
+          <p className="uploads-hint">
+            Check the documents you want to use for your next quiz — everything stays here
+            either way, unless you delete it.
+          </p>
           {isLoadingDocuments ? (
             <p className="uploads-empty">Loading documents...</p>
           ) : uploads.length === 0 ? (
             <p className="uploads-empty">No files uploaded yet.</p>
           ) : (
-            uploads.map((upload) => (
-              <div className="upload-row" key={upload.key}>
-                <div>
-                  <strong>{upload.name}</strong>
-                  <p>{upload.meta}</p>
-                  <p className="upload-attribution">
-                    {upload.isMine ? "Uploaded by you" : `Uploaded by ${upload.attribution ?? "a teammate"}`}
-                    {formatAddedDate(upload.createdAt) ? ` · ${formatAddedDate(upload.createdAt)}` : ""}
-                  </p>
-                </div>
-                <div className="upload-row-actions">
-                  <span
-                    className={`status ${
-                      upload.status === "Ready"
-                        ? "success"
-                        : upload.status === "Failed"
-                          ? "fail"
-                          : "warning"
-                    }`}
-                  >
-                    {upload.status}
-                  </span>
-                  {upload.documentId !== null && upload.isMine ? (
+            uploads.map((upload) => {
+              const isSelectable = upload.status === "Ready" && upload.documentId !== null;
+              const isSelected = isSelectable && !deselectedDocumentIds.has(upload.documentId as number);
+
+              return (
+                <div className="upload-row" key={upload.key}>
+                  <div className="upload-row-main">
                     <button
                       type="button"
-                      className={`delete-icon-btn${
-                        deletingKeys.has(upload.key) ? " is-deleting" : ""
-                      }`}
-                      aria-label={
-                        deletingKeys.has(upload.key)
-                          ? `Deleting ${upload.name}…`
-                          : `Delete ${upload.name}`
-                      }
-                      aria-busy={deletingKeys.has(upload.key)}
-                      title={deletingKeys.has(upload.key) ? "Deleting…" : "Delete"}
-                      disabled={deletingKeys.has(upload.key)}
-                      onClick={() => void handleDelete(upload)}
+                      className={`upload-select-toggle${isSelected ? " selected" : ""}`}
+                      disabled={!isSelectable}
+                      aria-pressed={isSelectable ? isSelected : false}
+                      title={isSelectable ? "Use this document for the next quiz" : "Not ready yet"}
+                      aria-label={`Use ${upload.name} for quiz generation`}
+                      onClick={() => toggleDocumentSelected(upload.documentId as number)}
                     >
-                      {deletingKeys.has(upload.key) ? (
-                        <span className="delete-spinner" aria-hidden="true" />
-                      ) : (
-                        <img src={trashIcon} alt="" className="delete-icon" />
-                      )}
+                      <CircleCheckIcon aria-hidden />
                     </button>
-                  ) : null}
+                    <div>
+                      <strong>{upload.name}</strong>
+                      <p>{upload.meta}</p>
+                      <p className="upload-attribution">
+                        {upload.isMine ? "Uploaded by you" : `Uploaded by ${upload.attribution ?? "a teammate"}`}
+                        {formatAddedDate(upload.createdAt) ? ` · ${formatAddedDate(upload.createdAt)}` : ""}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="upload-row-actions">
+                    <span
+                      className={`status ${
+                        upload.status === "Ready"
+                          ? "success"
+                          : upload.status === "Failed"
+                            ? "fail"
+                            : "warning"
+                      }`}
+                    >
+                      {upload.status}
+                    </span>
+                    {upload.documentId !== null && upload.isMine ? (
+                      <button
+                        type="button"
+                        className={`delete-icon-btn${
+                          deletingKeys.has(upload.key) ? " is-deleting" : ""
+                        }`}
+                        aria-label={
+                          deletingKeys.has(upload.key)
+                            ? `Deleting ${upload.name}…`
+                            : `Delete ${upload.name}`
+                        }
+                        aria-busy={deletingKeys.has(upload.key)}
+                        title={deletingKeys.has(upload.key) ? "Deleting…" : "Delete"}
+                        disabled={deletingKeys.has(upload.key)}
+                        onClick={() => void handleDelete(upload)}
+                      >
+                        {deletingKeys.has(upload.key) ? (
+                          <span className="delete-spinner" aria-hidden="true" />
+                        ) : (
+                          <img src={trashIcon} alt="" className="delete-icon" />
+                        )}
+                      </button>
+                    ) : null}
+                  </div>
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
         </section>
 
         {error ? <p className="form-error">{error}</p> : null}
+        {hasReadyDocument && !hasSelectedDocument ? (
+          <p className="form-error">Check at least one document above to continue.</p>
+        ) : null}
 
         <div className="page-actions">
           <span />
-          {hasReadyDocument ? (
+          {hasSelectedDocument ? (
             <Link className="primary-btn btn-link" to="/configure-quiz">
               Continue to Configure Quiz
             </Link>
