@@ -8,6 +8,7 @@ import QuizTakingPage from "../pages/QuizTakingPage";
 import QuizResultsPage from "../pages/QuizResultsPage";
 import ReviewPublishPage from "../pages/ReviewPublishPage";
 import UploadContentPage from "../pages/UploadContentPage";
+import MeetOurTeamPage from "../pages/MeetOurTeamPage";
 
 function App() {
   return (
@@ -21,6 +22,7 @@ function App() {
       <Route path="/configure-quiz" element={<ConfigureQuizPage />} />
       <Route path="/review-publish" element={<ReviewPublishPage />} />
       <Route path="/quiz-results" element={<QuizResultsPage />} />
+      <Route path="/meet-our-team" element={<MeetOurTeamPage />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

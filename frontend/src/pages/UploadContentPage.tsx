@@ -2,12 +2,30 @@ import type { ChangeEventHandler, DragEventHandler } from "react";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import AppNav from "../components/navigation/AppNav";
-import StepTabs from "../components/navigation/StepTabs";
+import WizardSteps from "../components/navigation/WizardSteps";
 import { apiFetch } from "../api/client";
 import { loadUploadedDocuments, saveUploadedDocuments } from "../features/quiz/storage";
-import { QUIZ_WORKFLOW_ROUTES, QUIZ_WORKFLOW_STEPS } from "../features/quiz/workflow";
-import trashIcon from "../assets/trash-icon.png";
+import {
+  ArrowRight,
+  CheckPlain,
+  CloudUploadIcon,
+  FileTextIcon,
+  GithubIcon,
+  LinkIcon,
+  ShieldIcon,
+  TrashIcon,
+  XPlain,
+} from "../components/icons";
 import { supabase } from "../lib/supabaseClient";
+
+const fileExt = (name: string) => name.split(".").pop()?.toLowerCase() ?? "";
+const extBadge = (name: string): { label: string; cls: string } => {
+  const ext = fileExt(name);
+  if (ext === "pdf") return { label: "PDF", cls: "pdf" };
+  if (ext === "doc" || ext === "docx") return { label: "W", cls: "docx" };
+  if (ext === "ppt" || ext === "pptx") return { label: "P", cls: "pptx" };
+  return { label: (ext || "file").slice(0, 3).toUpperCase(), cls: "docx" };
+};
 
 type UploadStatus = "Processing..." | "Ready" | "Failed";
 
@@ -74,17 +92,6 @@ const mapStoredStatus = (status: string): UploadStatus =>
     : status.toLowerCase() === "failed"
       ? "Failed"
       : "Processing...";
-const formatAddedDate = (value: string | null) => {
-  if (!value) return "";
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return "";
-  return parsed.toLocaleDateString("en-US", {
-    month: "long",
-    day: "numeric",
-    year: "numeric",
-  });
-};
-
 const detectLinkKind = (value: string): LinkKind => {
   const trimmed = value.trim();
   if (!trimmed) return "unsupported";
@@ -478,129 +485,162 @@ function UploadContentPage() {
   return (
     <div className="app-shell">
       <AppNav />
-      <main className="page-wrap">
-        <h1>Upload + Generate</h1>
-        <StepTabs steps={QUIZ_WORKFLOW_STEPS} activeIndex={0} stepRoutes={QUIZ_WORKFLOW_ROUTES} />
+      <main className="mgr-page">
+        <div className="mgr-hero">
+          <div>
+            <h1>Upload + Generate</h1>
+            <p>Upload your content and let SageForce create high-quality Salesforce-ready knowledge.</p>
+          </div>
+          <div className="mgr-hero-right">
+            <WizardSteps steps={["Upload", "Configure", "Review & Publish"]} activeIndex={0} />
+          </div>
+        </div>
 
         <section
-          className={`card upload-zone ${isDragActive ? "active" : ""}`}
+          className={`dropzone ${isDragActive ? "active" : ""}`}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
+          onClick={onPickFile}
+          role="button"
+          tabIndex={0}
         >
-          <h2>Drag &amp; drop content</h2>
-          <p>Drop PDF, DOCX, TXT, or MD here</p>
-          <button className="secondary-btn" type="button" onClick={onPickFile}>
-            Select Files
-          </button>
+          <div className="dropzone-cloud">
+            <CloudUploadIcon />
+          </div>
+          <div className="dropzone-body">
+            <h2>
+              Drag files here or <span className="accent">browse</span>
+            </h2>
+            <p>Upload documents, presentations, or other content to get started.</p>
+            <div className="filetype-chips">
+              <span className="filetype-chip">
+                <span className="tag pdf">PDF</span> PDF
+              </span>
+              <span className="filetype-chip">
+                <span className="tag docx">W</span> DOCX
+              </span>
+              <span className="filetype-chip">
+                <span className="tag pptx">P</span> PPTX
+              </span>
+            </div>
+            <span className="dropzone-secure">
+              <ShieldIcon /> Secure upload. Your data is encrypted and protected.
+            </span>
+          </div>
           <input
             ref={fileInputRef}
             type="file"
             className="sr-only"
             onChange={onFileChange}
-            accept=".pdf,.doc,.docx,.txt,.md"
+            onClick={(event) => event.stopPropagation()}
+            accept=".pdf,.doc,.docx,.txt,.md,.ppt,.pptx"
             multiple
           />
         </section>
 
-        <section className="card link-import-zone">
-          <h2>Import from Link</h2>
-          <p>Paste a Google Doc, Drive folder, or GitHub repo link.</p>
-          <div className="link-import-connection-row">
-            <span>
-              GitHub: {isGithubConnected ? "Connected" : "Not connected"}
-            </span>
-            <button
-              className="secondary-btn"
-              type="button"
-              onClick={() => void handleConnectGithub()}
-              disabled={isGithubConnected || isConnectingGithub}
-            >
-              {isGithubConnected
-                ? "Connected"
-                : isConnectingGithub
-                  ? "Connecting..."
-                  : "Connect GitHub"}
-            </button>
-          </div>
+        <section className="glass import-bar">
+          <span className="import-bar-icon">
+            <LinkIcon />
+          </span>
+          <span className="import-bar-text">
+            <strong>Import from link</strong>
+            <span>Pull content from a public URL or repository.</span>
+          </span>
+          <button
+            className="import-connect"
+            type="button"
+            onClick={() => void handleConnectGithub()}
+            disabled={isGithubConnected || isConnectingGithub}
+          >
+            <GithubIcon />
+            {isGithubConnected ? "Connected" : isConnectingGithub ? "Connecting…" : "Connect GitHub"}
+          </button>
           <input
             type="text"
             value={linkInput}
             onChange={(event) => setLinkInput(event.target.value)}
-            placeholder="https://docs.google.com/... or https://drive.google.com/drive/folders/... or https://github.com/org/repo"
-            className="text-input"
+            placeholder="https://example.com/docs or https://github.com/owner/repo"
+            className="import-url"
           />
           <button
-            className="secondary-btn"
+            className="sf-btn"
             type="button"
             onClick={() => void handleImportFromLink()}
             disabled={isImportingLink}
           >
-            {isImportingLink ? "Importing..." : "Import Link"}
+            {isImportingLink ? "Importing…" : "Import"}
           </button>
         </section>
 
-        <section className="card uploads-table">
-          <h3>Uploaded Files</h3>
+        <section className="glass files-card">
+          <h3 className="files-card-title">
+            <FileTextIcon /> Uploaded Files
+          </h3>
           {isLoadingDocuments ? (
-            <p className="uploads-empty">Loading documents...</p>
+            <p className="cfg-empty">Loading documents…</p>
           ) : uploads.length === 0 ? (
-            <p className="uploads-empty">No files uploaded yet.</p>
+            <p className="cfg-empty">No files uploaded yet.</p>
           ) : (
-            uploads.map((upload) => (
-              <div className="upload-row" key={upload.key}>
-                <div>
-                  <strong>{upload.name}</strong>
-                  <p>{upload.meta}</p>
-                  {formatAddedDate(upload.createdAt) ? (
-                    <p>Added {formatAddedDate(upload.createdAt)}</p>
-                  ) : null}
-                </div>
-                <div className="upload-row-actions">
+            uploads.map((upload) => {
+              const badge = extBadge(upload.name);
+              return (
+                <div className="file-row" key={upload.key}>
+                  <span className={`file-ic tag ${badge.cls}`}>{badge.label}</span>
+                  <span className="file-name" title={upload.name}>
+                    {upload.name}
+                  </span>
                   <span
-                    className={`status ${
+                    className={`file-status ${
                       upload.status === "Ready"
-                        ? "success"
+                        ? "ready"
                         : upload.status === "Failed"
-                          ? "fail"
-                          : "warning"
+                          ? "failed"
+                          : "processing"
                     }`}
                   >
-                    {upload.status}
+                    {upload.status === "Ready" ? (
+                      <>
+                        <CheckPlain /> Ready
+                      </>
+                    ) : upload.status === "Failed" ? (
+                      <>
+                        <XPlain /> Failed
+                      </>
+                    ) : (
+                      <>
+                        <span className="spin" /> Processing
+                      </>
+                    )}
                   </span>
                   {upload.documentId !== null ? (
                     <button
                       type="button"
-                      className="delete-icon-btn"
+                      className="file-del"
                       aria-label={`Delete ${upload.name}`}
                       title="Delete"
                       disabled={deletingKeys.has(upload.key)}
                       onClick={() => void handleDelete(upload)}
                     >
-                      {deletingKeys.has(upload.key) ? (
-                        "Deleting…"
-                      ) : (
-                        <img src={trashIcon} alt="" className="delete-icon" />
-                      )}
+                      <TrashIcon />
                     </button>
                   ) : null}
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
         </section>
 
         {error ? <p className="form-error">{error}</p> : null}
 
-        <div className="page-actions">
-          <span />
+        <div className="mgr-foot">
           {hasReadyDocument ? (
-            <Link className="primary-btn btn-link" to="/configure-quiz">
-              Continue to Configure Quiz
+            <Link className="sf-btn btn-link" to="/configure-quiz">
+              Continue to Configure <ArrowRight />
             </Link>
           ) : (
-            <button className="primary-btn" type="button" disabled>
-              Continue to Configure Quiz
+            <button className="sf-btn" type="button" disabled>
+              Continue to Configure <ArrowRight />
             </button>
           )}
         </div>

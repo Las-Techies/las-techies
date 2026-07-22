@@ -1,12 +1,29 @@
+import type { CSSProperties } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import AppNav from "../components/navigation/AppNav";
-import StepTabs from "../components/navigation/StepTabs";
+import WizardSteps from "../components/navigation/WizardSteps";
+import mascot from "../assets/panda-peek.png";
 import { apiFetch, streamQuizGeneration } from "../api/client";
 import { loadUploadedDocuments, saveQuizConfig } from "../features/quiz/storage";
 import type { GeneratedQuiz, QuizDifficulty, QuizQuestion } from "../features/quiz/types";
-import { QUIZ_WORKFLOW_ROUTES, QUIZ_WORKFLOW_STEPS } from "../features/quiz/workflow";
 import { PencilIcon, RegenerateIcon } from "../components/icons/QuizIcons";
+import {
+  ArrowLeft,
+  ArrowRight,
+  CalendarIcon,
+  ChartBarIcon,
+  CheckPlain,
+  ChevronDown,
+  ClockIcon,
+  GearIcon,
+  InfoIcon,
+  ListIcon,
+  SparkleIcon,
+  TagIcon,
+  TargetIcon,
+  TitleIcon,
+} from "../components/icons";
 
 const DIFFICULTY_VALUES: QuizDifficulty[] = ["Easy", "Medium", "Hard"];
 
@@ -39,7 +56,7 @@ function ConfigureQuizPage() {
   const [form, setForm] = useState<QuizFormState>({
     moduleTitle: "",
     topic: "",
-    passingScore: "",
+    passingScore: "70",
     timeLimit: "",
     questionCount: "",
     dueDate: "",
@@ -47,6 +64,9 @@ function ConfigureQuizPage() {
   });
   const [isGenerating, setIsGenerating] = useState(false);
   const [quiz, setQuiz] = useState<GeneratedQuiz | null>(null);
+  // Questions revealed one-by-one as the model streams them, before the final
+  // saved quiz arrives. Cleared when a new generation starts / finishes.
+  const [streamingQuestions, setStreamingQuestions] = useState<QuizQuestion[]>([]);
   // Whether we're still checking the backend for a previously generated
   // quiz to restore, on first mount only.
   const [isLoadingQuiz, setIsLoadingQuiz] = useState(true);
@@ -90,7 +110,10 @@ function ConfigureQuizPage() {
     (async () => {
       try {
         const latest = await apiFetch<GeneratedQuiz | null>("/api/quizzes/mine/latest");
-        if (!isMounted || !latest) return;
+        // A published quiz is finalized — don't resume it into the editor, so
+        // that after publishing, starting the workflow again begins a fresh
+        // (blank) quiz instead of reopening the one that was just published.
+        if (!isMounted || !latest || latest.status === "published") return;
 
         setQuiz(latest);
         setForm((current) => ({
@@ -101,7 +124,9 @@ function ConfigureQuizPage() {
           timeLimit:
             latest.timeLimitMinutes != null
               ? String(latest.timeLimitMinutes)
-              : current.timeLimit,
+              : latest.generationConfig
+                ? "none"
+                : current.timeLimit,
           questionCount:
             latest.questionsPayload.length > 0
               ? String(latest.questionsPayload.length)
@@ -148,6 +173,7 @@ function ConfigureQuizPage() {
 
     setError("");
     setQuiz(null);
+    setStreamingQuestions([]);
     setGenerationStatus("Starting generation…");
     setIsGenerating(true);
 
@@ -166,7 +192,7 @@ function ConfigureQuizPage() {
           metadata: {
             moduleTitle: form.moduleTitle.trim(),
             passingScore: Number.parseInt(form.passingScore, 10),
-            timeLimitMinutes: Number.parseInt(form.timeLimit, 10),
+            timeLimitMinutes: form.timeLimit === "none" ? null : Number.parseInt(form.timeLimit, 10),
             dueDate: form.dueDate,
           },
         },
@@ -174,12 +200,17 @@ function ConfigureQuizPage() {
           if (event.type === "progress") {
             setGenerationStatus(
               event.attempt > 1
-                ? `Retrying (attempt ${event.attempt})… generated ${event.questionsDetected} of ${event.totalQuestions} questions`
-                : `Generating question ${Math.min(
-                    event.questionsDetected + 1,
-                    event.totalQuestions
-                  )} of ${event.totalQuestions}…`
+                ? `Retrying (attempt ${event.attempt})… generating questions…`
+                : "Generating questions…"
             );
+          } else if (event.type === "question") {
+            // Place each question at its index so a retry (which re-streams
+            // from index 0) overwrites rather than appends.
+            setStreamingQuestions((prev) => {
+              const next = prev.slice();
+              next[event.index] = event.question;
+              return next;
+            });
           }
         }
       );
@@ -189,7 +220,7 @@ function ConfigureQuizPage() {
         moduleTitle: form.moduleTitle.trim(),
         topic: form.topic.trim(),
         passingScore: Number.parseInt(form.passingScore, 10),
-        timeLimit: Number.parseInt(form.timeLimit, 10),
+        timeLimit: form.timeLimit === "none" ? 0 : Number.parseInt(form.timeLimit, 10),
         questionCount: count,
         dueDate: form.dueDate,
         difficulty: form.difficulty,
@@ -342,17 +373,6 @@ function ConfigureQuizPage() {
     });
   }
 
-  // Pressing Enter while editing a field means "I'm done" — collapse the
-  // whole card back to its compact view, not just close the text box.
-  function collapseQuestion(questionId: number) {
-    setExpandedQuestionIds((prev) => {
-      if (!prev.has(questionId)) return prev;
-      const next = new Set(prev);
-      next.delete(questionId);
-      return next;
-    });
-  }
-
   async function handleRegenerate(questionId: number) {
     if (!quiz) return;
 
@@ -386,143 +406,219 @@ function ConfigureQuizPage() {
     }
   }
 
+  const hasQuestions = Boolean(quiz && quiz.questionsPayload.length > 0);
+
   return (
     <div className="app-shell">
       <AppNav />
-      <main className="page-wrap">
-        <h1>Upload + Generate</h1>
-        <StepTabs steps={QUIZ_WORKFLOW_STEPS} activeIndex={1} stepRoutes={QUIZ_WORKFLOW_ROUTES} />
+      <main className="mgr-page">
+        <div className="mgr-hero">
+          <div>
+            <h1>Configure Quiz</h1>
+            <p>Step 2 of 3</p>
+          </div>
+          <div className="mgr-hero-right">
+            <WizardSteps steps={["Create", "Configure", "Review"]} activeIndex={1} />
+          </div>
+        </div>
 
-        <section className="two-col">
-          <div className="card quiz-settings-card">
-            <h2>Quiz Settings</h2>
-            <div className="settings-fields">
-              <label>
-                Module Title
+        <section className="cfg-grid">
+          <div className="glass cfg-card">
+            <div className="cfg-head">
+              <span className="cfg-badge">
+                <GearIcon />
+              </span>
+              <h2>Quiz Settings</h2>
+            </div>
+
+            <div className="cfg-field">
+              <span className="cfg-field-ic">
+                <TitleIcon />
+              </span>
+              <span className="cfg-field-label">Title</span>
+              <span className="cfg-field-control">
                 <input
+                  style={{ flex: 1 }}
+                  placeholder="Salesforce Security Best Practices"
                   value={form.moduleTitle}
                   onChange={(event) => updateForm("moduleTitle", event.target.value)}
                 />
-              </label>
+              </span>
+            </div>
 
-              <label>
-                Passing Score (%)
-                <select
-                  value={form.passingScore}
+            <div className="cfg-field">
+              <span className="cfg-field-ic">
+                <TargetIcon />
+              </span>
+              <span className="cfg-field-label">Passing score (%)</span>
+              <span className="cfg-field-control">
+                <input
+                  type="range"
+                  className="cfg-slider"
+                  min={0}
+                  max={100}
+                  step={5}
+                  value={Number(form.passingScore) || 0}
                   onChange={(event) => updateForm("passingScore", event.target.value)}
-                >
-                  <option value="">Select score</option>
-                  <option value="60">60</option>
-                  <option value="70">70</option>
-                  <option value="80">80</option>
-                  <option value="90">90</option>
-                  <option value="100">100</option>
-                </select>
-              </label>
+                />
+                <span className="cfg-slider-val">{form.passingScore || 0}%</span>
+              </span>
+            </div>
 
-              <label>
-                Time Limit (minutes)
+            <div className="cfg-field">
+              <span className="cfg-field-ic">
+                <ClockIcon />
+              </span>
+              <span className="cfg-field-label">Time limit</span>
+              <span className="cfg-field-control">
                 <select
+                  style={{ flex: 1 }}
                   value={form.timeLimit}
                   onChange={(event) => updateForm("timeLimit", event.target.value)}
                 >
-                  <option value="">Select time</option>
-                  <option value="15">15</option>
-                  <option value="20">20</option>
-                  <option value="30">30</option>
-                  <option value="45">45</option>
-                  <option value="60">60</option>
+                  <option value="" disabled>
+                    Select…
+                  </option>
+                  <option value="none">None</option>
+                  <option value="15">15 minutes</option>
+                  <option value="20">20 minutes</option>
+                  <option value="30">30 minutes</option>
+                  <option value="45">45 minutes</option>
+                  <option value="60">60 minutes</option>
                 </select>
-              </label>
+              </span>
+            </div>
 
-              <label>
-                Number of Questions
-                <select
+            <div className="cfg-field">
+              <span className="cfg-field-ic">
+                <ListIcon />
+              </span>
+              <span className="cfg-field-label">Number of questions</span>
+              <span className="cfg-field-control">
+                <input
+                  type="number"
+                  min={1}
+                  max={50}
+                  placeholder="e.g. 10"
+                  style={{ width: 90 }}
                   value={form.questionCount}
                   onChange={(event) => updateForm("questionCount", event.target.value)}
-                >
-                  <option value="">Select quantity</option>
-                  <option value="5">5 questions</option>
-                  <option value="10">10 questions</option>
-                  <option value="15">15 questions</option>
-                  <option value="20">20 questions</option>
-                </select>
-              </label>
+                />
+              </span>
+            </div>
 
-              <label>
-                Due Date
+            <div className="cfg-field">
+              <span className="cfg-field-ic">
+                <CalendarIcon />
+              </span>
+              <span className="cfg-field-label">Due date</span>
+              <span className="cfg-field-control">
                 <input
                   type="date"
                   value={form.dueDate}
                   min={todayIso}
                   onChange={(event) => updateForm("dueDate", event.target.value)}
                 />
-              </label>
-
-              <label>
-                Topic Focus (optional)
-                <input
-                  value={form.topic}
-                  onChange={(event) => updateForm("topic", event.target.value)}
-                  placeholder="Leave blank for a general quiz, or e.g. &quot;password policy&quot;"
-                />
-              </label>
-
-              <label>Difficulty Mix</label>
-              <div className="difficulty-chips">
-                {(["Easy", "Medium", "Hard"] as const).map((value) => (
-                  <span className="difficulty-chip-wrap" key={value}>
-                    <button
-                      type="button"
-                      className={form.difficulty === value ? "selected" : ""}
-                      onClick={() => updateForm("difficulty", value)}
-                    >
-                      {value}
-                    </button>
-                    <span className="difficulty-tooltip" role="tooltip">
-                      {DIFFICULTY_DESCRIPTIONS[value]}
-                    </span>
-                  </span>
-                ))}
-              </div>
+              </span>
             </div>
 
-            <div className="settings-done-row">
-              <button type="button" className="done-icon-btn" onClick={handleGenerate}>
-                <span aria-hidden>✓</span> Done
+            <div className="cfg-field">
+              <span className="cfg-field-ic">
+                <TagIcon />
+              </span>
+              <span className="cfg-field-label">Topic</span>
+              <span className="cfg-field-control">
+                <input
+                  style={{ flex: 1 }}
+                  placeholder="e.g. Salesforce Security"
+                  value={form.topic}
+                  onChange={(event) => updateForm("topic", event.target.value)}
+                />
+              </span>
+            </div>
+
+            <div className="cfg-field">
+              <span className="cfg-field-ic">
+                <ChartBarIcon />
+              </span>
+              <span className="cfg-field-label">Difficulty</span>
+              <span className="cfg-field-control">
+                <span className="diff-seg">
+                  {(["Easy", "Medium", "Hard"] as const).map((value) => (
+                    <span className="diff-opt" key={value}>
+                      <button
+                        type="button"
+                        className={form.difficulty === value ? "on" : ""}
+                        onClick={() => updateForm("difficulty", value)}
+                      >
+                        {value}
+                      </button>
+                      <span className="diff-tip" role="tooltip">
+                        <span className="diff-tip-card">
+                          <span className="diff-tip-head">
+                            <span className="diff-tip-ic">
+                              <InfoIcon />
+                            </span>
+                            <span className="diff-tip-title">{value}</span>
+                          </span>
+                          <span className="diff-tip-body">
+                            {DIFFICULTY_DESCRIPTIONS[value]}
+                          </span>
+                          <span className="diff-tip-arrow" aria-hidden />
+                        </span>
+                      </span>
+                    </span>
+                  ))}
+                </span>
+              </span>
+            </div>
+
+            <div className="cfg-done-row">
+              <button type="button" className="sf-btn" onClick={handleGenerate}>
+                <CheckPlain /> {hasQuestions ? "Regenerate" : "Generate"}
               </button>
             </div>
             {error ? <p className="form-error">{error}</p> : null}
           </div>
 
-          <div className="card ai-preview-card">
-            <h2>AI-Generated Questions Preview</h2>
-            <div className="ai-preview-body">
-              {isGenerating ? (
-                <div className="ai-loading">
-                  <div className="loading-line" />
-                  <div className="loading-line" />
-                  <div className="loading-line short" />
-                  <p className="ai-loading-status">{generationStatus}</p>
-                </div>
-              ) : isLoadingQuiz ? (
-                <p className="ai-loading-status">Checking for your last generated quiz…</p>
-              ) : quiz && quiz.questionsPayload.length > 0 ? (
-                <div className="review-list">
-                  {quiz.questionsPayload.map((question, index) => {
+          <div className="cfg-ai-col">
+            <img className="mgr-peek" src={mascot} alt="" aria-hidden />
+            <div className="glass cfg-card">
+            <div className="cfg-head">
+              <span className="cfg-badge ai">
+                <SparkleIcon />
+              </span>
+              <h2>AI-Generated Questions</h2>
+              <span className="ai-tag">AI</span>
+            </div>
+
+            {isLoadingQuiz && !isGenerating ? (
+              <p className="cfg-empty">Checking for your last generated quiz…</p>
+            ) : null}
+
+            {!isLoadingQuiz && !hasQuestions && !isGenerating ? (
+              <p className="cfg-empty">
+                Fill in the settings and click Generate to create AI questions from your uploaded
+                content.
+              </p>
+            ) : null}
+
+            <div className="qcards">
+              {hasQuestions
+                ? quiz!.questionsPayload.map((question, index) => {
                     const isEditingPrompt =
-                      editingField?.questionId === question.id &&
-                      editingField.kind === "prompt";
+                      editingField?.questionId === question.id && editingField.kind === "prompt";
                     const isRegeneratingThisQuestion = regeneratingQuestionId === question.id;
                     const isSavingThisQuestion = savingQuestionId === question.id;
-                    const isExpanded = expandedQuestionIds.has(question.id);
+                    const isExpanded = !expandedQuestionIds.has(question.id);
 
                     return (
-                      <article className="review-question-card" key={question.id}>
-                        <div className="review-question-header">
+                      <article className="qcard" key={question.id}>
+                        <div className="qcard-head">
+                          <span className="qcard-num">{index + 1}</span>
                           {isEditingPrompt ? (
                             <textarea
-                              className="inline-edit-input prompt-edit-input"
+                              className="inline-edit-input qcard-prompt"
                               autoFocus
                               value={fieldDraft}
                               onChange={(event) => setFieldDraft(event.target.value)}
@@ -531,44 +627,51 @@ function ConfigureQuizPage() {
                                 if (event.key === "Enter" && !event.shiftKey) {
                                   event.preventDefault();
                                   void commitFieldEdit(question);
-                                  collapseQuestion(question.id);
                                 } else if (event.key === "Escape") {
                                   cancelFieldEdit();
                                 }
                               }}
                             />
-                          ) : isExpanded ? (
+                          ) : (
                             <h3
-                              className="editable-text"
+                              className="qcard-prompt editable-text"
                               title="Click to edit"
                               onClick={() => startEditPrompt(question)}
                             >
-                              Q{index + 1}. {question.prompt}
-                            </h3>
-                          ) : (
-                            <h3>
-                              Q{index + 1}. {question.prompt}
+                              {question.prompt}
                             </h3>
                           )}
-                          <div className="review-question-actions">
+                          <div className="qcard-actions">
                             <button
                               type="button"
-                              className="icon-btn"
-                              title={isExpanded ? "Collapse" : "Edit question"}
-                              aria-label={isExpanded ? "Collapse question" : "Edit question"}
-                              onClick={() => toggleExpanded(question.id)}
+                              className="qcard-icon-btn"
+                              title="Edit question"
+                              aria-label="Edit question"
+                              onClick={() => startEditPrompt(question)}
                             >
                               <PencilIcon aria-hidden />
                             </button>
                             <button
                               type="button"
-                              className={`icon-btn ${isRegeneratingThisQuestion ? "spinning" : ""}`}
+                              className={`qcard-icon-btn ${isRegeneratingThisQuestion ? "spinning" : ""}`}
                               title="Regenerate question"
                               aria-label="Regenerate question"
                               disabled={isRegeneratingThisQuestion}
                               onClick={() => void handleRegenerate(question.id)}
                             >
                               <RegenerateIcon aria-hidden />
+                            </button>
+                            <button
+                              type="button"
+                              className="qcard-icon-btn"
+                              title={isExpanded ? "Collapse" : "Expand"}
+                              aria-label={isExpanded ? "Collapse question" : "Expand question"}
+                              onClick={() => toggleExpanded(question.id)}
+                              style={{
+                                transform: isExpanded ? "rotate(180deg)" : undefined,
+                              }}
+                            >
+                              <ChevronDown aria-hidden />
                             </button>
                           </div>
                         </div>
@@ -581,85 +684,117 @@ function ConfigureQuizPage() {
                         ) : null}
 
                         {isExpanded ? (
-                          <>
-                            <p className="options-hint">
-                              Click <span aria-hidden>○</span> to mark the correct answer · click
-                              the text to edit its wording
-                            </p>
-                            <ul className="editable-options">
-                              {question.options.map((option) => {
-                                const isEditingThisOption =
-                                  editingField?.questionId === question.id &&
-                                  editingField.kind === "option" &&
-                                  editingField.optionId === option.id;
+                          <ul className="qopts">
+                            {question.options.map((option, optIndex) => {
+                              const isEditingThisOption =
+                                editingField?.questionId === question.id &&
+                                editingField.kind === "option" &&
+                                editingField.optionId === option.id;
+                              const letter = String.fromCharCode(65 + optIndex);
 
-                                return (
-                                  <li className="editable-option-row" key={option.id}>
+                              return (
+                                <li
+                                  key={option.id}
+                                  className={`qopt ${option.isCorrect ? "correct" : ""}`}
+                                >
+                                  <button
+                                    type="button"
+                                    className="qopt-radio"
+                                    title="Mark as the correct answer"
+                                    aria-label="Mark as the correct answer"
+                                    onClick={() => void setCorrectOption(question, option.id)}
+                                  />
+                                  {isEditingThisOption ? (
                                     <input
-                                      type="radio"
-                                      name={`correct-option-${question.id}`}
-                                      checked={option.isCorrect}
-                                      title="Mark as the correct answer"
-                                      aria-label="Mark as the correct answer"
-                                      onChange={() => void setCorrectOption(question, option.id)}
-                                    />
-                                    {isEditingThisOption ? (
-                                      <input
-                                        type="text"
-                                        className="inline-edit-input"
-                                        autoFocus
-                                        value={fieldDraft}
-                                        onChange={(event) => setFieldDraft(event.target.value)}
-                                        onBlur={() => void commitFieldEdit(question)}
-                                        onKeyDown={(event) => {
-                                          if (event.key === "Enter") {
-                                            event.preventDefault();
-                                            void commitFieldEdit(question);
-                                            collapseQuestion(question.id);
-                                          } else if (event.key === "Escape") {
-                                            cancelFieldEdit();
-                                          }
-                                        }}
-                                      />
-                                    ) : (
-                                      <span
-                                        className="editable-text"
-                                        title="Click to edit"
-                                        onClick={() =>
-                                          startEditOption(question, option.id, option.text)
+                                      type="text"
+                                      className="inline-edit-input"
+                                      autoFocus
+                                      value={fieldDraft}
+                                      onChange={(event) => setFieldDraft(event.target.value)}
+                                      onBlur={() => void commitFieldEdit(question)}
+                                      onKeyDown={(event) => {
+                                        if (event.key === "Enter") {
+                                          event.preventDefault();
+                                          void commitFieldEdit(question);
+                                        } else if (event.key === "Escape") {
+                                          cancelFieldEdit();
                                         }
-                                      >
-                                        {option.text}
-                                      </span>
-                                    )}
-                                  </li>
-                                );
-                              })}
-                            </ul>
-                          </>
+                                      }}
+                                    />
+                                  ) : (
+                                    <span
+                                      className="qopt-text editable-text"
+                                      title="Click to edit"
+                                      onClick={() => startEditOption(question, option.id, option.text)}
+                                    >
+                                      {letter}. {option.text}
+                                    </span>
+                                  )}
+                                  {option.isCorrect ? <CheckPlain className="qopt-check" /> : null}
+                                </li>
+                              );
+                            })}
+                          </ul>
                         ) : null}
                         {isSavingThisQuestion ? <p className="subtle">Saving…</p> : null}
                       </article>
                     );
-                  })}
+                  })
+                : null}
+
+              {isGenerating
+                ? streamingQuestions.map((question, index) =>
+                    question ? (
+                      <article className="qcard qcard-stream" key={question.id ?? index}>
+                        <div className="qcard-head">
+                          <span className="qcard-num">{index + 1}</span>
+                          <h3 className="qcard-prompt">{question.prompt}</h3>
+                        </div>
+                        <ul className="qopts">
+                          {question.options.map((option, optIndex) => (
+                            <li
+                              key={option.id ?? optIndex}
+                              className={`qopt ${option.isCorrect ? "correct" : ""}`}
+                            >
+                              <span className="qopt-radio" aria-hidden />
+                              <span className="qopt-text">
+                                {String.fromCharCode(65 + optIndex)}. {option.text}
+                              </span>
+                              {option.isCorrect ? <CheckPlain className="qopt-check" /> : null}
+                            </li>
+                          ))}
+                        </ul>
+                      </article>
+                    ) : null
+                  )
+                : null}
+
+              {isGenerating ? (
+                <div className="qcard-generating">
+                  <SparkleIcon style={{ width: 18, height: 18 }} />
+                  <span className="loading-line" />
+                  <span style={{ whiteSpace: "nowrap" }}>
+                    {generationStatus || "Generating questions…"}
+                  </span>
                 </div>
               ) : null}
+            </div>
             </div>
           </div>
         </section>
 
-        <div className="page-actions">
-          <Link className="secondary-btn btn-link" to="/upload-content">
-            Back
+        <div className="mgr-foot" style={{ justifyContent: "center", gap: 18 } as CSSProperties}>
+          <Link className="ghost-btn btn-link" to="/upload-content">
+            <ArrowLeft /> Back
           </Link>
           <button
-            className="primary-btn btn-link"
+            className="sf-btn"
             type="button"
             disabled={isMutatingQuestion}
             title={isMutatingQuestion ? "Waiting for your question edit to save…" : undefined}
             onClick={handleNext}
           >
-            {isMutatingQuestion ? "Saving…" : "Next: Review & Publish"}
+            {isMutatingQuestion ? "Saving…" : "Next: Review"} <ArrowRight />
           </button>
         </div>
       </main>
