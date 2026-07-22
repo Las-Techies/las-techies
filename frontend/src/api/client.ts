@@ -1,5 +1,5 @@
 import { supabase } from "../lib/supabaseClient";
-import type { GeneratedQuiz } from "../features/quiz/types";
+import type { GeneratedQuiz, QuizQuestion } from "../features/quiz/types";
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:4000";
 
@@ -46,6 +46,7 @@ export async function apiFetch<T>(
 
 export type QuizGenerationEvent =
   | { type: "progress"; attempt: number; questionsDetected: number; totalQuestions: number }
+  | { type: "question"; index: number; question: QuizQuestion }
   | { type: "done"; quiz: GeneratedQuiz }
   | { type: "error"; message: string };
 

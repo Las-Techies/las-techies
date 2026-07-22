@@ -1,33 +1,17 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import AppNav from "../components/navigation/AppNav";
+import mascot from "../assets/panda-home.png";
 import { listAssignedQuizzes, type AssignedQuiz } from "../api/client";
 import { useAuth } from "../context/AuthContext";
-
-type Urgency = "overdue" | "soon" | "ontrack" | "none" | "completed";
-
-const DAY_MS = 24 * 60 * 60 * 1000;
-
-function urgencyFor(assignment: AssignedQuiz): Urgency {
-  if (assignment.status === "completed") return "completed";
-  if (!assignment.dueDate) return "none";
-
-  const due = new Date(assignment.dueDate).getTime();
-  if (Number.isNaN(due)) return "none";
-
-  const daysLeft = (due - Date.now()) / DAY_MS;
-  if (daysLeft < 0) return "overdue";
-  if (daysLeft <= 3) return "soon";
-  return "ontrack";
-}
-
-const URGENCY_LABEL: Record<Urgency, string> = {
-  overdue: "Overdue",
-  soon: "Due soon",
-  ontrack: "On track",
-  none: "No due date",
-  completed: "Completed",
-};
+import {
+  ArrowRight,
+  CalendarIcon,
+  CheckIcon,
+  ChevronRight,
+  ClipboardIcon,
+  QuizIcon,
+} from "../components/icons";
 
 const formatDue = (iso: string | null): string => {
   if (!iso) return "No due date";
@@ -35,6 +19,8 @@ const formatDue = (iso: string | null): string => {
   if (Number.isNaN(date.getTime())) return "No due date";
   return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 };
+
+type StepStatus = "done" | "current" | "upcoming";
 
 function NewHireHomePage() {
   const navigate = useNavigate();
@@ -68,17 +54,36 @@ function NewHireHomePage() {
 
   const pendingCount = assignments.filter((a) => a.status !== "completed").length;
 
+  // Feature the first still-pending assignment (or fall back to the first one).
+  const featured =
+    assignments.find((a) => a.status !== "completed") ?? assignments[0] ?? null;
+
+  const firstPendingId = assignments.find((a) => a.status !== "completed")?.assignmentId;
+
+  const stepStatusFor = (assignment: AssignedQuiz): StepStatus => {
+    if (assignment.status === "completed") return "done";
+    return assignment.assignmentId === firstPendingId ? "current" : "upcoming";
+  };
+
+  const STEP_LABEL: Record<StepStatus, string> = {
+    done: "Completed",
+    current: "In Progress",
+    upcoming: "Upcoming",
+  };
+
   return (
     <div className="app-shell">
       <AppNav />
-      <main className="home-wrap">
-        <header className="home-header">
-          <h1>Welcome back, {firstName}</h1>
-          <p className="subtle">
-            {pendingCount > 0
-              ? `You have ${pendingCount} onboarding quiz${pendingCount === 1 ? "" : "zes"} to complete`
-              : "You're all caught up on your onboarding"}
-          </p>
+      <main className="nh-home">
+        <header className="nh-hero">
+          <div className="nh-hero-text">
+            <h1>Welcome back, {firstName}</h1>
+            <p className="nh-hero-sub">
+              {pendingCount > 0
+                ? `You have ${pendingCount} onboarding quiz${pendingCount === 1 ? "" : "zes"} to complete`
+                : "You're all caught up on your onboarding"}
+            </p>
+          </div>
         </header>
 
         {isLoading ? (
@@ -86,50 +91,87 @@ function NewHireHomePage() {
         ) : error ? (
           <p className="form-error">{error}</p>
         ) : assignments.length === 0 ? (
-          <section className="assigned-card">
-            <span className="assigned-eyebrow">Nothing assigned yet</span>
-            <h2>You're all set for now</h2>
-            <p className="assigned-desc">
-              Your manager hasn't assigned any onboarding quizzes yet. Check back soon.
-            </p>
+          <section className="nh-card glass nh-assigned">
+            <span className="nh-eyebrow">
+              <ClipboardIcon aria-hidden /> Assigned Module
+            </span>
+            <div className="nh-assigned-body">
+              <div className="nh-assigned-info">
+                <h2>You're all set for now</h2>
+                <p className="nh-meta">
+                  Your manager hasn't assigned any onboarding quizzes yet. Check back soon.
+                </p>
+              </div>
+            </div>
           </section>
         ) : (
-          <div className="assigned-quiz-list">
-            {assignments.map((assignment) => {
-              const urgency = urgencyFor(assignment);
-              return (
-                <section
-                  key={assignment.assignmentId}
-                  className={`card assigned-quiz-card urgency-${urgency}`}
-                >
-                  <div className="assigned-quiz-card-head">
-                    <span className={`assigned-quiz-badge urgency-${urgency}`}>
-                      {URGENCY_LABEL[urgency]}
-                    </span>
-                    <span className="subtle">Due {formatDue(assignment.dueDate)}</span>
-                  </div>
-                  <h2>{assignment.title}</h2>
-                  {assignment.description ? (
-                    <p className="assigned-desc">{assignment.description}</p>
-                  ) : null}
+          <div className="nh-grid">
+            {featured ? (
+              <section className="nh-card glass nh-assigned">
+                <span className="nh-eyebrow">
+                  <ClipboardIcon aria-hidden /> Assigned Module
+                </span>
 
-                  <button
-                    type="button"
-                    className="primary-btn assigned-cta"
-                    disabled={assignment.status === "completed"}
-                    onClick={() => navigate(`/learner-module?quizId=${assignment.quizId}`)}
-                  >
-                    {assignment.status === "completed" ? (
-                      "Completed"
-                    ) : (
-                      <>
-                        Get Started <span aria-hidden>→</span>
-                      </>
-                    )}
-                  </button>
-                </section>
-              );
-            })}
+                <div className="nh-assigned-body">
+                  <div className="nh-assigned-info">
+                    <h2>{featured.title}</h2>
+                    {featured.description ? (
+                      <p className="nh-meta">{featured.description}</p>
+                    ) : null}
+                    <p className="nh-meta">
+                      <CalendarIcon aria-hidden /> Due {formatDue(featured.dueDate)}
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  className="sf-btn sf-btn-block"
+                  disabled={featured.status === "completed"}
+                  onClick={() => navigate(`/learner-module?quizId=${featured.quizId}`)}
+                >
+                  {featured.status === "completed" ? (
+                    "Completed"
+                  ) : (
+                    <>
+                      Get Started <ArrowRight aria-hidden />
+                    </>
+                  )}
+                </button>
+              </section>
+            ) : null}
+
+            <section className="nh-card glass nh-quizzes">
+              <img className="nh-quizzes-mascot" src={mascot} alt="" aria-hidden />
+              <span className="nh-eyebrow">
+                <QuizIcon aria-hidden /> Your Quizzes
+              </span>
+
+              <ul className="nh-timeline">
+                {assignments.map((assignment) => {
+                  const status = stepStatusFor(assignment);
+                  return (
+                    <li
+                      key={assignment.assignmentId}
+                      className={`nh-step ${status}`}
+                      onClick={() => navigate(`/learner-module?quizId=${assignment.quizId}`)}
+                    >
+                      <span className="nh-step-icon">
+                        {status === "done" ? <CheckIcon aria-hidden /> : null}
+                      </span>
+                      <div className="nh-step-main">
+                        <strong>{assignment.title}</strong>
+                        <span>{STEP_LABEL[status]}</span>
+                      </div>
+                      <span className="nh-step-date">
+                        {status === "done" ? "Completed" : `Due ${formatDue(assignment.dueDate)}`}
+                      </span>
+                      <ChevronRight className="nh-step-chevron" aria-hidden />
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
           </div>
         )}
       </main>

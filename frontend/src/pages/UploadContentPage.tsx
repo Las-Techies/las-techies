@@ -2,7 +2,7 @@ import type { ChangeEventHandler, DragEventHandler } from "react";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import AppNav from "../components/navigation/AppNav";
-import StepTabs from "../components/navigation/StepTabs";
+import WizardSteps from "../components/navigation/WizardSteps";
 import AlertBanner from "../components/AlertBanner";
 import { apiFetch, listMyDocuments } from "../api/client";
 import {
@@ -11,8 +11,15 @@ import {
   saveDeselectedDocumentIds,
   saveUploadedDocuments,
 } from "../features/quiz/storage";
-import { QUIZ_WORKFLOW_ROUTES, QUIZ_WORKFLOW_STEPS } from "../features/quiz/workflow";
 import trashIcon from "../assets/trash-icon.png";
+import {
+  ArrowRight,
+  CloudUploadIcon,
+  FileTextIcon,
+  GithubIcon,
+  LinkIcon,
+  ShieldIcon,
+} from "../components/icons";
 import { supabase } from "../lib/supabaseClient";
 import { CircleCheckIcon } from "../components/icons/QuizIcons";
 
@@ -547,86 +554,115 @@ function UploadContentPage() {
   return (
     <div className="app-shell">
       <AppNav />
-      <main className="page-wrap">
-        <h1>Upload + Generate</h1>
-        <StepTabs steps={QUIZ_WORKFLOW_STEPS} activeIndex={0} stepRoutes={QUIZ_WORKFLOW_ROUTES} />
+      <main className="mgr-page">
+        <div className="mgr-hero">
+          <div>
+            <h1>Upload + Generate</h1>
+            <p>Upload your content and let SageForce create high-quality Salesforce-ready knowledge.</p>
+          </div>
+          <div className="mgr-hero-right">
+            <WizardSteps steps={["Upload", "Configure", "Review & Publish"]} activeIndex={0} />
+          </div>
+        </div>
 
         {error ? <AlertBanner message={error} onDismiss={() => setError("")} /> : null}
 
         <section
-          className={`card upload-zone ${isDragActive ? "active" : ""}`}
+          className={`dropzone ${isDragActive ? "active" : ""}`}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
+          onClick={onPickFile}
+          role="button"
+          tabIndex={0}
         >
-          <h2>Drag &amp; drop content</h2>
-          <p>Drop PDF, DOCX, TXT, or MD here</p>
-          <button className="secondary-btn" type="button" onClick={onPickFile}>
-            Select Files
-          </button>
+          <div className="dropzone-cloud">
+            <CloudUploadIcon />
+          </div>
+          <div className="dropzone-body">
+            <h2>
+              Drag files here or <span className="accent">browse</span>
+            </h2>
+            <p>Upload documents, presentations, or other content to get started.</p>
+            <div className="filetype-chips">
+              <span className="filetype-chip">
+                <span className="tag pdf">PDF</span> PDF
+              </span>
+              <span className="filetype-chip">
+                <span className="tag docx">W</span> DOCX
+              </span>
+              <span className="filetype-chip">
+                <span className="tag pptx">P</span> PPTX
+              </span>
+            </div>
+            <span className="dropzone-secure">
+              <ShieldIcon /> Secure upload. Your data is encrypted and protected.
+            </span>
+          </div>
           <input
             ref={fileInputRef}
             type="file"
             className="sr-only"
             onChange={onFileChange}
-            accept=".pdf,.doc,.docx,.txt,.md"
+            onClick={(event) => event.stopPropagation()}
+            accept=".pdf,.doc,.docx,.txt,.md,.ppt,.pptx"
             multiple
           />
         </section>
 
-        <section className="card link-import-zone">
-          <h2>Import from Link</h2>
-          <p>Paste a Google Doc, Drive folder, or GitHub repo link.</p>
-          <div className="link-import-connection-row">
-            <span>
-              GitHub: {isGithubConnected ? "Connected" : "Not connected"}
-            </span>
-            <button
-              className="secondary-btn"
-              type="button"
-              onClick={() => void handleConnectGithub()}
-              disabled={isConnectingGithub}
-            >
-              {isConnectingGithub
-                ? "Connecting..."
-                : isGithubConnected
-                  ? "Grant access to another repo"
-                  : "Connect GitHub"}
-            </button>
-          </div>
-          {isGithubConnected ? (
-            <p className="subtle">
-              To import a private repository, click "Grant access to another repo" and
-              authorize it on GitHub.
-            </p>
-          ) : null}
+        <section className="glass import-bar">
+          <span className="import-bar-icon">
+            <LinkIcon />
+          </span>
+          <span className="import-bar-text">
+            <strong>Import from link</strong>
+            <span>Paste a Google Doc, Drive folder, or GitHub repo link.</span>
+          </span>
+          <button
+            className="import-connect"
+            type="button"
+            onClick={() => void handleConnectGithub()}
+            disabled={isConnectingGithub}
+            title={
+              isGithubConnected ? "Grant access to another repo" : "Connect GitHub"
+            }
+          >
+            <GithubIcon />
+            {isConnectingGithub
+              ? "Connecting…"
+              : isGithubConnected
+                ? "Connected"
+                : "Connect GitHub"}
+          </button>
           <input
             type="text"
             value={linkInput}
             onChange={(event) => setLinkInput(event.target.value)}
-            placeholder="https://docs.google.com/... or https://drive.google.com/drive/folders/... or https://github.com/org/repo"
-            className="text-input"
+            placeholder="https://example.com/docs or https://github.com/owner/repo"
+            className="import-url"
           />
           <button
-            className="secondary-btn"
+            className="sf-btn"
             type="button"
             onClick={() => void handleImportFromLink()}
             disabled={isImportingLink}
           >
-            {isImportingLink ? "Importing..." : "Import Link"}
+            {isImportingLink ? "Importing…" : "Import"}
           </button>
         </section>
 
-        <section className="card uploads-table">
-          <h3>Uploaded Files</h3>
+        <section className="glass files-card uploads-table">
+          <h3 className="files-card-title">
+            <FileTextIcon /> Uploaded Files
+          </h3>
           <p className="uploads-hint">
             Check the documents you want to use for your next quiz — everything stays here
             either way, unless you delete it.
           </p>
           {isLoadingDocuments ? (
-            <p className="uploads-empty">Loading documents...</p>
+            <p className="cfg-empty">Loading documents…</p>
           ) : uploads.length === 0 ? (
-            <p className="uploads-empty">No files uploaded yet.</p>
+            <p className="cfg-empty">No files uploaded yet.</p>
           ) : (
             uploads.map((upload) => {
               const isSelectable = upload.status === "Ready" && upload.documentId !== null;
@@ -701,15 +737,14 @@ function UploadContentPage() {
           <p className="form-error">Check at least one document above to continue.</p>
         ) : null}
 
-        <div className="page-actions">
-          <span />
+        <div className="mgr-foot">
           {hasSelectedDocument ? (
-            <Link className="primary-btn btn-link" to="/configure-quiz">
-              Continue to Configure Quiz
+            <Link className="sf-btn btn-link" to="/configure-quiz">
+              Continue to Configure <ArrowRight />
             </Link>
           ) : (
-            <button className="primary-btn" type="button" disabled>
-              Continue to Configure Quiz
+            <button className="sf-btn" type="button" disabled>
+              Continue to Configure <ArrowRight />
             </button>
           )}
         </div>

@@ -1,22 +1,31 @@
 import { useEffect, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { QUIZ_WORKFLOW_ROUTES } from "../../features/quiz/workflow";
 import { useAuth } from "../../context/AuthContext";
 import { clearPreviewRole, getPreviewRole } from "../../features/auth/previewRole";
 import logoBadge from "../../assets/sageforce-logo-badge.png";
+import {
+  ChevronDown,
+  HomeIcon,
+  ModulesIcon,
+  ProgressIcon,
+  QuizIcon,
+  UploadIcon,
+} from "../icons";
 
-type NavItem = { label: string; type: "link"; to: string };
+type NavItem = { label: string; type: "link"; to: string; icon: ReactNode };
 
 const managerNavItems: NavItem[] = [
-  { label: "Upload + Generate", type: "link", to: "/upload-content" },
-  { label: "Learner Module", type: "link", to: "/learner-module" },
+  { label: "Upload + Generate", type: "link", to: "/upload-content", icon: <UploadIcon /> },
+  { label: "Learner Module", type: "link", to: "/learner-module", icon: <ModulesIcon /> },
 ];
 
 const newHireNavItems: NavItem[] = [
-  { label: "Home", type: "link", to: "/home" },
-  { label: "Learner Module", type: "link", to: "/learner-module" },
-  { label: "Quiz", type: "link", to: "/quiz-taking" },
-  { label: "Results", type: "link", to: "/quiz-results" },
+  { label: "Home", type: "link", to: "/home", icon: <HomeIcon /> },
+  { label: "My Modules", type: "link", to: "/learner-module", icon: <ModulesIcon /> },
+  { label: "Quiz", type: "link", to: "/quiz-taking", icon: <QuizIcon /> },
+  { label: "Progress", type: "link", to: "/quiz-results", icon: <ProgressIcon /> },
 ];
 
 function AppNav() {
@@ -76,6 +85,7 @@ function AppNav() {
               className={`app-nav-link ${isActive ? "active" : ""}`}
               to={item.to}
             >
+              {item.icon}
               {item.label}
             </Link>
           );
@@ -91,8 +101,9 @@ function AppNav() {
         >
           <span className="user-avatar">{initials.toUpperCase() || "•"}</span>
           <span>
-            Hi, {firstName} <span className="muted">· {role}</span>
+            {firstName} <span className="muted">· {role}</span>
           </span>
+          <ChevronDown className="chevron" aria-hidden />
         </button>
 
         {isMenuOpen ? (
