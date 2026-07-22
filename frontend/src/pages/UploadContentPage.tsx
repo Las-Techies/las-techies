@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import AppNav from "../components/navigation/AppNav";
 import StepTabs from "../components/navigation/StepTabs";
+import AlertBanner from "../components/AlertBanner";
 import { apiFetch, listTeamDocuments } from "../api/client";
 import {
   loadDeselectedDocumentIds,
@@ -541,6 +542,8 @@ function UploadContentPage() {
         <h1>Upload + Generate</h1>
         <StepTabs steps={QUIZ_WORKFLOW_STEPS} activeIndex={0} stepRoutes={QUIZ_WORKFLOW_ROUTES} />
 
+        {error ? <AlertBanner message={error} onDismiss={() => setError("")} /> : null}
+
         <section
           className={`card upload-zone ${isDragActive ? "active" : ""}`}
           onDragOver={handleDragOver}
@@ -679,7 +682,6 @@ function UploadContentPage() {
           )}
         </section>
 
-        {error ? <p className="form-error">{error}</p> : null}
         {hasReadyDocument && !hasSelectedDocument ? (
           <p className="form-error">Check at least one document above to continue.</p>
         ) : null}
