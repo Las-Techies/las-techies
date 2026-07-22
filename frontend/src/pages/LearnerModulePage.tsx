@@ -235,6 +235,9 @@ function LearnerModulePage() {
   const [sourceLoadingId, setSourceLoadingId] = useState<number | null>(null);
   const [sourceError, setSourceError] = useState("");
   const [timeLimit, setTimeLimit] = useState<number | null>(null);
+  // Distinguishes "haven't heard back from the API yet" (both stay null/false)
+  // from "the manager genuinely left this quiz untimed".
+  const [hasNoTimeLimit, setHasNoTimeLimit] = useState(false);
   const [confirmStart, setConfirmStart] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
 
@@ -270,7 +273,11 @@ function LearnerModulePage() {
       .then((quiz) => {
         if (cancelled || !quiz) return;
         if (quiz.title) setModuleTitle(quiz.title);
-        if (quiz.timeLimitMinutes) setTimeLimit(quiz.timeLimitMinutes);
+        if (quiz.timeLimitMinutes) {
+          setTimeLimit(quiz.timeLimitMinutes);
+        } else {
+          setHasNoTimeLimit(true);
+        }
       })
       .catch(() => {
         /* keep default title */
@@ -872,8 +879,14 @@ function LearnerModulePage() {
             </div>
             <h2>Ready to start the quiz?</h2>
             <p className="confirm-lead">
-              You'll have <strong>{timeLimit ?? 30} minutes</strong> to complete it once you
-              begin.
+              {hasNoTimeLimit ? (
+                "This quiz has no time limit — take as long as you need."
+              ) : (
+                <>
+                  You'll have <strong>{timeLimit ?? 30} minutes</strong> to complete it once you
+                  begin.
+                </>
+              )}
             </p>
             <p className="confirm-warn">
               Once you start, you won't be able to return to the learner module until you

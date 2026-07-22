@@ -311,7 +311,7 @@ function ReviewPublishPage() {
               </div>
               <div>
                 <span>Time Limit</span>
-                <strong>{displayTimeLimit || "--"} min</strong>
+                <strong>{displayTimeLimit ? `${displayTimeLimit} min` : "No limit"}</strong>
               </div>
               <div>
                 <span>Topic</span>

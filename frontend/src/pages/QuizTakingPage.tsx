@@ -86,7 +86,13 @@ function QuizTakingPage() {
   const [current, setCurrent] = useState(0);
   const [answers, setAnswers] = useState<Record<number, number>>({});
   const [flagged, setFlagged] = useState<Set<number>>(new Set());
-  const [secondsLeft, setSecondsLeft] = useState(() => loadQuizConfig().timeLimit * 60);
+  // null means "no time limit" — the countdown UI stays hidden and no
+  // interval runs. A time limit of 0 (or missing) from either the locally
+  // cached config or the fetched quiz is treated as "no limit".
+  const [secondsLeft, setSecondsLeft] = useState<number | null>(() => {
+    const minutes = loadQuizConfig().timeLimit;
+    return minutes > 0 ? minutes * 60 : null;
+  });
 
   // Reuse the same "my latest quiz" source as the results page so the new hire
   // takes the quiz their manager actually published. Falls back silently to the
@@ -99,7 +105,7 @@ function QuizTakingPage() {
         setQuestions(quiz.questionsPayload);
         setQuizId(quiz.id);
         setTitle(quiz.title);
-        if (quiz.timeLimitMinutes) setSecondsLeft(quiz.timeLimitMinutes * 60);
+        setSecondsLeft(quiz.timeLimitMinutes ? quiz.timeLimitMinutes * 60 : null);
       })
       .catch(() => {
         /* keep fallback questions */
@@ -110,9 +116,9 @@ function QuizTakingPage() {
   }, []);
 
   useEffect(() => {
-    if (secondsLeft <= 0) return;
+    if (secondsLeft === null || secondsLeft <= 0) return;
     const timer = window.setInterval(() => {
-      setSecondsLeft((value) => (value <= 1 ? 0 : value - 1));
+      setSecondsLeft((value) => (value === null || value <= 1 ? 0 : value - 1));
     }, 1000);
     return () => window.clearInterval(timer);
   }, [secondsLeft]);
@@ -177,9 +183,11 @@ function QuizTakingPage() {
           <span className="quiz-progress-count">
             Question {current + 1} of {total}
           </span>
-          <span className={`timer-pill ${secondsLeft <= 60 ? "low" : ""}`}>
-            <span aria-hidden>◷</span> {formatTime(secondsLeft)} left
-          </span>
+          {secondsLeft !== null ? (
+            <span className={`timer-pill ${secondsLeft <= 60 ? "low" : ""}`}>
+              <span aria-hidden>◷</span> {formatTime(secondsLeft)} left
+            </span>
+          ) : null}
         </div>
         <div className="progress-track quiz-progress-track">
           <div className="progress-fill" style={{ width: `${progressPercent}%` }} />

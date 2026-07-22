@@ -122,13 +122,12 @@ function ConfigureQuizPage() {
     };
   }, []);
 
-  // Topic Focus is intentionally excluded here — it's optional. Leaving it
-  // blank just means the AI pulls questions from the whole document instead
-  // of narrowing in on one topic.
+  // Topic Focus and Time Limit are intentionally excluded here — both are
+  // optional. Leaving Topic Focus blank pulls questions from the whole
+  // document; leaving Time Limit blank means the quiz has no time limit.
   const isFormValid = Boolean(
     form.moduleTitle.trim() &&
       form.passingScore &&
-      form.timeLimit &&
       form.questionCount &&
       form.dueDate
   );
@@ -166,7 +165,9 @@ function ConfigureQuizPage() {
           metadata: {
             moduleTitle: form.moduleTitle.trim(),
             passingScore: Number.parseInt(form.passingScore, 10),
-            timeLimitMinutes: Number.parseInt(form.timeLimit, 10),
+            ...(form.timeLimit
+              ? { timeLimitMinutes: Number.parseInt(form.timeLimit, 10) }
+              : {}),
             dueDate: form.dueDate,
           },
         },
@@ -189,7 +190,8 @@ function ConfigureQuizPage() {
         moduleTitle: form.moduleTitle.trim(),
         topic: form.topic.trim(),
         passingScore: Number.parseInt(form.passingScore, 10),
-        timeLimit: Number.parseInt(form.timeLimit, 10),
+        // 0 means "no time limit" — see QuizConfig.timeLimit in features/quiz/types.ts.
+        timeLimit: form.timeLimit ? Number.parseInt(form.timeLimit, 10) : 0,
         questionCount: count,
         dueDate: form.dueDate,
         difficulty: form.difficulty,
@@ -421,12 +423,12 @@ function ConfigureQuizPage() {
               </label>
 
               <label>
-                Time Limit (minutes)
+                Time Limit (minutes, optional)
                 <select
                   value={form.timeLimit}
                   onChange={(event) => updateForm("timeLimit", event.target.value)}
                 >
-                  <option value="">Select time</option>
+                  <option value="">No time limit</option>
                   <option value="15">15</option>
                   <option value="20">20</option>
                   <option value="30">30</option>
