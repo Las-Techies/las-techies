@@ -239,7 +239,13 @@ function QuizResultsPage() {
           {loading ? <p className="subtle">Loading quiz…</p> : null}
           {error ? <p className="form-error">{error}</p> : null}
 
-          {reviewQuestions.length > 0 ? (
+          {!attempt ? (
+            !loading && !error ? (
+              <p className="subtle">
+                Take the quiz to see the answer key and review explanations for each question.
+              </p>
+            ) : null
+          ) : reviewQuestions.length > 0 ? (
             <div className="review-list">
               {reviewQuestions.map((question, index) => {
                 const correct = question.options.find((option) => option.isCorrect);
@@ -412,16 +418,6 @@ function QuizResultsPage() {
                 );
               })}
             </div>
-          ) : !loading && !error ? (
-            <>
-              <p className="ok">✓ What is the minimum PPE requirement for Zone A?</p>
-              <p className="bad">
-                ✕ How often must fire extinguishers be inspected according to OSHA 2026 guidelines?
-              </p>
-              <p className="ok">
-                ✓ Which class of fire extinguisher is required for chemical fires involving metals?
-              </p>
-            </>
           ) : null}
         </section>
 
