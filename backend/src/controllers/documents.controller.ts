@@ -8,6 +8,7 @@ import {
 } from "../models/document.model";
 import { findUsersByIds } from "../models/user.model";
 import {
+  extractGoogleDocLinks,
   extractTextFromGoogleDriveFile,
   extractTextFromDocument,
   isSupportedGoogleDriveFile,
@@ -19,6 +20,7 @@ import {
   extractTextFromGoogleDriveUrl,
 } from "../services/documentProcessor";
 import { embedDocument } from "../services/documentEmbedder";
+import { getSignedFileUrl, uploadOriginalFile } from "../services/documentStorage";
 import { findQuizzesReferencingDocument } from "../models/quiz.model";
 
 type AuthUser = {
@@ -45,6 +47,75 @@ type ImportGithubRepoBody = {
   maxFiles?: number;
 };
 
+type LinkedImportItem = {
+  documentId: number | null;
+  sourceUrl: string;
+  title: string;
+  status: "ready" | "failed";
+  createdAt: Date | null;
+  error?: string;
+};
+
+async function importLinkedGoogleDocs(
+  teamId: number,
+  uploadedByUserId: number,
+  links: string[]
+): Promise<{
+  imported: number;
+  failed: number;
+  items: LinkedImportItem[];
+}> {
+  const items: LinkedImportItem[] = [];
+  let imported = 0;
+  let failed = 0;
+
+  for (const link of links) {
+    try {
+      const linkedDoc = await extractTextFromGoogleDriveUrl(link);
+      const linkedDocument = await createDocument({
+        teamId,
+        uploadedByUserId,
+        title: linkedDoc.title,
+        sourceType: "google_drive",
+        sourceUrl: link,
+        rawText: linkedDoc.rawText,
+        status: "ready",
+      });
+
+      imported += 1;
+      items.push({
+        documentId: linkedDocument.id,
+        sourceUrl: link,
+        title: linkedDocument.title,
+        status: "ready",
+        createdAt: linkedDocument.createdAt,
+      });
+    } catch (error) {
+      const failedLinkedDocument = await createDocument({
+        teamId,
+        uploadedByUserId,
+        title: "Linked Google Doc Import",
+        sourceType: "google_drive",
+        sourceUrl: link,
+        rawText: null,
+        status: "failed",
+      });
+
+      failed += 1;
+      items.push({
+        documentId: failedLinkedDocument.id,
+        sourceUrl: link,
+        title: failedLinkedDocument.title,
+        status: "failed",
+        createdAt: failedLinkedDocument.createdAt,
+        error: (error as Error).message,
+      });
+    }
+  }
+
+  return { imported, failed, items };
+}
+
 export async function uploadDocument(
   req: Request,
   res: Response,
@@ -63,6 +134,12 @@ export async function uploadDocument(
 
     try {
       const rawText = await extractTextFromDocument(file);
+      const linkedGoogleDocUrls = extractGoogleDocLinks(rawText, 5);
+
+      // Best-effort: if Storage is unreachable, we still keep the extracted
+      // text so the document is usable (just falls back to the text-only
+      // viewer instead of showing the original file).
+      const stored = await uploadOriginalFile(user.teamId, file);
 
       const document = await createDocument({
         teamId: user.teamId,
@@ -71,7 +148,15 @@ export async function uploadDocument(
         sourceType: "upload",
         rawText,
         status: "ready",
+        storagePath: stored?.storagePath ?? null,
+        mimeType: stored?.mimeType ?? null,
       });
+
+      const linkedImport = await importLinkedGoogleDocs(
+        user.teamId,
+        user.id,
+        linkedGoogleDocUrls
+      );
 
       // Best-effort: the chatbot's retrieval index shouldn't block the
       // upload response, and a document is still useful for quiz
@@ -86,6 +171,12 @@ export async function uploadDocument(
           title: document.title,
           status: document.status,
           createdAt: document.createdAt,
+          linkedImportSummary: {
+            totalFound: linkedGoogleDocUrls.length,
+            imported: linkedImport.imported,
+            failed: linkedImport.failed,
+            items: linkedImport.items,
+          },
         },
       });
     } catch (error) {
@@ -136,6 +227,45 @@ export async function getDocumentById(
     }
 
     return res.json({ data: document });
+  } catch (error) {
+    next(error);
+  }
+}
+
+// Returns a fresh, short-lived signed URL for the original file so the
+// frontend can embed the real document instead of the extracted-text
+// fallback. Documents uploaded before this feature (or imported from
+// Google Drive/GitHub) have no storagePath, so `url` comes back null and
+// the caller should fall back to the rawText viewer.
+export async function getDocumentFileUrl(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  try {
+    const documentId = Number(req.params.documentId);
+    if (!Number.isInteger(documentId) || documentId <= 0) {
+      return res
+        .status(400)
+        .json({ error: { message: "Invalid documentId" } });
+    }
+
+    const user = (req as any).user as AuthUser | undefined;
+    if (!user?.teamId) {
+      return res.status(401).json({ error: { message: "Unauthorized" } });
+    }
+
+    const document = await findDocumentByIdForTeam(documentId, user.teamId);
+    if (!document) {
+      return res.status(404).json({ error: { message: "Document not found" } });
+    }
+
+    if (!document.storagePath) {
+      return res.json({ data: { url: null, mimeType: null } });
+    }
+
+    const url = await getSignedFileUrl(document.storagePath);
+    return res.json({ data: { url, mimeType: document.mimeType } });
   } catch (error) {
     next(error);
   }
@@ -255,6 +385,7 @@ export async function importGoogleDriveDocument(//import from google drive url
 
     try {
       const { title, rawText } = await extractTextFromGoogleDriveUrl(url);
+      const linkedGoogleDocUrls = extractGoogleDocLinks(rawText, 5);
 
       const document = await createDocument({
         teamId: user.teamId,
@@ -266,12 +397,24 @@ export async function importGoogleDriveDocument(//import from google drive url
         status: "ready",
       });
 
+      const linkedImport = await importLinkedGoogleDocs(
+        user.teamId,
+        user.id,
+        linkedGoogleDocUrls
+      );
+
       return res.status(201).json({
         data: {
           id: document.id,
           title: document.title,
           status: document.status,
           createdAt: document.createdAt,
+          linkedImportSummary: {
+            totalFound: linkedGoogleDocUrls.length,
+            imported: linkedImport.imported,
+            failed: linkedImport.failed,
+            items: linkedImport.items,
+          },
         },
       });
     } catch (error) {

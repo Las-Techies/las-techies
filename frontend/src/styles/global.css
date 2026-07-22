@@ -571,10 +571,9 @@ label {
 }
 
 .uploads-table h3 {
-  font-size: 12px;
-  color: #706e6b;
-  font-weight: 500;
-  margin-bottom: 4px;
+  font-size: 20px;
+  font-weight: 700;
+  margin-bottom: 6px;
 }
 
 .uploads-empty {
@@ -583,12 +582,54 @@ label {
   font-size: 13px;
 }
 
+.uploads-hint {
+  margin: 0 0 10px;
+  color: #5c5c5a;
+  font-size: 15px;
+}
+
 .upload-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   border-top: 1px solid #f0efef;
   padding: 12px 0;
+}
+
+.upload-row-main {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.upload-select-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  margin-top: 2px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: #c9c9c8;
+  cursor: pointer;
+  transition: color 0.15s ease, transform 0.1s ease;
+}
+
+.upload-select-toggle:hover:not(:disabled) {
+  color: #9ac7f2;
+  transform: scale(1.08);
+}
+
+.upload-select-toggle.selected {
+  color: #020061;
+}
+
+.upload-select-toggle:disabled {
+  color: #e5e5e4;
+  cursor: default;
 }
 
 .upload-row p {
@@ -798,6 +839,21 @@ label {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+.doc-picker-summary {
+  font-size: 13px;
+  color: #444;
+  background: #f7f7f6;
+  border: 1px solid #e5e5e4;
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin-bottom: 14px;
+}
+
+.doc-picker-manage-link {
+  font-weight: 600;
+  white-space: nowrap;
 }
 
 .difficulty-chips {
@@ -2371,12 +2427,35 @@ label {
   padding: 1px 2px;
 }
 
+/* Fills the modal body edge-to-edge (overriding its padding) so the
+   embedded PDF/DOCX viewer reads as the real document, not a text card. */
+.doc-modal-iframe {
+  width: 100%;
+  height: 100%;
+  margin: -24px;
+  border: none;
+  background: #fff;
+}
+
 .doc-modal-foot {
   display: flex;
   align-items: center;
   justify-content: flex-end;
+  gap: 16px;
   padding: 12px 18px;
   border-top: 1px solid #e6e6e6;
+}
+
+.doc-modal-open-original {
+  margin-right: auto;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #020061;
+  text-decoration: none;
+}
+
+.doc-modal-open-original:hover {
+  text-decoration: underline;
 }
 
 .pager {

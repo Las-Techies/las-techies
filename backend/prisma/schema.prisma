@@ -37,6 +37,12 @@ model Document {
   sourceType       String   @default("upload")
   source_url       String?
   rawText          String?
+  // Path within the Supabase Storage "documents" bucket for the original
+  // uploaded file. Null for documents uploaded before this feature existed,
+  // or for google_drive/github imports (they link out via source_url
+  // instead) — the viewer falls back to the rawText-only view in that case.
+  storagePath      String?
+  mimeType         String?
   status           String   @default("processing")
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
