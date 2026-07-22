@@ -2,6 +2,7 @@ import type { Request, Response, NextFunction } from "express";
 import {
   createQuiz,
   findLatestQuizForUser,
+  findLatestPublishedQuizForTeam,
   findQuizById,
   findQuizByIdForTeam,
   isValidQuizStatus,
@@ -23,14 +24,19 @@ export async function getQuiz(req: Request, res: Response, next: NextFunction) {
   }
 }
 
-// Lets the frontend resume "my most recently generated quiz" on any device,
-// instead of remembering a quizId in this browser's localStorage. Responds
-// 200 with null (not 404) when the user has no quiz yet, since "no quiz" is
+// Returns "the quiz to show me" and is role-aware:
+//   - manager: their most recently generated quiz (to resume editing/publishing)
+//   - new hire: the latest *published* quiz on their team (their assignment) —
+//     new hires author nothing, so a creator-scoped lookup would always be null.
+// Responds 200 with null (not 404) when there's no quiz yet, since "no quiz" is
 // a normal state here, not an error.
 export async function getLatestQuiz(req: Request, res: Response, next: NextFunction) {
   try {
     const user = (req as any).user;
-    const quiz = await findLatestQuizForUser(user.id, user.teamId);
+    const quiz =
+      user.role === "manager"
+        ? await findLatestQuizForUser(user.id, user.teamId)
+        : await findLatestPublishedQuizForTeam(user.teamId);
     res.json(quiz ?? null);
   } catch (err) {
     next(err);
