@@ -213,7 +213,10 @@ function ReviewPublishPage() {
         selectedLearners.map((email) =>
           apiFetch("/api/invites", {
             method: "POST",
-            body: JSON.stringify({ email }),
+            // Tie the invite to this quiz so accepting it auto-creates the
+            // new hire's assignment (otherwise they'd land with nothing on
+            // their onboarding list).
+            body: JSON.stringify({ email, quizId: updated.id }),
           })
         )
       );

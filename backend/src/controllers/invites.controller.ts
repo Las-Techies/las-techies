@@ -10,6 +10,7 @@ import {
 } from "../models/invite.model";
 import { assignUserTeamAndRole } from "../models/user.model";
 import { findTeamById } from "../models/team.model";
+import { createQuizAssignments, findQuizByIdForTeam } from "../models/quiz.model";
 
 type AuthUser = {
   id: number;
@@ -61,6 +62,25 @@ export async function createInviteHandler(
       }
     }
 
+    // Optional: the quiz this invite is for. When present, accepting the
+    // invite auto-creates a QuizAssignment so the new hire lands with the
+    // quiz already on their onboarding list. Validated against the manager's
+    // team so a manager can't attach another team's quiz to their invite.
+    let quizId: number | null = null;
+    if (req.body?.quizId !== undefined && req.body?.quizId !== null) {
+      const parsed = Number(req.body.quizId);
+      if (!Number.isInteger(parsed) || parsed <= 0) {
+        return res.status(400).json({ error: { message: "Invalid quizId" } });
+      }
+      const quiz = await findQuizByIdForTeam(parsed, user.teamId);
+      if (!quiz) {
+        return res
+          .status(404)
+          .json({ error: { message: "Quiz not found on your team" } });
+      }
+      quizId = quiz.id;
+    }
+
     const token = randomBytes(32).toString("hex");
     const expiresAt = new Date(
       Date.now() + env.inviteExpiryHours * 60 * 60 * 1000
@@ -70,6 +90,7 @@ export async function createInviteHandler(
       token,
       teamId: user.teamId,
       email,
+      quizId,
       createdByUserId: user.id,
       expiresAt,
     });
@@ -176,11 +197,18 @@ export async function acceptInviteHandler(
 
     // Update the local row now so the response reflects the new team
     // immediately (rather than waiting for the next login to sync).
-    await assignUserTeamAndRole({
+    const updatedUser = await assignUserTeamAndRole({
       supabaseUserId: user.supabaseUserId,
       teamId,
       role: "new_hire",
     });
+
+    // If the invite was sent for a specific quiz, record the assignment now so
+    // the quiz shows up on the new hire's onboarding list. skipDuplicates makes
+    // this a harmless no-op if they somehow already have it.
+    if (invite.quizId) {
+      await createQuizAssignments(invite.quizId, [updatedUser.id], invite.createdByUserId);
+    }
 
     await markInviteUsed(invite.id);
 
