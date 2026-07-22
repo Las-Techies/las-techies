@@ -15,7 +15,14 @@ function App() {
     <Routes>
       <Route path="/" element={<LoginPage />} />
       <Route path="/signup" element={<InviteSignupPage />} />
-      <Route path="/home" element={<NewHireHomePage />} />
+      <Route
+        path="/home"
+        element={
+          <RequireRole role="new_hire">
+            <NewHireHomePage />
+          </RequireRole>
+        }
+      />
       <Route path="/learner-module" element={<LearnerModulePage />} />
       <Route path="/quiz-taking" element={<QuizTakingPage />} />
       <Route
