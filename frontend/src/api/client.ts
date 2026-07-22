@@ -197,6 +197,21 @@ export async function listTeamDocuments(): Promise<TeamDocument[]> {
   return res.data;
 }
 
+export type MyDocument = {
+  id: number;
+  title: string;
+  status: string;
+  createdAt: string;
+};
+
+// Only the caller's own uploads. Backs the manager upload dashboard so a
+// brand-new manager starts with an empty list instead of seeing every
+// document already in the team/database.
+export async function listMyDocuments(): Promise<MyDocument[]> {
+  const res = await apiFetch<{ data: MyDocument[] }>("/api/documents/mine");
+  return res.data;
+}
+
 export type DocumentFileUrl = {
   url: string | null;
   mimeType: string | null;
