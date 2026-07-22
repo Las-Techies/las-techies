@@ -6,6 +6,7 @@ import {
   deleteChatConversation,
   getChatConversation,
   listChatConversations,
+  listTeamDocuments,
   sendChatMessage,
   type ChatConversationSummary,
   type ChatSource,
@@ -26,6 +27,8 @@ type DisplayDoc = {
   kind: SourceKind;
   typeLabel: string;
   addedLabel: string;
+  // null means the current user uploaded it themselves.
+  attribution: string | null;
 };
 
 type ChatMessage = { role: "assistant" | "user"; text: string; sources?: ChatSource[] };
@@ -248,26 +251,28 @@ function LearnerModulePage() {
   const [confirmStart, setConfirmStart] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
 
-  // Load the team's real uploaded documents (and the assigned quiz's title +
-  // time limit) from the backend. A loading skeleton shows while the request is
-  // in flight; if it fails or returns nothing we land on a clean empty state —
-  // never demo/fake data.
+  // Load the team's real uploaded documents — everyone's, not just this
+  // user's own uploads, since the library is scoped to the whole team (and
+  // the assigned quiz's title + time limit) from the backend. A loading
+  // skeleton shows while the request is in flight; if it fails or returns
+  // nothing we land on a clean empty state — never demo/fake data.
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    apiFetch<{ data: { id: number; title: string; status: string; createdAt?: string }[] }>(
-      "/api/documents/mine"
-    )
-      .then((res) => {
+    listTeamDocuments()
+      .then((teamDocs) => {
         if (cancelled) return;
-        const files = (res.data ?? []).map<DisplayDoc>((doc) => ({
-          id: `doc-${doc.id}`,
-          remoteId: doc.id,
-          title: doc.title,
-          kind: "file",
-          typeLabel: fileTypeLabel(doc.title),
-          addedLabel: relativeAddedLabel(doc.createdAt),
-        }));
+        const files = teamDocs
+          .filter((doc) => doc.status.toLowerCase() === "ready")
+          .map<DisplayDoc>((doc) => ({
+            id: `doc-${doc.id}`,
+            remoteId: doc.id,
+            title: doc.title,
+            kind: "file",
+            typeLabel: fileTypeLabel(doc.title),
+            addedLabel: relativeAddedLabel(doc.createdAt),
+            attribution: doc.isMine ? null : doc.uploadedByName,
+          }));
         setDocs(files);
       })
       .catch(() => {
@@ -624,6 +629,7 @@ function LearnerModulePage() {
                               <strong className="doc-title">{doc.title}</strong>
                               <span className="doc-meta">
                                 {doc.typeLabel} · {doc.addedLabel}
+                                {doc.attribution ? ` · Uploaded by ${doc.attribution}` : ""}
                               </span>
                             </div>
                             <span className={`read-badge ${isRead ? "read" : "unread"}`}>
