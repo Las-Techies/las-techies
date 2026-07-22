@@ -631,31 +631,47 @@ label {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
   width: 30px;
   height: 30px;
+  border-radius: 999px;
   border: 1px solid #f3b9b3;
   background: #fff;
-  border-radius: 999px;
   font-size: 11px;
   color: #ba0517;
   padding: 0;
   cursor: pointer;
-  transition: background 0.15s ease;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
 }
 
 .delete-icon-btn:hover:not(:disabled) {
   background: #fdeceb;
+  transform: scale(1.05);
 }
 
 .delete-icon-btn:disabled {
   cursor: default;
-  opacity: 0.6;
+}
+
+.delete-icon-btn.is-deleting {
+  background: #fdeceb;
+  border-color: #f3b9b3;
+  opacity: 1;
 }
 
 .delete-icon {
   width: 16px;
   height: 16px;
   object-fit: contain;
+}
+
+.delete-spinner {
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  border: 2px solid #f3b9b3;
+  border-top-color: #ba0517;
+  animation: aiLoadingSpin 0.7s linear infinite;
 }
 
 .page-actions {

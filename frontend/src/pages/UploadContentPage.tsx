@@ -571,14 +571,21 @@ function UploadContentPage() {
                   {upload.documentId !== null ? (
                     <button
                       type="button"
-                      className="delete-icon-btn"
-                      aria-label={`Delete ${upload.name}`}
-                      title="Delete"
+                      className={`delete-icon-btn${
+                        deletingKeys.has(upload.key) ? " is-deleting" : ""
+                      }`}
+                      aria-label={
+                        deletingKeys.has(upload.key)
+                          ? `Deleting ${upload.name}…`
+                          : `Delete ${upload.name}`
+                      }
+                      aria-busy={deletingKeys.has(upload.key)}
+                      title={deletingKeys.has(upload.key) ? "Deleting…" : "Delete"}
                       disabled={deletingKeys.has(upload.key)}
                       onClick={() => void handleDelete(upload)}
                     >
                       {deletingKeys.has(upload.key) ? (
-                        "Deleting…"
+                        <span className="delete-spinner" aria-hidden="true" />
                       ) : (
                         <img src={trashIcon} alt="" className="delete-icon" />
                       )}
