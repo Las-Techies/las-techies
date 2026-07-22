@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 import AppNav from "../components/navigation/AppNav";
 import StepTabs from "../components/navigation/StepTabs";
 import AlertBanner from "../components/AlertBanner";
-import { apiFetch, listTeamDocuments } from "../api/client";
+import { apiFetch, listMyDocuments } from "../api/client";
 import {
   loadDeselectedDocumentIds,
   loadUploadedDocuments,
@@ -169,10 +169,9 @@ function UploadContentPage() {
     const hydrateUploads = async () => {
       try {
         await refreshGithubConnectionStatus();
-        // Team-wide, not just this manager's own uploads, so teammates'
-        // documents show up here too (with attribution) and can be reused
-        // for a new quiz.
-        const documents = await listTeamDocuments();
+        // Only this manager's own uploads — a brand-new manager should start
+        // with an empty dashboard, not every document already in the team/DB.
+        const documents = await listMyDocuments();
         const serverUploads: UploadedItem[] = documents.map((document) => ({
           key: `saved-${document.id}`,
           documentId: document.id,
@@ -180,8 +179,8 @@ function UploadContentPage() {
           meta: "SAVED",
           status: mapStoredStatus(document.status),
           createdAt: document.createdAt ?? null,
-          attribution: document.isMine ? null : document.uploadedByName,
-          isMine: document.isMine,
+          attribution: null,
+          isMine: true,
         }));
         setUploads(serverUploads);
         persistReadyDocs(serverUploads);
