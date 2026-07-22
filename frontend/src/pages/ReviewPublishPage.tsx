@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import AppNav from "../components/navigation/AppNav";
 import StepTabs from "../components/navigation/StepTabs";
 import { apiFetch, assignQuiz, listTeamMembers, type TeamMember } from "../api/client";
@@ -41,6 +41,7 @@ const questionBankDefault = [
 ];
 
 function ReviewPublishPage() {
+  const navigate = useNavigate();
   const [quizConfig, setQuizConfig] = useState<QuizConfig>(DEFAULT_QUIZ_CONFIG);
   const [quiz, setQuiz] = useState<GeneratedQuiz | null>(null);
   const [isLoadingQuiz, setIsLoadingQuiz] = useState(false);
@@ -190,6 +191,50 @@ function ReviewPublishPage() {
 
   const isPublished = quiz?.status === "published";
 
+  // Emails invites to typed-in learners and creates tracked assignments for
+  // selected team members, all tied to the given quiz. Shared by the initial
+  // publish and the later "invite more people" flow. Returns a human-readable
+  // problem string when something partially failed, or null on full success.
+  async function runInvitesAndAssignments(quizId: number): Promise<string | null> {
+    // Email each not-yet-registered learner an invite link. Each invite is
+    // tied to the manager's team server-side, so accepting it puts the new
+    // hire on this team as a new_hire. The quizId makes accepting the invite
+    // auto-create their assignment. Failures are collected, not thrown.
+    const inviteResults = await Promise.allSettled(
+      selectedLearners.map((email) =>
+        apiFetch("/api/invites", {
+          method: "POST",
+          body: JSON.stringify({ email, quizId }),
+        })
+      )
+    );
+    const failedInvites = inviteResults.filter((r) => r.status === "rejected");
+
+    // Real, tracked assignments for learners who already have an account on
+    // the team — this powers their assigned-quiz list with due dates and
+    // completion status.
+    let assignmentFailed = false;
+    if (selectedLearnerIds.length > 0) {
+      try {
+        await assignQuiz(quizId, selectedLearnerIds);
+      } catch {
+        assignmentFailed = true;
+      }
+    }
+
+    if (failedInvites.length === 0 && !assignmentFailed) return null;
+    const parts: string[] = [];
+    if (failedInvites.length > 0) {
+      parts.push(
+        `${failedInvites.length} of ${selectedLearners.length} invite email(s) could not be sent`
+      );
+    }
+    if (assignmentFailed) {
+      parts.push("assigning to the selected team members failed");
+    }
+    return parts.join(" and ");
+  }
+
   async function handleConfirmPublish() {
     if (!quiz) {
       // No real quiz to publish (e.g. still on the static fallback bank) —
@@ -201,62 +246,39 @@ function ReviewPublishPage() {
     setIsPublishing(true);
     setPublishError("");
     try {
-      const updated = await apiFetch<GeneratedQuiz>(`/api/quizzes/${quiz.id}`, {
-        method: "PATCH",
-        body: JSON.stringify({ status: "published" }),
-      });
+      // If the quiz is already published, this is an "invite more people"
+      // action — skip the status PATCH and just send the new invites.
+      const updated = isPublished
+        ? quiz
+        : await apiFetch<GeneratedQuiz>(`/api/quizzes/${quiz.id}`, {
+            method: "PATCH",
+            body: JSON.stringify({ status: "published" }),
+          });
 
-      // Email each not-yet-registered learner an invite link. Each invite is
-      // tied to the manager's team server-side, so accepting it puts the new
-      // hire on this team as a new_hire. Failures are collected rather than
-      // aborting the whole publish (the quiz is already published here).
-      const inviteResults = await Promise.allSettled(
-        selectedLearners.map((email) =>
-          apiFetch("/api/invites", {
-            method: "POST",
-            // Tie the invite to this quiz so accepting it auto-creates the
-            // new hire's assignment (otherwise they'd land with nothing on
-            // their onboarding list).
-            body: JSON.stringify({ email, quizId: updated.id }),
-          })
-        )
-      );
-      const failedInvites = inviteResults.filter((r) => r.status === "rejected");
-
-      // Real, tracked assignments for learners who already have an account
-      // on the team — this is what powers their assigned-quiz list with due
-      // dates and completion status.
-      let assignmentFailed = false;
-      if (selectedLearnerIds.length > 0) {
-        try {
-          await assignQuiz(updated.id, selectedLearnerIds);
-        } catch {
-          assignmentFailed = true;
-        }
+      const problem = await runInvitesAndAssignments(updated.id);
+      if (problem) {
+        const prefix = isPublished ? "Invites sent, but" : "Quiz published, but";
+        setPublishError(`${prefix} ${problem}.`);
       }
 
-      if (failedInvites.length > 0 || assignmentFailed) {
-        const parts: string[] = [];
-        if (failedInvites.length > 0) {
-          parts.push(
-            `${failedInvites.length} of ${selectedLearners.length} invite email(s) could not be sent`
-          );
-        }
-        if (assignmentFailed) {
-          parts.push("assigning to the selected team members failed");
-        }
-        setPublishError(`Quiz published, but ${parts.join(" and ")}.`);
-      }
-
+      // Clear the just-invited learners so the chips/checkboxes reset for a
+      // possible next round of invites.
+      setSelectedLearners([]);
+      setSelectedLearnerIds([]);
       setQuiz(updated);
       setIsPublishModalOpen(false);
     } catch (err) {
       setPublishError(
-        err instanceof Error ? err.message : "Failed to publish quiz. Please try again."
+        err instanceof Error ? err.message : "Something went wrong. Please try again."
       );
     } finally {
       setIsPublishing(false);
     }
+  }
+
+  // "Create new quiz" — start the workflow over from the upload step.
+  function handleCreateNewQuiz() {
+    navigate("/upload-content");
   }
 
   async function loadSourceText(documentId: number) {
@@ -597,16 +619,26 @@ function ReviewPublishPage() {
           </div>
 
           <div className="review-actions">
-            <Link className="secondary-btn btn-link" to="/configure-quiz">
-              Back to Configure Quiz
-            </Link>
+            {isPublished ? (
+              <button
+                className="secondary-btn btn-link"
+                type="button"
+                onClick={handleCreateNewQuiz}
+              >
+                Create new quiz
+              </button>
+            ) : (
+              <Link className="secondary-btn btn-link" to="/configure-quiz">
+                Back to Configure Quiz
+              </Link>
+            )}
             <button
               className="primary-btn btn-link"
               type="button"
-              disabled={!hasAnyLearnerSelected || isLoadingQuiz || isPublished}
+              disabled={!hasAnyLearnerSelected || isLoadingQuiz}
               onClick={() => setIsPublishModalOpen(true)}
             >
-              {isPublished ? "Published" : "Publish"}
+              {isPublished ? "Invite more people" : "Publish"}
             </button>
           </div>
         </section>
@@ -614,9 +646,9 @@ function ReviewPublishPage() {
         {isPublishModalOpen ? (
           <div className="modal-backdrop" role="dialog" aria-modal="true">
             <div className="modal-card">
-              <h3>Publish Module</h3>
+              <h3>{isPublished ? "Invite More People" : "Publish Module"}</h3>
               <p>
-                Are you ready to publish this module to{" "}
+                {isPublished ? "Assign this quiz to " : "Are you ready to publish this module to "}
                 {[...selectedLearnerNames, ...selectedLearners].length > 0 ? (
                   <strong>{[...selectedLearnerNames, ...selectedLearners].join(", ")}</strong>
                 ) : (
@@ -643,7 +675,13 @@ function ReviewPublishPage() {
                   disabled={isPublishing}
                   onClick={handleConfirmPublish}
                 >
-                  {isPublishing ? "Publishing…" : "Confirm Publish"}
+                  {isPublishing
+                    ? isPublished
+                      ? "Sending…"
+                      : "Publishing…"
+                    : isPublished
+                      ? "Confirm Invites"
+                      : "Confirm Publish"}
                 </button>
               </div>
             </div>
