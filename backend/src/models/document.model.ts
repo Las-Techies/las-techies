@@ -44,6 +44,22 @@ export function findDocumentsForUser(userId: number, teamId: number) {
   });
 }
 
+// Team-wide (not uploader-scoped) so a manager can reuse a teammate's
+// upload for their own quiz instead of only ever seeing their own files.
+export function findDocumentsForTeam(teamId: number) {
+  return prisma.document.findMany({
+    where: { teamId },
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      title: true,
+      status: true,
+      createdAt: true,
+      uploadedByUserId: true,
+    },
+  });
+}
+
 // Scoped to the uploader (not just the team) so a manager can only delete
 // documents they personally uploaded, not a teammate's.
 export function deleteDocumentForUser(id: number, userId: number, teamId: number) {

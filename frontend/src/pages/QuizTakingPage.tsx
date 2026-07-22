@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import AppNav from "../components/navigation/AppNav";
-import { apiFetch } from "../api/client";
+import { apiFetch, completeQuizAssignment } from "../api/client";
 import { loadQuizConfig, saveQuizAttempt } from "../features/quiz/storage";
 import type { GeneratedQuiz, QuizQuestion } from "../features/quiz/types";
 
@@ -80,8 +80,12 @@ const formatTime = (seconds: number) => {
 
 function QuizTakingPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const quizIdParam = searchParams.get("quizId");
   const [title, setTitle] = useState(() => loadQuizConfig().moduleTitle);
-  const [quizId, setQuizId] = useState<number | null>(null);
+  const [quizId, setQuizId] = useState<number | null>(
+    quizIdParam ? Number(quizIdParam) : null
+  );
   const [questions, setQuestions] = useState<QuizQuestion[]>(FALLBACK_QUESTIONS);
   const [current, setCurrent] = useState(0);
   const [answers, setAnswers] = useState<Record<number, number>>({});
@@ -94,12 +98,17 @@ function QuizTakingPage() {
     return minutes > 0 ? minutes * 60 : null;
   });
 
-  // Reuse the same "my latest quiz" source as the results page so the new hire
-  // takes the quiz their manager actually published. Falls back silently to the
-  // sample questions if the API is unavailable.
+  // Loads the specific quiz this page was opened for (from the new-hire's
+  // assigned-quiz list); falls back to "my latest quiz" only when no quizId
+  // was passed in, so old links/bookmarks without one still work. Falls
+  // back silently to the sample questions if the API is unavailable.
   useEffect(() => {
     let cancelled = false;
-    apiFetch<GeneratedQuiz | null>("/api/quizzes/mine/latest")
+    const quizRequest = quizIdParam
+      ? apiFetch<GeneratedQuiz | null>(`/api/quizzes/${quizIdParam}`)
+      : apiFetch<GeneratedQuiz | null>("/api/quizzes/mine/latest");
+
+    quizRequest
       .then((quiz) => {
         if (cancelled || !quiz || quiz.questionsPayload.length === 0) return;
         setQuestions(quiz.questionsPayload);
@@ -113,7 +122,7 @@ function QuizTakingPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [quizIdParam]);
 
   useEffect(() => {
     if (secondsLeft === null || secondsLeft <= 0) return;
@@ -149,6 +158,16 @@ function QuizTakingPage() {
       questions,
       answers,
     });
+
+    // Best-effort: marks this new hire's assignment complete so it drops off
+    // their "to do" list. Never blocks navigating to results — a failure
+    // here shouldn't stop the learner from seeing how they did.
+    if (quizId) {
+      void completeQuizAssignment(quizId).catch(() => {
+        /* non-fatal */
+      });
+    }
+
     navigate("/quiz-results");
   };
 
@@ -173,7 +192,9 @@ function QuizTakingPage() {
           <button
             type="button"
             className="exit-link"
-            onClick={() => navigate("/learner-module")}
+            onClick={() =>
+              navigate(quizId ? `/learner-module?quizId=${quizId}` : "/learner-module")
+            }
           >
             Exit quiz
           </button>

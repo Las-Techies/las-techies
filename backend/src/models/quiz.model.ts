@@ -84,6 +84,72 @@ export function updateQuizQuestions(
   });
 }
 
+// Skips rows that already exist for a (quiz, user) pair rather than
+// erroring, so re-publishing/re-assigning the same quiz to an already
+// assigned learner is a harmless no-op.
+export function createQuizAssignments(
+  quizId: number,
+  assignedToUserIds: number[],
+  assignedByUserId: number
+) {
+  return prisma.quizAssignment.createMany({
+    data: assignedToUserIds.map((assignedToUserId) => ({
+      quizId,
+      assignedToUserId,
+      assignedByUserId,
+    })),
+    skipDuplicates: true,
+  });
+}
+
+// No Prisma relations between QuizAssignment and Quiz (same convention as
+// the rest of this schema), so the join happens here in application code.
+// Only published quizzes are returned — a new hire shouldn't see a quiz
+// while it's still a manager's draft. Sorted so the most urgent, not-yet-
+// completed work floats to the top: soonest due date first, then quizzes
+// with no due date, then completed ones last.
+export async function findAssignedQuizzesForUser(userId: number) {
+  const assignments = await prisma.quizAssignment.findMany({
+    where: { assignedToUserId: userId },
+  });
+  if (assignments.length === 0) return [];
+
+  const quizIds = assignments.map((assignment) => assignment.quizId);
+  const quizzes = await prisma.quiz.findMany({
+    where: { id: { in: quizIds }, status: "published" },
+  });
+  const quizById = new Map(quizzes.map((quiz) => [quiz.id, quiz]));
+
+  return assignments
+    .map((assignment) => ({ assignment, quiz: quizById.get(assignment.quizId) }))
+    .filter(
+      (entry): entry is { assignment: (typeof assignments)[number]; quiz: (typeof quizzes)[number] } =>
+        Boolean(entry.quiz)
+    )
+    .sort((a, b) => {
+      const aCompleted = a.assignment.status === "completed";
+      const bCompleted = b.assignment.status === "completed";
+      if (aCompleted !== bCompleted) return aCompleted ? 1 : -1;
+
+      const aDue = a.quiz.dueDate ? a.quiz.dueDate.getTime() : Infinity;
+      const bDue = b.quiz.dueDate ? b.quiz.dueDate.getTime() : Infinity;
+      return aDue - bDue;
+    });
+}
+
+// Scoped to the caller's own assignment row so a new hire can only mark
+// their own progress complete, never someone else's.
+export function markAssignmentComplete(quizId: number, userId: number, score?: number) {
+  return prisma.quizAssignment.updateMany({
+    where: { quizId, assignedToUserId: userId },
+    data: {
+      status: "completed",
+      completedAt: new Date(),
+      ...(typeof score === "number" ? { score } : {}),
+    },
+  });
+}
+
 // sourceDocumentIds is a plain JSON array, not a real foreign key, so this
 // checks in application code rather than relying on a DB-level JSON query
 // (keeps it correct regardless of the Postgres/Prisma JSON operator used).

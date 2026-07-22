@@ -3,8 +3,10 @@ import {
   createDocument,
   deleteDocumentForUser,
   findDocumentsForUser,
+  findDocumentsForTeam,
   findDocumentByIdForTeam,
 } from "../models/document.model";
+import { findUsersByIds } from "../models/user.model";
 import {
   extractTextFromGoogleDriveFile,
   extractTextFromDocument,
@@ -191,6 +193,43 @@ export async function getMyDocuments(
 
     const documents = await findDocumentsForUser(user.id, user.teamId);
     return res.json({ data: documents });
+  } catch (error) {
+    next(error);
+  }
+}
+
+// Team-wide document list with uploader attribution, so a manager can pick
+// a teammate's upload for their own quiz and see who added it and when.
+export async function getTeamDocuments(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  try {
+    const user = (req as any).user as AuthUser | undefined;
+    if (!user?.id || !user?.teamId) {
+      return res.status(401).json({ error: { message: "Unauthorized" } });
+    }
+
+    const documents = await findDocumentsForTeam(user.teamId);
+    const uploaderIds = [...new Set(documents.map((doc) => doc.uploadedByUserId))];
+    const uploaders = await findUsersByIds(uploaderIds);
+    const uploaderById = new Map(uploaders.map((uploader) => [uploader.id, uploader]));
+
+    return res.json({
+      data: documents.map((doc) => {
+        const uploader = uploaderById.get(doc.uploadedByUserId);
+        return {
+          id: doc.id,
+          title: doc.title,
+          status: doc.status,
+          createdAt: doc.createdAt,
+          uploadedByUserId: doc.uploadedByUserId,
+          uploadedByName: uploader ? `${uploader.firstName} ${uploader.lastName}`.trim() : "Unknown",
+          isMine: doc.uploadedByUserId === user.id,
+        };
+      }),
+    });
   } catch (error) {
     next(error);
   }

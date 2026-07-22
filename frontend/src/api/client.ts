@@ -179,3 +179,69 @@ export function deleteChatConversation(conversationId: number): Promise<void> {
     method: "DELETE",
   });
 }
+
+export type TeamDocument = {
+  id: number;
+  title: string;
+  status: string;
+  createdAt: string;
+  uploadedByUserId: number;
+  uploadedByName: string;
+  isMine: boolean;
+};
+
+// All documents visible to the caller's team (not just their own uploads),
+// with uploader attribution so a manager can reuse a teammate's upload.
+export async function listTeamDocuments(): Promise<TeamDocument[]> {
+  const res = await apiFetch<{ data: TeamDocument[] }>("/api/documents/team");
+  return res.data;
+}
+
+export type TeamMember = {
+  id: number;
+  firstName: string;
+  lastName: string;
+  email: string;
+};
+
+// Real team roster (id + name + email) for the "assign learners" picker —
+// defaults to new hires since managers assign quizzes, not other managers.
+export async function listTeamMembers(role: string = "new_hire"): Promise<TeamMember[]> {
+  const res = await apiFetch<{ data: TeamMember[] }>(
+    `/api/users/team-members?role=${encodeURIComponent(role)}`
+  );
+  return res.data;
+}
+
+export type AssignedQuiz = {
+  assignmentId: number;
+  quizId: number;
+  title: string;
+  description: string | null;
+  dueDate: string | null;
+  status: "pending" | "completed";
+};
+
+// Assigns a published quiz to a set of new hires on the manager's team.
+export function assignQuiz(quizId: number, userIds: number[]): Promise<void> {
+  return apiFetch<void>(`/api/quizzes/${quizId}/assignments`, {
+    method: "POST",
+    body: JSON.stringify({ userIds }),
+  });
+}
+
+// Every quiz assigned to the caller, soonest-due-and-pending first.
+export function listAssignedQuizzes(): Promise<AssignedQuiz[]> {
+  return apiFetch<AssignedQuiz[]>("/api/quizzes/assigned/mine");
+}
+
+// Best-effort: marks the caller's own assignment for this quiz complete.
+export function completeQuizAssignment(
+  quizId: number,
+  score?: number
+): Promise<{ updated: boolean }> {
+  return apiFetch<{ updated: boolean }>(`/api/quizzes/${quizId}/assignments/me/complete`, {
+    method: "POST",
+    body: JSON.stringify(typeof score === "number" ? { score } : {}),
+  });
+}

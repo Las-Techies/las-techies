@@ -4,6 +4,33 @@ export function findUserBySupabaseId(supabaseUserId: string) {
   return prisma.user.findUnique({ where: { supabaseUserId } });
 }
 
+// Powers the "assign learners" picker on Review & Publish: a manager needs
+// real user ids (not free-text emails) for a team roster of new hires.
+export function findTeamMembersByRole(teamId: number, role: string) {
+  return prisma.user.findMany({
+    where: { teamId, role },
+    orderBy: [{ firstName: "asc" }, { lastName: "asc" }],
+    select: { id: true, firstName: true, lastName: true, email: true },
+  });
+}
+
+// Used to validate that assignment target ids are real new hires on the
+// manager's own team, not arbitrary/cross-team user ids.
+export function findUsersByIdsForTeam(ids: number[], teamId: number) {
+  return prisma.user.findMany({
+    where: { id: { in: ids }, teamId },
+    select: { id: true, firstName: true, lastName: true, email: true },
+  });
+}
+
+// Batch name lookup for document/quiz attribution ("uploaded by X").
+export function findUsersByIds(ids: number[]) {
+  return prisma.user.findMany({
+    where: { id: { in: ids } },
+    select: { id: true, firstName: true, lastName: true },
+  });
+}
+
 // Used when a new hire accepts an invite: assign them to the inviting
 // manager's team and lock their role to new_hire, server-side.
 export function assignUserTeamAndRole(input: {

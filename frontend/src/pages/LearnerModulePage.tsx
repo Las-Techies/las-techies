@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import AppNav from "../components/navigation/AppNav";
 import {
   apiFetch,
@@ -212,6 +212,13 @@ function DeleteChatIcon() {
 
 function LearnerModulePage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  // Which assigned quiz this module page is for. Falls back to "my latest"
+  // (below) when arriving without a quizId, e.g. an old bookmark.
+  const quizIdParam = searchParams.get("quizId");
+  const [quizId, setQuizId] = useState<number | null>(
+    quizIdParam ? Number(quizIdParam) : null
+  );
   const [activeFilter, setActiveFilter] = useState<Filter>("All");
   const [readIds, setReadIds] = useState<Set<string>>(() => new Set());
   const [openDoc, setOpenDoc] = useState<DisplayDoc | null>(null);
@@ -269,7 +276,14 @@ function LearnerModulePage() {
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
-    apiFetch<GeneratedQuiz | null>("/api/quizzes/mine/latest")
+    // Prefer the specific quiz this page was opened for (from the new-hire's
+    // assigned-quiz list); fall back to "my latest" only when no quizId was
+    // passed in, so old links/bookmarks without one still work.
+    const quizRequest = quizIdParam
+      ? apiFetch<GeneratedQuiz | null>(`/api/quizzes/${quizIdParam}`)
+      : apiFetch<GeneratedQuiz | null>("/api/quizzes/mine/latest");
+
+    quizRequest
       .then((quiz) => {
         if (cancelled || !quiz) return;
         if (quiz.title) setModuleTitle(quiz.title);
@@ -285,7 +299,7 @@ function LearnerModulePage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [quizIdParam]);
 
   // Hydrate the chat panel from the user's most recently active thread, if
   // any. Conversations already come back sorted by updatedAt desc, so the
@@ -905,7 +919,7 @@ function LearnerModulePage() {
                 className="primary-btn"
                 onClick={() => {
                   setConfirmStart(false);
-                  navigate("/quiz-taking");
+                  navigate(quizId ? `/quiz-taking?quizId=${quizId}` : "/quiz-taking");
                 }}
               >
                 Start quiz →
