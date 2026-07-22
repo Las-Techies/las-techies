@@ -326,6 +326,7 @@ function LearnerModulePage() {
         } else {
           setHasNoTimeLimit(true);
         }
+        setQuizId(quiz.id);
       })
       .catch(() => {
         /* keep default title */
