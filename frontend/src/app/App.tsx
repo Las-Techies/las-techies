@@ -8,6 +8,7 @@ import QuizTakingPage from "../pages/QuizTakingPage";
 import QuizResultsPage from "../pages/QuizResultsPage";
 import ReviewPublishPage from "../pages/ReviewPublishPage";
 import UploadContentPage from "../pages/UploadContentPage";
+import RequireRole from "../components/RequireRole";
 
 function App() {
   return (
@@ -17,9 +18,30 @@ function App() {
       <Route path="/home" element={<NewHireHomePage />} />
       <Route path="/learner-module" element={<LearnerModulePage />} />
       <Route path="/quiz-taking" element={<QuizTakingPage />} />
-      <Route path="/upload-content" element={<UploadContentPage />} />
-      <Route path="/configure-quiz" element={<ConfigureQuizPage />} />
-      <Route path="/review-publish" element={<ReviewPublishPage />} />
+      <Route
+        path="/upload-content"
+        element={
+          <RequireRole role="manager">
+            <UploadContentPage />
+          </RequireRole>
+        }
+      />
+      <Route
+        path="/configure-quiz"
+        element={
+          <RequireRole role="manager">
+            <ConfigureQuizPage />
+          </RequireRole>
+        }
+      />
+      <Route
+        path="/review-publish"
+        element={
+          <RequireRole role="manager">
+            <ReviewPublishPage />
+          </RequireRole>
+        }
+      />
       <Route path="/quiz-results" element={<QuizResultsPage />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

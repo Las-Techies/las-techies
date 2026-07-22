@@ -1,9 +1,10 @@
 import { Router } from "express";
 import { upload } from "../middleware/upload";
-// import { requireAuth } from "../middleware/requireAuth"; // optional if you want route-level auth
+import { requireRole } from "../middleware/requireRole";
 import {
   deleteDocument,
   getMyDocuments,
+  getTeamDocuments,
   importGoogleDriveDocument,
   importGoogleDriveFolder,
   importGithubRepo,
@@ -15,11 +16,12 @@ import {
 const router = Router();
 
 // If app.ts already has app.use("/api", requireAuth), you do NOT need requireAuth here.
-router.post("/upload", upload.single("file"), uploadDocument);
-router.post("/import/google-drive", importGoogleDriveDocument);
-router.post("/import/google-drive-folder", importGoogleDriveFolder);
-router.post("/import/github-repo", importGithubRepo);
+router.post("/upload", requireRole("manager"), upload.single("file"), uploadDocument);
+router.post("/import/google-drive", requireRole("manager"), importGoogleDriveDocument);
+router.post("/import/google-drive-folder", requireRole("manager"), importGoogleDriveFolder);
+router.post("/import/github-repo", requireRole("manager"), importGithubRepo);
 router.get("/mine", getMyDocuments);
+router.get("/team", getTeamDocuments);
 router.get("/:documentId", getDocumentById);
 router.delete("/:documentId", deleteDocument);
 

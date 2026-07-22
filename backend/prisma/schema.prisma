@@ -117,3 +117,18 @@ model Quiz {
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 }
+
+model QuizAssignment {
+  id               Int       @id @default(autoincrement())
+  quizId           Int
+  assignedToUserId Int
+  assignedByUserId Int
+  status           String    @default("pending") // pending | completed
+  score            Int?
+  completedAt      DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@unique([quizId, assignedToUserId])
+  @@index([assignedToUserId])
+}

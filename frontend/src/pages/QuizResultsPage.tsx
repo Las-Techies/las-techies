@@ -429,14 +429,20 @@ function QuizResultsPage() {
           <button
             className="secondary-btn"
             type="button"
-            onClick={() => navigate("/quiz-taking")}
+            onClick={() =>
+              navigate(attempt?.quizId ? `/quiz-taking?quizId=${attempt.quizId}` : "/quiz-taking")
+            }
           >
             Retake Quiz
           </button>
           <button
             className="primary-btn"
             type="button"
-            onClick={() => navigate("/learner-module")}
+            onClick={() =>
+              navigate(
+                attempt?.quizId ? `/learner-module?quizId=${attempt.quizId}` : "/learner-module"
+              )
+            }
           >
             Back to Module
           </button>
