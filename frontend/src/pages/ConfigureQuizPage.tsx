@@ -2,8 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import AppNav from "../components/navigation/AppNav";
 import StepTabs from "../components/navigation/StepTabs";
-import { apiFetch, streamQuizGeneration } from "../api/client";
-import { loadUploadedDocuments, saveQuizConfig } from "../features/quiz/storage";
+import { apiFetch, listTeamDocuments, streamQuizGeneration, type TeamDocument } from "../api/client";
+import { loadDeselectedDocumentIds, saveQuizConfig } from "../features/quiz/storage";
 import type { GeneratedQuiz, QuizDifficulty, QuizQuestion } from "../features/quiz/types";
 import { QUIZ_WORKFLOW_ROUTES, QUIZ_WORKFLOW_STEPS } from "../features/quiz/workflow";
 import { PencilIcon, RegenerateIcon } from "../components/icons/QuizIcons";
@@ -72,6 +72,14 @@ function ConfigureQuizPage() {
   // Questions start collapsed (prompt only). Clicking the pencil icon
   // expands a question to show its options for viewing/editing.
   const [expandedQuestionIds, setExpandedQuestionIds] = useState<Set<number>>(new Set());
+  // Which documents will actually be used to generate this quiz. The
+  // checkboxes live on the Upload Content page (so a document and its
+  // "use for quiz" state stay next to each other) — this page just reads
+  // that selection and shows a read-only summary of it.
+  const [teamDocuments, setTeamDocuments] = useState<TeamDocument[]>([]);
+  const [isLoadingDocuments, setIsLoadingDocuments] = useState(true);
+  const [documentsError, setDocumentsError] = useState("");
+  const [deselectedDocumentIds] = useState(() => loadDeselectedDocumentIds());
   const navigate = useNavigate();
   const todayIso = useMemo(() => new Date().toISOString().split("T")[0], []);
 
@@ -122,6 +130,37 @@ function ConfigureQuizPage() {
     };
   }, []);
 
+  // Loads every "ready" document visible to the team (any manager's
+  // uploads), so this manager can pick a subset to generate from instead of
+  // always pulling in the whole team's library.
+  useEffect(() => {
+    let isMounted = true;
+
+    (async () => {
+      try {
+        const documents = await listTeamDocuments();
+        if (!isMounted) return;
+        setTeamDocuments(documents.filter((doc) => doc.status.toLowerCase() === "ready"));
+      } catch (err) {
+        if (isMounted) {
+          setDocumentsError(
+            err instanceof Error ? err.message : "Failed to load your team's documents."
+          );
+        }
+      } finally {
+        if (isMounted) setIsLoadingDocuments(false);
+      }
+    })();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // The documents this quiz will actually generate from — every "ready" team
+  // document except the ones unchecked on the Upload Content page.
+  const selectedDocuments = teamDocuments.filter((doc) => !deselectedDocumentIds.has(doc.id));
+
   // Topic Focus and Time Limit are intentionally excluded here — both are
   // optional. Leaving Topic Focus blank pulls questions from the whole
   // document; leaving Time Limit blank means the quiz has no time limit.
@@ -138,10 +177,13 @@ function ConfigureQuizPage() {
       return;
     }
 
-    const documents = loadUploadedDocuments();
-    const documentIds = documents.map((doc) => doc.id);
+    const documentIds = selectedDocuments.map((doc) => doc.id);
     if (documentIds.length === 0) {
-      setError("Please upload a document first before generating questions.");
+      setError(
+        teamDocuments.length === 0
+          ? "Please upload a document first before generating questions."
+          : "Please go back to Upload Content and check at least one document before generating questions."
+      );
       return;
     }
 
@@ -406,6 +448,32 @@ function ConfigureQuizPage() {
                   onChange={(event) => updateForm("moduleTitle", event.target.value)}
                 />
               </label>
+
+              <label>Source Documents</label>
+              {isLoadingDocuments ? (
+                <p className="uploads-empty">Loading your team's documents…</p>
+              ) : documentsError ? (
+                <p className="form-error">{documentsError}</p>
+              ) : teamDocuments.length === 0 ? (
+                <p className="uploads-empty">
+                  No documents yet — <Link to="/upload-content">upload one first</Link>.
+                </p>
+              ) : selectedDocuments.length === 0 ? (
+                <p className="form-error">
+                  Nothing checked yet — go to{" "}
+                  <Link to="/upload-content">Upload Content</Link> and check at least one
+                  document.
+                </p>
+              ) : (
+                <p className="doc-picker-summary">
+                  Using document
+                  {teamDocuments.length === 1 ? "" : "s"}:{" "}
+                  {selectedDocuments.map((doc) => doc.title).join(", ")}.{" "}
+                  <Link to="/upload-content" className="doc-picker-manage-link">
+                    Change selection
+                  </Link>
+                </p>
+              )}
 
               <label>
                 Passing Score (%)
