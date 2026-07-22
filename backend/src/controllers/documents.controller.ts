@@ -161,7 +161,12 @@ export async function uploadDocument(
       // Best-effort: the chatbot's retrieval index shouldn't block the
       // upload response, and a document is still useful for quiz
       // generation even if embedding fails (e.g. model download hiccup).
-      embedDocument({ id: document.id, teamId: document.teamId, rawText }).catch((error) => {
+      embedDocument({
+        id: document.id,
+        teamId: document.teamId,
+        title: document.title,
+        rawText,
+      }).catch((error) => {
         console.error(`Failed to embed document ${document.id} for chat retrieval:`, error);
       });
 

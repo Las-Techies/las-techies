@@ -2,6 +2,18 @@ import { chunkText } from "./chunker";
 import { embedBatch } from "./embeddings";
 import { replaceChunksForDocument } from "../models/documentChunk.model";
 
+// Prefixes the text we actually embed (never the stored/displayed content)
+// with the document title and, if known, the section heading in effect for
+// that chunk. A bare chunk like "Salesforce Edge is a content delivery
+// network..." shares little vocabulary with a vague/meta question like
+// "give me an overview of my team" — folding in "Edge Onboarding Document —
+// OVERVIEW" gives the embedding model more surface area to match against,
+// without polluting the chunk's citable content shown to users/the LLM.
+function buildEmbeddingText(title: string, chunk: { content: string; heading?: string }): string {
+  const context = chunk.heading ? `${title} — ${chunk.heading}` : title;
+  return `${context}\n\n${chunk.content}`;
+}
+
 // Chunks a document's extracted text, embeds every chunk locally via
 // Transformers.js, and stores the result for retrieval. Used right after
 // upload and by the backfill script for documents that predate this
@@ -11,6 +23,7 @@ import { replaceChunksForDocument } from "../models/documentChunk.model";
 export async function embedDocument(document: {
   id: number;
   teamId: number;
+  title: string;
   rawText: string;
 }): Promise<{ chunkCount: number }> {
   const chunks = chunkText(document.rawText);
@@ -18,7 +31,9 @@ export async function embedDocument(document: {
     return { chunkCount: 0 };
   }
 
-  const embeddings = await embedBatch(chunks.map((chunk) => chunk.content));
+  const embeddings = await embedBatch(
+    chunks.map((chunk) => buildEmbeddingText(document.title, chunk))
+  );
   if (embeddings.length !== chunks.length) {
     throw new Error(
       `Embedding count (${embeddings.length}) did not match chunk count (${chunks.length})`

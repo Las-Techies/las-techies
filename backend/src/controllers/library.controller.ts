@@ -9,6 +9,7 @@ import {
 } from "../models/chatConversation.model";
 import { createMessage, listMessagesForConversation } from "../models/chatMessage.model";
 import { findSimilarChunks } from "../models/documentChunk.model";
+import { findTeamById } from "../models/team.model";
 import { embedText } from "../services/embeddings";
 import { generateChatAnswer } from "../services/chatGenerator";
 
@@ -33,6 +34,20 @@ function parseSelectedDocumentIds(raw: unknown): number[] | undefined {
   if (!Array.isArray(raw)) return undefined;
   const ids = raw.filter((id): id is number => typeof id === "number" && Number.isInteger(id) && id > 0);
   return ids.length > 0 ? ids : undefined;
+}
+
+// Matches "my team"/"our team"/"this team" (case-insensitive) so a vague,
+// meta-phrased question can be embedded with the team's actual name instead
+// — e.g. "give me an overview of my team" becomes "give me an overview of
+// Salesforce Edge", which shares far more vocabulary with that team's
+// uploaded docs than the word "team" ever would. Only affects the text used
+// for retrieval; the original wording is still what's stored in chat
+// history and what's shown to the LLM as the user's question.
+const TEAM_REFERENCE_PATTERN = /\b(my|our|this)\s+team\b/gi;
+
+function buildRetrievalQuery(message: string, teamName?: string | null): string {
+  if (!teamName?.trim()) return message;
+  return message.replace(TEAM_REFERENCE_PATTERN, teamName.trim());
 }
 
 // Sends a message in a conversation (creating the conversation on first
@@ -76,7 +91,15 @@ export async function postChatMessage(req: Request, res: Response, next: NextFun
           content: m.content,
         }));
 
-    const queryEmbedding = await embedText(message);
+    // Cheap, no-LLM query rewrite: substitute the user's actual team name for
+    // generic "my/our/this team" phrasing before embedding, so retrieval for
+    // team-overview-style questions doesn't rely on the document literally
+    // containing the word "team". Adds one indexed lookup, not another
+    // model/LLM call, so it doesn't add meaningful latency to the request.
+    const team = await findTeamById(user.teamId);
+    const retrievalQuery = buildRetrievalQuery(message, team?.name);
+
+    const queryEmbedding = await embedText(retrievalQuery);
     const chunks = await findSimilarChunks(user.teamId, queryEmbedding, {
       ...(selectedDocumentIds ? { documentIds: selectedDocumentIds } : {}),
       limit: RETRIEVAL_TOP_K,
