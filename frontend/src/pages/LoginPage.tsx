@@ -55,11 +55,18 @@ function LoginPage() {
 
   // Already logged in with a role set (e.g. came back to "/" with a valid
   // session) — skip the form entirely instead of asking them to log in again.
+  //
+  // Suppressed while `submitting`: completing a Google manager's profile sets
+  // their role (which lands here mid-flight) *before* their team is created and
+  // the session refreshed. Navigating away early would fire team-scoped
+  // requests with a JWT that still has no team_id, and the backend would sync
+  // the DB row back to the default team. We let handleCompleteProfile navigate
+  // itself once the new team_id is in the refreshed JWT.
   useEffect(() => {
-    if (!loading && session && session.user.user_metadata?.role) {
+    if (!submitting && !loading && session && session.user.user_metadata?.role) {
       navigate(routeForRole(session.user.user_metadata.role), { replace: true });
     }
-  }, [loading, session, navigate]);
+  }, [submitting, loading, session, navigate]);
 
   const switchMode = (next: Mode) => {
     setMode(next);
@@ -201,10 +208,29 @@ function LoginPage() {
       return;
     }
 
+    if (role === "manager" && !teamName.trim()) {
+      setError("Please name the team you'll be managing.");
+      return;
+    }
+
     setError("");
     setSubmitting(true);
     try {
       await updateRole(role);
+
+      // Like the email/password signup, a Google manager names their team as
+      // they finish setup. Create it now so the backend assigns them to their
+      // own team (and updates Supabase metadata) instead of defaulting to team
+      // 1; refresh the session so the new team_id lands in the JWT before any
+      // team-scoped requests run.
+      if (role === "manager") {
+        await apiFetch("/api/teams", {
+          method: "POST",
+          body: JSON.stringify({ name: teamName.trim() }),
+        });
+        await supabase.auth.refreshSession();
+      }
+
       navigate(routeForRole(role));
     } catch (err) {
       setError(
@@ -263,15 +289,28 @@ function LoginPage() {
 
           {roleToggle}
 
-          <button
-            className="sf-btn sf-btn-block login-continue"
-            type="button"
-            onClick={handleCompleteProfile}
-            disabled={submitting}
-          >
-            {submitting ? "Saving…" : "Continue"}
-            <ChevronRight className="btn-arrow" aria-hidden />
-          </button>
+          {role === "manager" ? (
+            <label>
+              Create your team
+              <input
+                type="text"
+                placeholder="e.g. Frontline Ops Team"
+                value={teamName}
+                onChange={(event) => setTeamName(event.target.value)}
+              />
+            </label>
+          ) : null}
+
+          <div className="login-actions">
+            <button
+              className="primary-btn btn-link"
+              type="button"
+              onClick={handleCompleteProfile}
+              disabled={submitting}
+            >
+              {submitting ? "Saving…" : "Continue"}
+            </button>
+          </div>
           {error ? <p className="form-error">{error}</p> : null}
         </section>
       </main>
