@@ -3,7 +3,6 @@ import { Link, useNavigate } from "react-router-dom";
 import AppNav from "../components/navigation/AppNav";
 import WizardSteps from "../components/navigation/WizardSteps";
 import { apiFetch, assignQuiz, listTeamMembers, type TeamMember } from "../api/client";
-import { findHighlightSpan } from "../features/quiz/citationMatch";
 import { loadQuizConfig } from "../features/quiz/storage";
 import {
   DEFAULT_QUIZ_CONFIG,
@@ -83,15 +82,14 @@ function ReviewPublishPage() {
   }, []);
 
   // Real roster of new hires on this manager's team, so "Assign Learners"
-  // maps to actual accounts instead of free-text emails.
+  // maps to actual accounts (tracked assignments) instead of only free-text
+  // email invites.
   useEffect(() => {
     setIsLoadingMembers(true);
     listTeamMembers("new_hire")
       .then((members) => setTeamMembers(members))
       .catch((err) => {
-        setMembersError(
-          err instanceof Error ? err.message : "Failed to load team members."
-        );
+        setMembersError(err instanceof Error ? err.message : "Failed to load team members.");
       })
       .finally(() => setIsLoadingMembers(false));
   }, []);
@@ -151,12 +149,6 @@ function ReviewPublishPage() {
     );
   };
 
-  const selectedLearnerNames = teamMembers
-    .filter((member) => selectedLearnerIds.includes(member.id))
-    .map((member) => `${member.firstName} ${member.lastName}`);
-
-  const hasAnyLearnerSelected = selectedLearners.length > 0 || selectedLearnerIds.length > 0;
-
   // Prefer values actually persisted on the quiz record; only fall back to
   // the locally-cached form state when no quiz has been generated/loaded yet
   // (e.g. this is a brand-new session with nothing saved server-side).
@@ -178,50 +170,6 @@ function ReviewPublishPage() {
 
   const isPublished = quiz?.status === "published";
 
-  // Emails invites to typed-in learners and creates tracked assignments for
-  // selected team members, all tied to the given quiz. Shared by the initial
-  // publish and the later "invite more people" flow. Returns a human-readable
-  // problem string when something partially failed, or null on full success.
-  async function runInvitesAndAssignments(quizId: number): Promise<string | null> {
-    // Email each not-yet-registered learner an invite link. Each invite is
-    // tied to the manager's team server-side, so accepting it puts the new
-    // hire on this team as a new_hire. The quizId makes accepting the invite
-    // auto-create their assignment. Failures are collected, not thrown.
-    const inviteResults = await Promise.allSettled(
-      selectedLearners.map((email) =>
-        apiFetch("/api/invites", {
-          method: "POST",
-          body: JSON.stringify({ email, quizId }),
-        })
-      )
-    );
-    const failedInvites = inviteResults.filter((r) => r.status === "rejected");
-
-    // Real, tracked assignments for learners who already have an account on
-    // the team — this powers their assigned-quiz list with due dates and
-    // completion status.
-    let assignmentFailed = false;
-    if (selectedLearnerIds.length > 0) {
-      try {
-        await assignQuiz(quizId, selectedLearnerIds);
-      } catch {
-        assignmentFailed = true;
-      }
-    }
-
-    if (failedInvites.length === 0 && !assignmentFailed) return null;
-    const parts: string[] = [];
-    if (failedInvites.length > 0) {
-      parts.push(
-        `${failedInvites.length} of ${selectedLearners.length} invite email(s) could not be sent`
-      );
-    }
-    if (assignmentFailed) {
-      parts.push("assigning to the selected team members failed");
-    }
-    return parts.join(" and ");
-  }
-
   async function handleConfirmPublish() {
     if (!quiz) {
       // No real quiz to publish (e.g. still on the static fallback bank) —
@@ -233,39 +181,66 @@ function ReviewPublishPage() {
     setIsPublishing(true);
     setPublishError("");
     try {
-      // If the quiz is already published, this is an "invite more people"
-      // action — skip the status PATCH and just send the new invites.
-      const updated = isPublished
-        ? quiz
-        : await apiFetch<GeneratedQuiz>(`/api/quizzes/${quiz.id}`, {
-            method: "PATCH",
-            body: JSON.stringify({ status: "published" }),
-          });
+      const updated = await apiFetch<GeneratedQuiz>(`/api/quizzes/${quiz.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ status: "published" }),
+      });
 
-      const problem = await runInvitesAndAssignments(updated.id);
-      if (problem) {
-        const prefix = isPublished ? "Invites sent, but" : "Quiz published, but";
-        setPublishError(`${prefix} ${problem}.`);
+      // Email each not-yet-registered learner an invite link (tied to the
+      // manager's team + this quiz server-side, so accepting auto-creates
+      // their assignment). Failures are collected rather than aborting the
+      // whole publish (the quiz is already published at this point).
+      const inviteResults = await Promise.allSettled(
+        selectedLearners.map((email) =>
+          apiFetch("/api/invites", {
+            method: "POST",
+            body: JSON.stringify({ email, quizId: quiz.id }),
+          })
+        )
+      );
+      const failedInvites = inviteResults.filter((r) => r.status === "rejected");
+
+      // Real, tracked assignments for learners already on the team — this
+      // powers their assigned-quiz list with due dates and completion status.
+      let assignmentFailed = false;
+      if (selectedLearnerIds.length > 0) {
+        try {
+          await assignQuiz(quiz.id, selectedLearnerIds);
+        } catch {
+          assignmentFailed = true;
+        }
       }
 
-      // Clear the just-invited learners so the chips/checkboxes reset for a
-      // possible next round of invites.
-      setSelectedLearners([]);
-      setSelectedLearnerIds([]);
       setQuiz(updated);
+      if (failedInvites.length > 0 || assignmentFailed) {
+        // Keep the manager on the page (modal open) so they can see what
+        // failed rather than silently moving on.
+        const parts: string[] = [];
+        if (failedInvites.length > 0) {
+          parts.push(
+            `${failedInvites.length} of ${selectedLearners.length} invite email(s) could not be sent`
+          );
+        }
+        if (assignmentFailed) {
+          parts.push("assigning to the selected team members failed");
+        }
+        setPublishError(`Quiz published, but ${parts.join(" and ")}.`);
+        return;
+      }
+
+      // Published cleanly — reset the workflow and head back to the start so
+      // the manager can build a brand-new quiz. The just-published quiz stays
+      // saved server-side; the resume-latest logic simply skips published
+      // quizzes, so Upload/Configure begin fresh.
       setIsPublishModalOpen(false);
+      navigate("/upload-content");
     } catch (err) {
       setPublishError(
-        err instanceof Error ? err.message : "Something went wrong. Please try again."
+        err instanceof Error ? err.message : "Failed to publish quiz. Please try again."
       );
     } finally {
       setIsPublishing(false);
     }
-  }
-
-  // "Create new quiz" — start the workflow over from the upload step.
-  function handleCreateNewQuiz() {
-    navigate("/upload-content");
   }
 
   async function loadSourceText(documentId: number) {
@@ -297,16 +272,17 @@ function ReviewPublishPage() {
   }
 
   function renderHighlightedSource(sourceText: string, snippet: string, questionPrompt: string) {
-    const source = sourceText ?? "";
-    // Falls back to a fuzzy sentence match when the citation isn't a
-    // verbatim substring (LLM-written quotes often drift slightly), and to
-    // no highlight at all when nothing is close enough to be trustworthy.
-    const span = findHighlightSpan(source, snippet);
-    if (!span) return source;
+    const normalizedSource = sourceText ?? "";
+    const normalizedSnippet = snippet?.trim() ?? "";
+    if (!normalizedSnippet) return normalizedSource;
 
-    const before = source.slice(0, span.start);
-    const match = source.slice(span.start, span.end);
-    const after = source.slice(span.end);
+    const start = normalizedSource.indexOf(normalizedSnippet);
+    if (start === -1) return normalizedSource;
+
+    const end = start + normalizedSnippet.length;
+    const before = normalizedSource.slice(0, start);
+    const match = normalizedSource.slice(start, end);
+    const after = normalizedSource.slice(end);
 
     return (
       <>
@@ -322,7 +298,6 @@ function ReviewPublishPage() {
             scrollMarginTop: "40px",
             boxShadow: "0 0 0 2px rgba(255, 224, 102, 0.5)",
           }}
-          title={span.matchType === "fuzzy" ? "Approximate match — wording may differ slightly" : undefined}
         >
           {match}
         </mark>
@@ -391,7 +366,7 @@ function ReviewPublishPage() {
               </div>
               <div>
                 <span>Time Limit</span>
-                <strong>{displayTimeLimit ? `${displayTimeLimit} min` : "No limit"}</strong>
+                <strong>{displayTimeLimit || "--"} min</strong>
               </div>
               <div>
                 <span>Topic</span>
@@ -449,13 +424,13 @@ function ReviewPublishPage() {
           <div className="assign-learners rp-assign">
             <h3>Assign Learners</h3>
 
-            <p className="subtle">Already on your team</p>
+            <p className="rp-assign-label">Already on your team</p>
             {isLoadingMembers ? (
-              <p className="uploads-empty">Loading team roster…</p>
+              <p className="cfg-empty">Loading team roster…</p>
             ) : membersError ? (
               <p className="form-error">{membersError}</p>
             ) : teamMembers.length === 0 ? (
-              <p className="uploads-empty">No new hires on your team yet — invite one below.</p>
+              <p className="cfg-empty">No new hires on your team yet — invite one below.</p>
             ) : (
               <div className="learner-roster">
                 {teamMembers.map((member) => (
@@ -465,16 +440,16 @@ function ReviewPublishPage() {
                       checked={selectedLearnerIds.includes(member.id)}
                       onChange={() => toggleLearner(member.id)}
                     />
-                    <span>
-                      {member.firstName} {member.lastName}{" "}
-                      <span className="subtle">({member.email})</span>
+                    <span className="learner-roster-name">
+                      {member.firstName} {member.lastName}
+                      <span className="learner-roster-email">{member.email}</span>
                     </span>
                   </label>
                 ))}
               </div>
             )}
 
-            <p className="subtle">Invite someone new</p>
+            <p className="rp-assign-label">Invite someone new</p>
             <div className="learner-email-input">
               <input
                 type="email"
@@ -513,22 +488,20 @@ function ReviewPublishPage() {
           </div>
 
           <div className="mgr-foot" style={{ justifyContent: "center", gap: 18 }}>
-            {isPublished ? (
-              <button className="ghost-btn btn-link" type="button" onClick={handleCreateNewQuiz}>
-                Create new quiz
-              </button>
-            ) : (
-              <Link className="ghost-btn btn-link" to="/configure-quiz">
-                <ArrowLeft /> Back to Configure Quiz
-              </Link>
-            )}
+            <Link className="ghost-btn btn-link" to="/configure-quiz">
+              <ArrowLeft /> Back to Configure Quiz
+            </Link>
             <button
               className="sf-btn"
               type="button"
-              disabled={!hasAnyLearnerSelected || isLoadingQuiz}
+              disabled={
+                (selectedLearners.length === 0 && selectedLearnerIds.length === 0) ||
+                isLoadingQuiz ||
+                isPublished
+              }
               onClick={() => setIsPublishModalOpen(true)}
             >
-              {isPublished ? "Invite more people" : "Publish"}
+              {isPublished ? "Published" : "Publish"}
             </button>
           </div>
         </section>
@@ -580,14 +553,13 @@ function ReviewPublishPage() {
         {isPublishModalOpen ? (
           <div className="modal-backdrop" role="dialog" aria-modal="true">
             <div className="modal-card">
-              <h3>{isPublished ? "Invite More People" : "Publish Module"}</h3>
+              <h3>Publish Module</h3>
               <p>
-                {isPublished ? "Assign this quiz to " : "Are you ready to publish this module to "}
-                {[...selectedLearnerNames, ...selectedLearners].length > 0 ? (
-                  <strong>{[...selectedLearnerNames, ...selectedLearners].join(", ")}</strong>
-                ) : (
-                  <strong>the selected learners</strong>
-                )}
+                Are you ready to publish this module to{" "}
+                <strong>
+                  {selectedLearnerIds.length + selectedLearners.length} learner
+                  {selectedLearnerIds.length + selectedLearners.length === 1 ? "" : "s"}
+                </strong>
                 ?
               </p>
               {publishError ? <p className="form-error">{publishError}</p> : null}
@@ -609,13 +581,7 @@ function ReviewPublishPage() {
                   disabled={isPublishing}
                   onClick={handleConfirmPublish}
                 >
-                  {isPublishing
-                    ? isPublished
-                      ? "Sending…"
-                      : "Publishing…"
-                    : isPublished
-                      ? "Confirm Invites"
-                      : "Confirm Publish"}
+                  {isPublishing ? "Publishing…" : "Confirm Publish"}
                 </button>
               </div>
             </div>

@@ -3,25 +3,34 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import AppNav from "../components/navigation/AppNav";
 import WizardSteps from "../components/navigation/WizardSteps";
-import AlertBanner from "../components/AlertBanner";
-import { apiFetch, listMyDocuments } from "../api/client";
+import { apiFetch } from "../api/client";
 import {
   loadDeselectedDocumentIds,
   loadUploadedDocuments,
   saveDeselectedDocumentIds,
   saveUploadedDocuments,
 } from "../features/quiz/storage";
-import trashIcon from "../assets/trash-icon.png";
 import {
   ArrowRight,
+  CheckPlain,
   CloudUploadIcon,
   FileTextIcon,
   GithubIcon,
   LinkIcon,
   ShieldIcon,
+  TrashIcon,
+  XPlain,
 } from "../components/icons";
 import { supabase } from "../lib/supabaseClient";
-import { CircleCheckIcon } from "../components/icons/QuizIcons";
+
+const fileExt = (name: string) => name.split(".").pop()?.toLowerCase() ?? "";
+const extBadge = (name: string): { label: string; cls: string } => {
+  const ext = fileExt(name);
+  if (ext === "pdf") return { label: "PDF", cls: "pdf" };
+  if (ext === "doc" || ext === "docx") return { label: "W", cls: "docx" };
+  if (ext === "ppt" || ext === "pptx") return { label: "P", cls: "pptx" };
+  return { label: (ext || "file").slice(0, 3).toUpperCase(), cls: "docx" };
+};
 
 type UploadStatus = "Processing..." | "Ready" | "Failed";
 
@@ -32,12 +41,14 @@ type UploadedItem = {
   meta: string;
   status: UploadStatus;
   createdAt: string | null;
-  attribution: string | null;
-  isMine: boolean;
 };
 
 type UploadResponse = {
   data: { id: number; title: string; status: string; createdAt: string };
+};
+
+type MyDocumentsResponse = {
+  data: Array<{ id: number; title: string; status: string; createdAt: string }>;
 };
 
 type GoogleDriveFolderImportResponse = {
@@ -90,13 +101,8 @@ const formatAddedDate = (value: string | null) => {
   if (!value) return "";
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return "";
-  return parsed.toLocaleDateString("en-US", {
-    month: "long",
-    day: "numeric",
-    year: "numeric",
-  });
+  return parsed.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
 };
-
 const detectLinkKind = (value: string): LinkKind => {
   const trimmed = value.trim();
   if (!trimmed) return "unsupported";
@@ -131,9 +137,7 @@ function UploadContentPage() {
   const [isGithubConnected, setIsGithubConnected] = useState(false);
   const [isConnectingGithub, setIsConnectingGithub] = useState(false);
   // Which documents are unchecked for quiz generation. Stored as "deselected"
-  // rather than "selected" so every document — including ones uploaded after
-  // this was first set — defaults to checked. Nothing here ever removes a
-  // document from this page; that only happens via explicit delete.
+  // rather than "selected" so newly uploaded documents default to checked.
   const [deselectedDocumentIds, setDeselectedDocumentIds] = useState<Set<number>>(() =>
     loadDeselectedDocumentIds()
   );
@@ -176,18 +180,14 @@ function UploadContentPage() {
     const hydrateUploads = async () => {
       try {
         await refreshGithubConnectionStatus();
-        // Only this manager's own uploads — a brand-new manager should start
-        // with an empty dashboard, not every document already in the team/DB.
-        const documents = await listMyDocuments();
-        const serverUploads: UploadedItem[] = documents.map((document) => ({
+        const res = await apiFetch<MyDocumentsResponse>("/api/documents/mine");
+        const serverUploads: UploadedItem[] = res.data.map((document) => ({
           key: `saved-${document.id}`,
           documentId: document.id,
           name: document.title,
           meta: "SAVED",
           status: mapStoredStatus(document.status),
           createdAt: document.createdAt ?? null,
-          attribution: null,
-          isMine: true,
         }));
         setUploads(serverUploads);
         persistReadyDocs(serverUploads);
@@ -202,8 +202,6 @@ function UploadContentPage() {
           meta: "SAVED",
           status: mapStoredStatus(document.status),
           createdAt: document.createdAt ?? null,
-          attribution: null,
-          isMine: true,
         }));
         setUploads(hydratedUploads);
       } finally {
@@ -222,16 +220,6 @@ function UploadContentPage() {
         provider: "github",
         options: {
           redirectTo: window.location.origin,
-          // `repo` grants read access to private repositories (public-only
-          // access can't clone/read a private repo). Re-running this flow also
-          // lets the user re-authorize to grant access to a different repo —
-          // GitHub re-prompts for which repos/orgs to allow.
-          scopes: "repo",
-          queryParams: {
-            // Force GitHub's authorization screen even when already connected,
-            // so the user can pick/grant access to another repository.
-            prompt: "consent",
-          },
         },
       });
       if (oauthError) {
@@ -255,16 +243,7 @@ function UploadContentPage() {
       const meta = `${fileTypeLabel(file)} • ${formatBytes(file.size)}`;
 
       setUploads((prev) => [
-        {
-          key,
-          documentId: null,
-          name: file.name,
-          meta,
-          status: "Processing...",
-          createdAt: null,
-          attribution: null,
-          isMine: true,
-        },
+        { key, documentId: null, name: file.name, meta, status: "Processing...", createdAt: null },
         ...prev,
       ]);
 
@@ -316,8 +295,6 @@ function UploadContentPage() {
         meta: "GOOGLE DRIVE",
         status: "Processing...",
         createdAt: null,
-        attribution: null,
-        isMine: true,
       },
       ...prev,
     ]);
@@ -395,8 +372,6 @@ function UploadContentPage() {
         meta: "GOOGLE DRIVE FOLDER",
         status: item.status === "ready" ? "Ready" : "Failed",
         createdAt: item.createdAt,
-        attribution: null,
-        isMine: true,
       }));
 
       setUploads((prev) => {
@@ -444,8 +419,6 @@ function UploadContentPage() {
         meta: "GITHUB REPO",
         status: item.status === "ready" ? "Ready" : "Failed",
         createdAt: item.createdAt,
-        attribution: null,
-        isMine: true,
       }));
 
       setUploads((prev) => {
@@ -565,8 +538,6 @@ function UploadContentPage() {
           </div>
         </div>
 
-        {error ? <AlertBanner message={error} onDismiss={() => setError("")} /> : null}
-
         <section
           className={`dropzone ${isDragActive ? "active" : ""}`}
           onDragOver={handleDragOver}
@@ -616,23 +587,16 @@ function UploadContentPage() {
           </span>
           <span className="import-bar-text">
             <strong>Import from link</strong>
-            <span>Paste a Google Doc, Drive folder, or GitHub repo link.</span>
+            <span>Pull content from a public URL or repository.</span>
           </span>
           <button
             className="import-connect"
             type="button"
             onClick={() => void handleConnectGithub()}
-            disabled={isConnectingGithub}
-            title={
-              isGithubConnected ? "Grant access to another repo" : "Connect GitHub"
-            }
+            disabled={isGithubConnected || isConnectingGithub}
           >
             <GithubIcon />
-            {isConnectingGithub
-              ? "Connecting…"
-              : isGithubConnected
-                ? "Connected"
-                : "Connect GitHub"}
+            {isGithubConnected ? "Connected" : isConnectingGithub ? "Connecting…" : "Connect GitHub"}
           </button>
           <input
             type="text"
@@ -651,11 +615,11 @@ function UploadContentPage() {
           </button>
         </section>
 
-        <section className="glass files-card uploads-table">
+        <section className="glass files-card">
           <h3 className="files-card-title">
             <FileTextIcon /> Uploaded Files
           </h3>
-          <p className="uploads-hint">
+          <p className="files-card-hint">
             Check the documents you want to use for your next quiz — everything stays here
             either way, unless you delete it.
           </p>
@@ -665,74 +629,77 @@ function UploadContentPage() {
             <p className="cfg-empty">No files uploaded yet.</p>
           ) : (
             uploads.map((upload) => {
+              const badge = extBadge(upload.name);
               const isSelectable = upload.status === "Ready" && upload.documentId !== null;
-              const isSelected = isSelectable && !deselectedDocumentIds.has(upload.documentId as number);
-
+              const isSelected =
+                isSelectable && !deselectedDocumentIds.has(upload.documentId as number);
+              const addedDate = formatAddedDate(upload.createdAt);
               return (
-                <div className="upload-row" key={upload.key}>
-                  <div className="upload-row-main">
+                <div className="file-row" key={upload.key}>
+                  <button
+                    type="button"
+                    className={`file-check ${isSelected ? "selected" : ""}`}
+                    disabled={!isSelectable}
+                    aria-pressed={isSelectable ? isSelected : false}
+                    title={isSelectable ? "Use this document for the next quiz" : "Not ready yet"}
+                    aria-label={`Use ${upload.name} for quiz generation`}
+                    onClick={() =>
+                      isSelectable && toggleDocumentSelected(upload.documentId as number)
+                    }
+                  >
+                    <CheckPlain />
+                  </button>
+                  <span className={`file-ic tag ${badge.cls}`}>{badge.label}</span>
+                  <span className="file-info">
+                    <span className="file-name" title={upload.name}>
+                      {upload.name}
+                    </span>
+                    <span className="file-attribution">
+                      Uploaded by you{addedDate ? ` · ${addedDate}` : ""}
+                    </span>
+                  </span>
+                  <span
+                    className={`file-status ${
+                      upload.status === "Ready"
+                        ? "ready"
+                        : upload.status === "Failed"
+                          ? "failed"
+                          : "processing"
+                    }`}
+                  >
+                    {upload.status === "Ready" ? (
+                      <>
+                        <CheckPlain /> Ready
+                      </>
+                    ) : upload.status === "Failed" ? (
+                      <>
+                        <XPlain /> Failed
+                      </>
+                    ) : (
+                      <>
+                        <span className="spin" /> Processing
+                      </>
+                    )}
+                  </span>
+                  {upload.documentId !== null ? (
                     <button
                       type="button"
-                      className={`upload-select-toggle${isSelected ? " selected" : ""}`}
-                      disabled={!isSelectable}
-                      aria-pressed={isSelectable ? isSelected : false}
-                      title={isSelectable ? "Use this document for the next quiz" : "Not ready yet"}
-                      aria-label={`Use ${upload.name} for quiz generation`}
-                      onClick={() => toggleDocumentSelected(upload.documentId as number)}
+                      className="file-del"
+                      aria-label={`Delete ${upload.name}`}
+                      title="Delete"
+                      disabled={deletingKeys.has(upload.key)}
+                      onClick={() => void handleDelete(upload)}
                     >
-                      <CircleCheckIcon aria-hidden />
+                      <TrashIcon />
                     </button>
-                    <div>
-                      <strong>{upload.name}</strong>
-                      <p>{upload.meta}</p>
-                      <p className="upload-attribution">
-                        {upload.isMine ? "Uploaded by you" : `Uploaded by ${upload.attribution ?? "a teammate"}`}
-                        {formatAddedDate(upload.createdAt) ? ` · ${formatAddedDate(upload.createdAt)}` : ""}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="upload-row-actions">
-                    <span
-                      className={`status ${
-                        upload.status === "Ready"
-                          ? "success"
-                          : upload.status === "Failed"
-                            ? "fail"
-                            : "warning"
-                      }`}
-                    >
-                      {upload.status}
-                    </span>
-                    {upload.documentId !== null && upload.isMine ? (
-                      <button
-                        type="button"
-                        className={`delete-icon-btn${
-                          deletingKeys.has(upload.key) ? " is-deleting" : ""
-                        }`}
-                        aria-label={
-                          deletingKeys.has(upload.key)
-                            ? `Deleting ${upload.name}…`
-                            : `Delete ${upload.name}`
-                        }
-                        aria-busy={deletingKeys.has(upload.key)}
-                        title={deletingKeys.has(upload.key) ? "Deleting…" : "Delete"}
-                        disabled={deletingKeys.has(upload.key)}
-                        onClick={() => void handleDelete(upload)}
-                      >
-                        {deletingKeys.has(upload.key) ? (
-                          <span className="delete-spinner" aria-hidden="true" />
-                        ) : (
-                          <img src={trashIcon} alt="" className="delete-icon" />
-                        )}
-                      </button>
-                    ) : null}
-                  </div>
+                  ) : null}
                 </div>
               );
             })
           )}
         </section>
 
+        {error ? <p className="form-error">{error}</p> : null}
         {hasReadyDocument && !hasSelectedDocument ? (
           <p className="form-error">Check at least one document above to continue.</p>
         ) : null}

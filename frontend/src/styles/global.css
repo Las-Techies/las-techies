@@ -569,53 +569,6 @@ label {
   color: #ba0517;
 }
 
-.alert-banner {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  margin-top: 14px;
-  padding: 14px 16px;
-  border-radius: 12px;
-  box-shadow: 0 4px 16px rgba(2, 42, 84, 0.05);
-}
-
-.alert-banner-error {
-  background: #fdeceb;
-  border: 1px solid #f6c4c1;
-  color: #8a1a12;
-}
-
-.alert-banner-icon {
-  flex-shrink: 0;
-  margin-top: 1px;
-}
-
-.alert-banner-message {
-  margin: 0;
-  font-size: 14px;
-  line-height: 1.45;
-  flex: 1;
-}
-
-.alert-banner-dismiss {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  padding: 0;
-  border: none;
-  border-radius: 6px;
-  background: transparent;
-  color: inherit;
-  cursor: pointer;
-}
-
-.alert-banner-dismiss:hover {
-  background: rgba(138, 26, 18, 0.1);
-}
-
 .form-info {
   margin: 10px 0 0;
   font-size: 13px;
@@ -1004,21 +957,16 @@ label {
 }
 
 .uploads-table h3 {
-  font-size: 20px;
-  font-weight: 700;
-  margin-bottom: 6px;
+  font-size: 12px;
+  color: #706e6b;
+  font-weight: 500;
+  margin-bottom: 4px;
 }
 
 .uploads-empty {
   margin: 10px 0 4px;
   color: #7a7a7a;
   font-size: 13px;
-}
-
-.uploads-hint {
-  margin: 0 0 10px;
-  color: #5c5c5a;
-  font-size: 15px;
 }
 
 .upload-row {
@@ -1029,50 +977,9 @@ label {
   padding: 12px 0;
 }
 
-.upload-row-main {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-}
-
-.upload-select-toggle {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  width: 28px;
-  height: 28px;
-  margin-top: 2px;
-  padding: 0;
-  border: none;
-  background: none;
-  color: #c9c9c8;
-  cursor: pointer;
-  transition: color 0.15s ease, transform 0.1s ease;
-}
-
-.upload-select-toggle:hover:not(:disabled) {
-  color: #9ac7f2;
-  transform: scale(1.08);
-}
-
-.upload-select-toggle.selected {
-  color: #020061;
-}
-
-.upload-select-toggle:disabled {
-  color: #e5e5e4;
-  cursor: default;
-}
-
 .upload-row p {
   margin: 2px 0 0;
   color: #706e6b;
-}
-
-.upload-attribution {
-  font-size: 12px;
-  font-style: italic;
 }
 
 .status {
@@ -1110,47 +1017,31 @@ label {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  flex-shrink: 0;
   width: 30px;
   height: 30px;
-  border-radius: 999px;
   border: 1px solid #f3b9b3;
   background: #fff;
+  border-radius: 999px;
   font-size: 11px;
   color: #ba0517;
   padding: 0;
   cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+  transition: background 0.15s ease;
 }
 
 .delete-icon-btn:hover:not(:disabled) {
   background: #fdeceb;
-  transform: scale(1.05);
 }
 
 .delete-icon-btn:disabled {
   cursor: default;
-}
-
-.delete-icon-btn.is-deleting {
-  background: #fdeceb;
-  border-color: #f3b9b3;
-  opacity: 1;
+  opacity: 0.6;
 }
 
 .delete-icon {
   width: 16px;
   height: 16px;
   object-fit: contain;
-}
-
-.delete-spinner {
-  width: 14px;
-  height: 14px;
-  border-radius: 999px;
-  border: 2px solid #f3b9b3;
-  border-top-color: #ba0517;
-  animation: aiLoadingSpin 0.7s linear infinite;
 }
 
 .page-actions {
@@ -1272,21 +1163,6 @@ label {
     opacity: 1;
     transform: translateY(0);
   }
-}
-
-.doc-picker-summary {
-  font-size: 13px;
-  color: #444;
-  background: #f7f7f6;
-  border: 1px solid #e5e5e4;
-  border-radius: 8px;
-  padding: 8px 10px;
-  margin-bottom: 14px;
-}
-
-.doc-picker-manage-link {
-  font-weight: 600;
-  white-space: nowrap;
 }
 
 .difficulty-chips {
@@ -1869,21 +1745,6 @@ label {
   color: #014486;
 }
 
-.learner-roster {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-bottom: 14px;
-}
-
-.learner-roster-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  cursor: pointer;
-}
-
 .learner-email-input {
   display: flex;
   gap: 8px;
@@ -2277,72 +2138,6 @@ label {
   .nh-grid {
     grid-template-columns: 1fr;
   }
-}
-
-.assigned-quiz-list {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.assigned-quiz-card {
-  border-left: 4px solid #dddbda;
-}
-
-.assigned-quiz-card.urgency-overdue {
-  border-left-color: #ba0517;
-}
-
-.assigned-quiz-card.urgency-soon {
-  border-left-color: #dd7a01;
-}
-
-.assigned-quiz-card.urgency-ontrack {
-  border-left-color: #04844b;
-}
-
-.assigned-quiz-card.urgency-completed {
-  border-left-color: #706e6b;
-  opacity: 0.75;
-}
-
-.assigned-quiz-card-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.assigned-quiz-badge {
-  display: inline-block;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  padding: 3px 10px;
-  border-radius: 999px;
-  background: #f3f3f3;
-  color: #3d3d3d;
-}
-
-.assigned-quiz-badge.urgency-overdue {
-  background: #fde3e5;
-  color: #ba0517;
-}
-
-.assigned-quiz-badge.urgency-soon {
-  background: #fdf1de;
-  color: #b95c00;
-}
-
-.assigned-quiz-badge.urgency-ontrack {
-  background: #dff3e8;
-  color: #04844b;
-}
-
-.assigned-quiz-badge.urgency-completed {
-  background: #ececec;
-  color: #706e6b;
 }
 
 /* ===== Learner Module ===== */
@@ -3044,35 +2839,12 @@ label {
   padding: 1px 2px;
 }
 
-/* Fills the modal body edge-to-edge (overriding its padding) so the
-   embedded PDF/DOCX viewer reads as the real document, not a text card. */
-.doc-modal-iframe {
-  width: 100%;
-  height: 100%;
-  margin: -24px;
-  border: none;
-  background: #fff;
-}
-
 .doc-modal-foot {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 16px;
   padding: 12px 18px;
   border-top: 1px solid #e6e6e6;
-}
-
-.doc-modal-open-original {
-  margin-right: auto;
-  font-size: 13.5px;
-  font-weight: 600;
-  color: #020061;
-  text-decoration: none;
-}
-
-.doc-modal-open-original:hover {
-  text-decoration: underline;
 }
 
 .pager {
@@ -4010,6 +3782,27 @@ label {
   white-space: nowrap;
 }
 
+.source-tag-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  font-weight: 600;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.source-tag-btn svg {
+  width: 13px;
+  height: 13px;
+}
+
+.source-tag-btn:hover {
+  background: #e2ebf7;
+  color: var(--sf-blue);
+  border-color: rgba(47, 111, 179, 0.35);
+}
+
 .review-more {
   display: inline-flex;
   align-items: center;
@@ -4416,6 +4209,63 @@ label {
 .file-del:disabled {
   opacity: 0.5;
   cursor: default;
+}
+
+.files-card-hint {
+  margin: 0 0 10px;
+  color: #5c6b82;
+  font-size: 13.5px;
+  line-height: 1.45;
+}
+
+.file-check {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  border: 2px solid rgba(11, 42, 84, 0.25);
+  background: #fff;
+  color: transparent;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.file-check.selected {
+  border-color: var(--sf-blue);
+  background: var(--sf-blue);
+  color: #fff;
+}
+
+.file-check:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.file-check svg {
+  width: 13px;
+  height: 13px;
+}
+
+.file-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.file-info .file-name {
+  flex: none;
+}
+
+.file-attribution {
+  font-size: 12px;
+  color: #7a879b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .mgr-foot {
@@ -5074,6 +4924,65 @@ label {
 
 .rp-assign .sf-btn {
   padding: 8px 16px;
+}
+
+.rp-assign-label {
+  margin: 12px 0 8px;
+  color: #5a6b82;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.rp-assign-label:first-of-type {
+  margin-top: 2px;
+}
+
+.learner-roster {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.learner-roster-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(11, 42, 84, 0.1);
+  background: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.learner-roster-item:hover {
+  border-color: var(--sf-blue);
+  background: #fff;
+}
+
+.learner-roster-item input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--sf-blue);
+  cursor: pointer;
+}
+
+.learner-roster-name {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #263a54;
+}
+
+.learner-roster-email {
+  font-size: 12px;
+  font-weight: 500;
+  color: #7a879b;
 }
 
 /* =========================================================================

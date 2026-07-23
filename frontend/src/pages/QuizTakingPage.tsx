@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import logoBadge from "../assets/sageforce-logo-badge.png";
-import { apiFetch, completeQuizAssignment } from "../api/client";
+import { apiFetch } from "../api/client";
 import { saveQuizAttempt } from "../features/quiz/storage";
 import type { GeneratedQuiz, QuizQuestion } from "../features/quiz/types";
 import { ArrowRight, ClockIcon } from "../components/icons";
@@ -16,11 +16,9 @@ const formatTime = (seconds: number) => {
 
 function QuizTakingPage() {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const quizIdParam = searchParams.get("quizId");
   const [isLoading, setIsLoading] = useState(true);
   const [title, setTitle] = useState("");
-  const [quizId, setQuizId] = useState<number | null>(quizIdParam ? Number(quizIdParam) : null);
+  const [quizId, setQuizId] = useState<number | null>(null);
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
   const [current, setCurrent] = useState(0);
   const [answers, setAnswers] = useState<Record<number, number>>({});
@@ -29,16 +27,11 @@ function QuizTakingPage() {
   // Guards against the auto-submit-on-timeout effect firing more than once.
   const hasSubmittedRef = useRef(false);
 
-  // Loads the specific quiz this page was opened for (from the new-hire's
-  // assigned-quiz list); falls back to "my latest quiz" only when no quizId
-  // was passed in, so old links/bookmarks without one still work.
+  // Load the new hire's assigned quiz (their manager's latest published quiz).
+  // Nothing is shown until this resolves — no placeholder/sample questions.
   useEffect(() => {
     let cancelled = false;
-    const quizRequest = quizIdParam
-      ? apiFetch<GeneratedQuiz | null>(`/api/quizzes/${quizIdParam}`)
-      : apiFetch<GeneratedQuiz | null>("/api/quizzes/mine/latest");
-
-    quizRequest
+    apiFetch<GeneratedQuiz | null>("/api/quizzes/mine/latest")
       .then((quiz) => {
         if (cancelled || !quiz || quiz.questionsPayload.length === 0) return;
         setQuestions(quiz.questionsPayload);
@@ -58,7 +51,7 @@ function QuizTakingPage() {
     return () => {
       cancelled = true;
     };
-  }, [quizIdParam]);
+  }, []);
 
   const total = questions.length;
   const question = questions[current];
@@ -74,16 +67,6 @@ function QuizTakingPage() {
       questions,
       answers,
     });
-
-    // Best-effort: marks this new hire's assignment complete so it drops off
-    // their "to do" list. Never blocks navigating to results — a failure
-    // here shouldn't stop the learner from seeing how they did.
-    if (quizId) {
-      void completeQuizAssignment(quizId).catch(() => {
-        /* non-fatal */
-      });
-    }
-
     navigate("/quiz-results");
   };
 

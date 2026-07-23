@@ -1,17 +1,14 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import AppNav from "../components/navigation/AppNav";
 import {
   apiFetch,
   deleteChatConversation,
   getChatConversation,
-  getDocumentFileUrl,
   listChatConversations,
-  listTeamDocuments,
   sendChatMessage,
   type ChatConversationSummary,
   type ChatSource,
-  type DocumentFileUrl,
 } from "../api/client";
 import { saveModuleProgress } from "../features/quiz/storage";
 import type { GeneratedQuiz } from "../features/quiz/types";
@@ -21,8 +18,7 @@ type Filter = "All" | "Files" | "Confluence" | "Repos";
 const FILTERS: Filter[] = ["All", "Files", "Confluence", "Repos"];
 
 // A document as rendered in the library. Backed by a real uploaded document;
-// `remoteId` lets "View source" fetch its original file (or extracted text,
-// for documents that predate the original-file viewer) on demand.
+// `remoteId` lets "View source" fetch its extracted text on demand.
 type DisplayDoc = {
   id: string;
   remoteId: number;
@@ -30,26 +26,7 @@ type DisplayDoc = {
   kind: SourceKind;
   typeLabel: string;
   addedLabel: string;
-  // null means the current user uploaded it themselves.
-  attribution: string | null;
 };
-
-const PDF_MIME = "application/pdf";
-const DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
-
-function isViewableInline(mimeType: string | null): boolean {
-  return mimeType === PDF_MIME || mimeType === DOCX_MIME;
-}
-
-// Microsoft's viewer can render DOCX inline given any internet-reachable
-// URL (our Supabase signed URL qualifies) — there's no native browser
-// equivalent to an <iframe> PDF for Office formats.
-function embedSrcFor(url: string, mimeType: string | null): string {
-  if (mimeType === DOCX_MIME) {
-    return `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(url)}`;
-  }
-  return url;
-}
 
 type ChatMessage = { role: "assistant" | "user"; text: string; sources?: ChatSource[] };
 
@@ -235,13 +212,6 @@ function DeleteChatIcon() {
 
 function LearnerModulePage() {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  // Which assigned quiz this module page is for. Falls back to "my latest"
-  // (below) when arriving without a quizId, e.g. an old bookmark.
-  const quizIdParam = searchParams.get("quizId");
-  const [quizId, setQuizId] = useState<number | null>(
-    quizIdParam ? Number(quizIdParam) : null
-  );
   const [activeFilter, setActiveFilter] = useState<Filter>("All");
   const [readIds, setReadIds] = useState<Set<string>>(() => new Set());
   const [openDoc, setOpenDoc] = useState<DisplayDoc | null>(null);
@@ -264,44 +234,30 @@ function LearnerModulePage() {
   const [sourceText, setSourceText] = useState<Record<number, string>>({});
   const [sourceLoadingId, setSourceLoadingId] = useState<number | null>(null);
   const [sourceError, setSourceError] = useState("");
-  // Signed URL (+ mime type) for the document's original file, so the modal
-  // can embed the real PDF/DOCX instead of the extracted-text fallback.
-  // Fetched fresh every time the modal opens rather than cached, since
-  // signed URLs expire after a few minutes.
-  const [fileUrlLoadingId, setFileUrlLoadingId] = useState<number | null>(null);
-  const [fileUrl, setFileUrl] = useState<DocumentFileUrl | null>(null);
   const [timeLimit, setTimeLimit] = useState<number | null>(null);
-  // Distinguishes "haven't heard back from the API yet" (both stay null/false)
-  // from "the manager genuinely left this quiz untimed".
-  const [hasNoTimeLimit, setHasNoTimeLimit] = useState(false);
   const [confirmStart, setConfirmStart] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
 
-  // Load the team's real uploaded documents — everyone's, not just this
-  // user's own uploads, since the library is scoped to the whole team (and
-  // the assigned quiz's title + time limit) from the backend. A loading
-  // skeleton shows while the request is in flight; if it fails or returns
-  // nothing we land on a clean empty state — never demo/fake data.
+  // Load the team's real uploaded documents (and the assigned quiz's title +
+  // time limit) from the backend. A loading skeleton shows while the request is
+  // in flight; if it fails or returns nothing we land on a clean empty state —
+  // never demo/fake data.
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    // Team-scoped, not uploader-scoped: the manager uploaded these documents,
-    // so /mine (uploadedByUserId === this user) would be empty for a new hire.
-    // The new hire should see everything on their team.
-    listTeamDocuments()
-      .then((teamDocs) => {
+    apiFetch<{ data: { id: number; title: string; status: string; createdAt?: string }[] }>(
+      "/api/documents/mine"
+    )
+      .then((res) => {
         if (cancelled) return;
-        const files = teamDocs
-          .filter((doc) => doc.status.toLowerCase() === "ready")
-          .map<DisplayDoc>((doc) => ({
-            id: `doc-${doc.id}`,
-            remoteId: doc.id,
-            title: doc.title,
-            kind: "file",
-            typeLabel: fileTypeLabel(doc.title),
-            addedLabel: relativeAddedLabel(doc.createdAt),
-            attribution: doc.isMine ? null : doc.uploadedByName,
-          }));
+        const files = (res.data ?? []).map<DisplayDoc>((doc) => ({
+          id: `doc-${doc.id}`,
+          remoteId: doc.id,
+          title: doc.title,
+          kind: "file",
+          typeLabel: fileTypeLabel(doc.title),
+          addedLabel: relativeAddedLabel(doc.createdAt),
+        }));
         setDocs(files);
       })
       .catch(() => {
@@ -310,23 +266,11 @@ function LearnerModulePage() {
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
-    // Prefer the specific quiz this page was opened for (from the new-hire's
-    // assigned-quiz list); fall back to "my latest" only when no quizId was
-    // passed in, so old links/bookmarks without one still work.
-    const quizRequest = quizIdParam
-      ? apiFetch<GeneratedQuiz | null>(`/api/quizzes/${quizIdParam}`)
-      : apiFetch<GeneratedQuiz | null>("/api/quizzes/mine/latest");
-
-    quizRequest
+    apiFetch<GeneratedQuiz | null>("/api/quizzes/mine/latest")
       .then((quiz) => {
         if (cancelled || !quiz) return;
         if (quiz.title) setModuleTitle(quiz.title);
-        if (quiz.timeLimitMinutes) {
-          setTimeLimit(quiz.timeLimitMinutes);
-        } else {
-          setHasNoTimeLimit(true);
-        }
-        setQuizId(quiz.id);
+        if (quiz.timeLimitMinutes) setTimeLimit(quiz.timeLimitMinutes);
       })
       .catch(() => {
         /* keep default title */
@@ -334,7 +278,7 @@ function LearnerModulePage() {
     return () => {
       cancelled = true;
     };
-  }, [quizIdParam]);
+  }, []);
 
   // Hydrate the chat panel from the user's most recently active thread, if
   // any. Conversations already come back sorted by updatedAt desc, so the
@@ -452,14 +396,6 @@ function LearnerModulePage() {
       next.add(doc.id);
       return next;
     });
-    setFileUrl(null);
-    setFileUrlLoadingId(doc.remoteId);
-    getDocumentFileUrl(doc.remoteId)
-      .then((result) => setFileUrl(result))
-      .catch(() => setFileUrl({ url: null, mimeType: null }))
-      .finally(() => setFileUrlLoadingId(null));
-    // Extracted text is still the fallback for legacy documents (no
-    // original file stored) and for file types we don't embed inline.
     loadSource(doc.remoteId);
   };
 
@@ -667,7 +603,6 @@ function LearnerModulePage() {
                               <strong className="doc-title">{doc.title}</strong>
                               <span className="doc-meta">
                                 {doc.typeLabel} · {doc.addedLabel}
-                                {doc.attribution ? ` · Uploaded by ${doc.attribution}` : ""}
                               </span>
                             </div>
                             <span className={`read-badge ${isRead ? "read" : "unread"}`}>
@@ -890,15 +825,7 @@ function LearnerModulePage() {
             </header>
 
             <div className="doc-modal-body">
-              {fileUrlLoadingId === openDoc.remoteId ? (
-                <p className="subtle">Loading document…</p>
-              ) : fileUrl?.url && isViewableInline(fileUrl.mimeType) ? (
-                <iframe
-                  className="doc-modal-iframe"
-                  src={embedSrcFor(fileUrl.url, fileUrl.mimeType)}
-                  title={openDoc.title}
-                />
-              ) : sourceLoadingId === openDoc.remoteId ? (
+              {sourceLoadingId === openDoc.remoteId ? (
                 <p className="subtle">Loading source…</p>
               ) : sourceError && !sourceText[openDoc.remoteId] ? (
                 <p className="form-error">{sourceError}</p>
@@ -913,16 +840,6 @@ function LearnerModulePage() {
             </div>
 
             <footer className="doc-modal-foot">
-              {fileUrl?.url ? (
-                <a
-                  className="doc-modal-open-original"
-                  href={fileUrl.url}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  Open original
-                </a>
-              ) : null}
               <button type="button" className="primary-btn" onClick={() => setOpenDoc(null)}>
                 Done
               </button>
@@ -955,14 +872,8 @@ function LearnerModulePage() {
             </div>
             <h2>Ready to start the quiz?</h2>
             <p className="confirm-lead">
-              {hasNoTimeLimit ? (
-                "This quiz has no time limit — take as long as you need."
-              ) : (
-                <>
-                  You'll have <strong>{timeLimit ?? 30} minutes</strong> to complete it once you
-                  begin.
-                </>
-              )}
+              You'll have <strong>{timeLimit ?? 30} minutes</strong> to complete it once you
+              begin.
             </p>
             <p className="confirm-warn">
               Once you start, you won't be able to return to the learner module until you
@@ -981,7 +892,7 @@ function LearnerModulePage() {
                 className="primary-btn"
                 onClick={() => {
                   setConfirmStart(false);
-                  navigate(quizId ? `/quiz-taking?quizId=${quizId}` : "/quiz-taking");
+                  navigate("/quiz-taking");
                 }}
               >
                 Start quiz →
