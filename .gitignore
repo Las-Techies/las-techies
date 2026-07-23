@@ -13,3 +13,9 @@ CLAUDE.md
 
 # Downloaded Transformers.js embedding model weights (see backend/src/services/embeddings.ts)
 backend/.cache/
+
+# Local-only tooling/scratch artifacts (never commit these)
+.cursor/
+.shots/
+.v2preview/
+dist/

@@ -1,74 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import AppNav from "../components/navigation/AppNav";
+import logoBadge from "../assets/sageforce-logo-badge.png";
 import { apiFetch, completeQuizAssignment } from "../api/client";
-import { loadQuizConfig, saveQuizAttempt } from "../features/quiz/storage";
+import { saveQuizAttempt } from "../features/quiz/storage";
 import type { GeneratedQuiz, QuizQuestion } from "../features/quiz/types";
-
-// Shown when the account has no generated quiz yet, so the screen is always
-// demoable. Mirrors the wireframe content.
-const FALLBACK_QUESTIONS: QuizQuestion[] = [
-  {
-    id: 1,
-    prompt: "What is the minimum PPE requirement for Zone A?",
-    type: "multiple_choice",
-    explanation: "",
-    options: [
-      { id: 11, text: "Hard hat only", isCorrect: false },
-      { id: 12, text: "Hard hat, safety glasses, and steel-toe boots", isCorrect: true },
-      { id: 13, text: "High-visibility vest only", isCorrect: false },
-      { id: 14, text: "No PPE required if walking only", isCorrect: false },
-    ],
-  },
-  {
-    id: 2,
-    prompt: "How often must fire extinguishers be inspected according to OSHA 2026 guidelines?",
-    type: "multiple_choice",
-    explanation: "",
-    options: [
-      { id: 21, text: "Weekly", isCorrect: false },
-      { id: 22, text: "Monthly", isCorrect: false },
-      { id: 23, text: "Every 6 months", isCorrect: true },
-      { id: 24, text: "Annually", isCorrect: false },
-    ],
-  },
-  {
-    id: 3,
-    prompt: "When must hearing protection be worn in Zone A?",
-    type: "multiple_choice",
-    explanation: "",
-    options: [
-      { id: 31, text: "At all times", isCorrect: false },
-      { id: 32, text: "When noise levels exceed 85 dB", isCorrect: true },
-      { id: 33, text: "Only during night shifts", isCorrect: false },
-      { id: 34, text: "Never", isCorrect: false },
-    ],
-  },
-  {
-    id: 4,
-    prompt: "Who may enter Zone A during active machinery operation?",
-    type: "multiple_choice",
-    explanation: "",
-    options: [
-      { id: 41, text: "Anyone with a visitor badge", isCorrect: false },
-      { id: 42, text: "Only certified operators", isCorrect: true },
-      { id: 43, text: "Any full-time employee", isCorrect: false },
-      { id: 44, text: "New hires in their first week", isCorrect: false },
-    ],
-  },
-  {
-    id: 5,
-    prompt: "What should you do before servicing equipment in Zone A?",
-    type: "multiple_choice",
-    explanation: "",
-    options: [
-      { id: 51, text: "Apply lockout/tagout and verify zero energy state", isCorrect: true },
-      { id: 52, text: "Notify a coworker verbally", isCorrect: false },
-      { id: 53, text: "Nothing, just start working", isCorrect: false },
-      { id: 54, text: "Remove any existing locks", isCorrect: false },
-    ],
-  },
-];
+import { ArrowRight, ClockIcon } from "../components/icons";
 
 const LETTERS = ["A", "B", "C", "D", "E", "F"];
 
@@ -82,81 +18,57 @@ function QuizTakingPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const quizIdParam = searchParams.get("quizId");
-  const [title, setTitle] = useState(() => loadQuizConfig().moduleTitle);
+  const [isLoading, setIsLoading] = useState(true);
+  const [title, setTitle] = useState("");
   const [quizId, setQuizId] = useState<number | null>(
     quizIdParam ? Number(quizIdParam) : null
   );
-  const [questions, setQuestions] = useState<QuizQuestion[]>(FALLBACK_QUESTIONS);
-  // Gate rendering until the assigned quiz has loaded, so the fallback (OSHA)
-  // questions never flash before the manager's real quiz swaps in.
-  const [loading, setLoading] = useState(true);
+  const [questions, setQuestions] = useState<QuizQuestion[]>([]);
   const [current, setCurrent] = useState(0);
   const [answers, setAnswers] = useState<Record<number, number>>({});
-  const [flagged, setFlagged] = useState<Set<number>>(new Set());
-  // null means "no time limit" — the countdown UI stays hidden and no
-  // interval runs. A time limit of 0 (or missing) from either the locally
-  // cached config or the fetched quiz is treated as "no limit".
-  const [secondsLeft, setSecondsLeft] = useState<number | null>(() => {
-    const minutes = loadQuizConfig().timeLimit;
-    return minutes > 0 ? minutes * 60 : null;
-  });
+  const [hasTimeLimit, setHasTimeLimit] = useState(false);
+  const [secondsLeft, setSecondsLeft] = useState(0);
+  // Guards against the auto-submit-on-timeout effect firing more than once.
+  const hasSubmittedRef = useRef(false);
 
-  // Loads the specific quiz this page was opened for (from the new-hire's
+  // Loads the specific quiz this page was opened for (from the new hire's
   // assigned-quiz list); falls back to "my latest quiz" only when no quizId
-  // was passed in, so old links/bookmarks without one still work. Falls
-  // back silently to the sample questions if the API is unavailable.
+  // was passed in, so older links without one still work. Nothing is shown
+  // until this resolves — no placeholder/sample questions.
   useEffect(() => {
     let cancelled = false;
     const quizRequest = quizIdParam
       ? apiFetch<GeneratedQuiz | null>(`/api/quizzes/${quizIdParam}`)
       : apiFetch<GeneratedQuiz | null>("/api/quizzes/mine/latest");
-
     quizRequest
       .then((quiz) => {
         if (cancelled || !quiz || quiz.questionsPayload.length === 0) return;
         setQuestions(quiz.questionsPayload);
         setQuizId(quiz.id);
         setTitle(quiz.title);
-        setSecondsLeft(quiz.timeLimitMinutes ? quiz.timeLimitMinutes * 60 : null);
+        if (quiz.timeLimitMinutes) {
+          setHasTimeLimit(true);
+          setSecondsLeft(quiz.timeLimitMinutes * 60);
+        }
       })
       .catch(() => {
-        /* keep fallback questions */
+        /* leave questions empty — the empty state renders below */
       })
       .finally(() => {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) setIsLoading(false);
       });
     return () => {
       cancelled = true;
     };
   }, [quizIdParam]);
 
-  useEffect(() => {
-    if (secondsLeft === null || secondsLeft <= 0) return;
-    const timer = window.setInterval(() => {
-      setSecondsLeft((value) => (value === null || value <= 1 ? 0 : value - 1));
-    }, 1000);
-    return () => window.clearInterval(timer);
-  }, [secondsLeft]);
-
   const total = questions.length;
   const question = questions[current];
-  const progressPercent = Math.round(((current + 1) / total) * 100);
   const isLast = current === total - 1;
 
-  const selectOption = (optionId: number) => {
-    setAnswers((prev) => ({ ...prev, [question.id]: optionId }));
-  };
-
-  const toggleFlag = () => {
-    setFlagged((prev) => {
-      const next = new Set(prev);
-      if (next.has(question.id)) next.delete(question.id);
-      else next.add(question.id);
-      return next;
-    });
-  };
-
   const submitQuiz = () => {
+    if (hasSubmittedRef.current) return;
+    hasSubmittedRef.current = true;
     saveQuizAttempt({
       quizId,
       title,
@@ -166,8 +78,8 @@ function QuizTakingPage() {
     });
 
     // Best-effort: marks this new hire's assignment complete so it drops off
-    // their "to do" list. Never blocks navigating to results — a failure
-    // here shouldn't stop the learner from seeing how they did.
+    // their "to do" list. Never blocks navigating to results — a failure here
+    // shouldn't stop the learner from seeing how they did.
     if (quizId) {
       void completeQuizAssignment(quizId).catch(() => {
         /* non-fatal */
@@ -175,6 +87,27 @@ function QuizTakingPage() {
     }
 
     navigate("/quiz-results");
+  };
+
+  // Countdown ticks only while there's a time limit and time remaining.
+  useEffect(() => {
+    if (!hasTimeLimit || secondsLeft <= 0) return;
+    const timer = window.setInterval(() => {
+      setSecondsLeft((value) => (value <= 1 ? 0 : value - 1));
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [hasTimeLimit, secondsLeft]);
+
+  // When the clock hits zero, the quiz auto-submits.
+  useEffect(() => {
+    if (hasTimeLimit && secondsLeft === 0 && !isLoading && questions.length > 0) {
+      submitQuiz();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasTimeLimit, secondsLeft, isLoading, questions.length]);
+
+  const selectOption = (optionId: number) => {
+    setAnswers((prev) => ({ ...prev, [question.id]: optionId }));
   };
 
   const goNext = () => {
@@ -189,101 +122,92 @@ function QuizTakingPage() {
 
   const dots = useMemo(() => Array.from({ length: total }, (_, index) => index), [total]);
 
-  if (loading) {
-    return (
-      <div className="app-shell">
-        <AppNav />
-        <main className="page-wrap">
-          <p className="uploads-empty">Loading your quiz…</p>
-        </main>
-      </div>
-    );
-  }
-
   return (
     <div className="app-shell">
-      <AppNav />
-      <main className="page-wrap">
-        <div className="quiz-take-head">
-          <h1>{title} — Quiz</h1>
-          <button
-            type="button"
-            className="exit-link"
-            onClick={() =>
-              navigate(quizId ? `/learner-module?quizId=${quizId}` : "/learner-module")
-            }
-          >
-            Exit quiz
-          </button>
+      <header className="slim-topbar">
+        <div className="brand">
+          <img className="brand-logo" src={logoBadge} alt="SageForce" />
+          <span className="brand-name">SageForce</span>
         </div>
+      </header>
 
-        <div className="quiz-progress-row">
-          <span className="quiz-progress-count">
-            Question {current + 1} of {total}
-          </span>
-          {secondsLeft !== null ? (
-            <span className={`timer-pill ${secondsLeft <= 60 ? "low" : ""}`}>
-              <span aria-hidden>◷</span> {formatTime(secondsLeft)} left
-            </span>
-          ) : null}
-        </div>
-        <div className="progress-track quiz-progress-track">
-          <div className="progress-fill" style={{ width: `${progressPercent}%` }} />
-        </div>
+      <main className="quiz-stage">
+        {isLoading ? (
+          <section className="glass quiz-panel">
+            <p className="cfg-empty">Loading quiz…</p>
+          </section>
+        ) : total === 0 ? (
+          <section className="glass quiz-panel">
+            <p className="cfg-empty">
+              No quiz is available yet. Check back once your manager publishes one.
+            </p>
+          </section>
+        ) : (
+          <section className="glass quiz-panel">
+            <div className="quiz-panel-head">
+              <span className="quiz-qcount">
+                Question {current + 1} of {total}
+              </span>
+              {hasTimeLimit ? (
+                <span className={`timer-chip ${secondsLeft <= 60 ? "low" : ""}`}>
+                  <ClockIcon /> {formatTime(secondsLeft)} left
+                </span>
+              ) : null}
+            </div>
 
-        <section className="card quiz-card">
-          <span className="q-eyebrow">Question {current + 1}</span>
-          <h2 className="q-prompt">{question.prompt}</h2>
+            <div className="seg-progress" aria-hidden>
+              {dots.map((index) => (
+                <span key={index} className={index <= current ? "on" : ""} />
+              ))}
+            </div>
 
-          <div className="q-options">
-            {question.options.map((option, index) => {
-              const selected = answers[question.id] === option.id;
-              return (
-                <button
-                  key={option.id}
-                  type="button"
-                  className={`q-option ${selected ? "selected" : ""}`}
-                  onClick={() => selectOption(option.id)}
-                >
-                  <span className={`q-radio ${selected ? "on" : ""}`} aria-hidden />
-                  <span className="q-letter">{LETTERS[index]}.</span>
-                  <span className="q-text">{option.text}</span>
-                </button>
-              );
-            })}
-          </div>
+            <h1 className="quiz-prompt">{question.prompt}</h1>
 
-          <button type="button" className="flag-btn" onClick={toggleFlag}>
-            <span aria-hidden>⚑</span>{" "}
-            {flagged.has(question.id) ? "Flagged for review" : "Flag for review"}
-          </button>
-        </section>
+            <div className="answers">
+              {question.options.map((option, index) => {
+                const selected = answers[question.id] === option.id;
+                return (
+                  <button
+                    key={option.id}
+                    type="button"
+                    className={`answer ${selected ? "selected" : ""}`}
+                    onClick={() => selectOption(option.id)}
+                  >
+                    <span className="answer-letter">{LETTERS[index]}</span>
+                    <span className="answer-text">{option.text}</span>
+                    <span className="answer-radio" aria-hidden />
+                  </button>
+                );
+              })}
+            </div>
 
-        <div className="quiz-foot">
-          <button
-            className="secondary-btn"
-            type="button"
-            onClick={goPrev}
-            disabled={current === 0}
-          >
-            ← Previous
-          </button>
+            <div className="quiz-panel-foot">
+              <button
+                className="ghost-btn"
+                type="button"
+                onClick={goPrev}
+                disabled={current === 0}
+              >
+                Previous
+              </button>
 
-          <div className="stepper" aria-hidden>
-            {dots.map((index) => (
-              <span
-                key={index}
-                className={`dot ${index < current ? "filled" : ""} ${
-                  index === current ? "current" : ""
-                }`}
-              />
-            ))}
-          </div>
+              <div className="dot-stepper" aria-hidden>
+                {dots.map((index) => (
+                  <span
+                    key={index}
+                    className={`d ${index < current ? "on" : ""} ${
+                      index === current ? "here" : ""
+                    }`}
+                  />
+                ))}
+              </div>
 
-          <button className="primary-btn" type="button" onClick={goNext}>
-            {isLast ? "Submit" : "Next →"}
-          </button>
-        </div>
+              <button className="sf-btn" type="button" onClick={goNext}>
+                {isLast ? "Submit" : "Next"} <ArrowRight />
+              </button>
+            </div>
+          </section>
+        )}
       </main>
     </div>
   );

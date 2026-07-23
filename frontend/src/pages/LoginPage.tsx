@@ -1,11 +1,20 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import mascotLogo from "../assets/sageforce-mascot-transparent.png";
+import mascotLogo from "../assets/panda-login.png";
 import { useAuth } from "../context/AuthContext";
-import { setPreviewRole } from "../features/auth/previewRole";
-import type { UserRole } from "../context/AuthContext";
 import { apiFetch } from "../api/client";
 import { supabase } from "../lib/supabaseClient";
+import {
+  ChevronRight,
+  EyeIcon,
+  EyeOffIcon,
+  GoogleIcon,
+  LockIcon,
+  MailIcon,
+  PeopleIcon,
+  PersonIcon,
+  StarSpark,
+} from "../components/icons";
 
 type Mode = "login" | "signup";
 
@@ -15,12 +24,13 @@ function routeForRole(role: string | undefined): string {
 
 function LoginPage() {
   const [mode, setMode] = useState<Mode>("login");
-  const [role, setRole] = useState<"" | "new_hire" | "manager">("");
+  const [role, setRole] = useState<"" | "new_hire" | "manager">("new_hire");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [teamName, setTeamName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [infoMessage, setInfoMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -66,7 +76,7 @@ function LoginPage() {
 
   const handleForgotPassword = async () => {
     if (!email.trim()) {
-      setError("Enter your email above first, then click 'Forgot password?'.");
+      setError("Enter your email above first, then click 'Need help signing in?'.");
       return;
     }
 
@@ -141,9 +151,7 @@ function LoginPage() {
         lastName.trim()
       );
       if (!result) {
-        setError(
-          "Account created. Please confirm your email, then log in."
-        );
+        setError("Account created. Please confirm your email, then log in.");
         switchMode("login");
         return;
       }
@@ -176,13 +184,6 @@ function LoginPage() {
     } else {
       handleSignup();
     }
-  };
-
-  // Temporary shortcut: jump straight into either role's tabs without a full
-  // login. Remove before shipping — it's only for exploring the app locally.
-  const enterAs = (nextRole: UserRole) => {
-    setPreviewRole(nextRole);
-    navigate(routeForRole(nextRole));
   };
 
   const handleGoogleSignIn = async () => {
@@ -240,37 +241,53 @@ function LoginPage() {
     }
   };
 
+  const brandArt = (
+    <section className="login-left">
+      <img className="login-mascot" src={mascotLogo} alt="SageForce mascot logo" />
+      <div className="login-brand">
+        <span className="login-wordmark">
+          <StarSpark aria-hidden />
+          SageForce
+        </span>
+        <p className="login-tagline">AI-powered onboarding platform</p>
+      </div>
+    </section>
+  );
+
+  const roleToggle = (
+    <div className="field">
+      <span className="field-label">I'm signing in as</span>
+      <div className="seg">
+        <button
+          type="button"
+          className={role === "new_hire" ? "seg-opt active" : "seg-opt"}
+          onClick={() => setRole("new_hire")}
+        >
+          <PersonIcon aria-hidden /> New Hire
+        </button>
+        <button
+          type="button"
+          className={role === "manager" ? "seg-opt active" : "seg-opt"}
+          onClick={() => setRole("manager")}
+        >
+          <PeopleIcon aria-hidden /> Manager
+        </button>
+      </div>
+    </div>
+  );
+
   if (needsRoleSetup) {
     return (
       <main className="login-page">
-        <section className="login-left">
-          <img className="login-mascot" src={mascotLogo} alt="SageForce mascot logo" />
-        </section>
-
+        {brandArt}
         <section className="login-card">
           <h2>Almost there</h2>
-          <p className="role-setup-intro">
+          <p className="login-sub">
             Welcome, {session?.user.user_metadata?.full_name ?? session?.user.email}! Pick your
             role to finish setting up your account.
           </p>
 
-          <label>Role</label>
-          <div className="role-switch">
-            <button
-              type="button"
-              className={role === "new_hire" ? "selected role-option" : "role-option"}
-              onClick={() => setRole("new_hire")}
-            >
-              New Hire
-            </button>
-            <button
-              type="button"
-              className={role === "manager" ? "selected role-option" : "role-option"}
-              onClick={() => setRole("manager")}
-            >
-              Manager
-            </button>
-          </div>
+          {roleToggle}
 
           {role === "manager" ? (
             <label>
@@ -302,130 +319,111 @@ function LoginPage() {
 
   return (
     <main className="login-page">
-      <section className="login-left">
-        <img className="login-mascot" src={mascotLogo} alt="SageForce mascot logo" />
-      </section>
+      {brandArt}
 
       <section className="login-card">
-        <h2>{mode === "login" ? "Welcome back" : "Welcome to SageForce"}</h2>
+        <h2>{mode === "login" ? "Welcome back" : "Create your account"}</h2>
+        <p className="login-sub">
+          {mode === "login"
+            ? "Sign in to continue to SageForce."
+            : "Join SageForce to get started."}
+        </p>
 
         {mode === "signup" ? (
           <div className="name-row">
-            <label>
-              First Name
-              <input
-                type="text"
-                placeholder="Frida"
-                value={firstName}
-                onChange={(event) => setFirstName(event.target.value)}
-              />
-            </label>
-
-            <label>
-              Last Name
-              <input
-                type="text"
-                placeholder="Arriaga"
-                value={lastName}
-                onChange={(event) => setLastName(event.target.value)}
-              />
-            </label>
+            <div className="field">
+              <span className="field-label">First name</span>
+              <div className="input-wrap">
+                <input
+                  type="text"
+                  placeholder="Frida"
+                  value={firstName}
+                  onChange={(event) => setFirstName(event.target.value)}
+                  style={{ paddingLeft: 14 }}
+                />
+              </div>
+            </div>
+            <div className="field">
+              <span className="field-label">Last name</span>
+              <div className="input-wrap">
+                <input
+                  type="text"
+                  placeholder="Arriaga"
+                  value={lastName}
+                  onChange={(event) => setLastName(event.target.value)}
+                  style={{ paddingLeft: 14 }}
+                />
+              </div>
+            </div>
           </div>
         ) : null}
 
-        <label>
-          Work Email
-          <input
-            type="email"
-            placeholder="you@salesforce.com"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-          />
-        </label>
-
-        <label>
-          Password
-          <input
-            type="password"
-            placeholder="••••••••••••"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-          />
-        </label>
-
-        {mode === "login" ? (
-          <button
-            type="button"
-            className="forgot-password-link"
-            onClick={handleForgotPassword}
-            disabled={isSendingReset}
-          >
-            {isSendingReset ? "Sending…" : "Forgot password?"}
-          </button>
-        ) : null}
-
-        {mode === "signup" ? (
-          <>
-            <label>Role</label>
-            <div className="role-switch">
-              <button
-                type="button"
-                className={role === "new_hire" ? "selected role-option" : "role-option"}
-                onClick={() => setRole("new_hire")}
-              >
-                New Hire
-              </button>
-              <button
-                type="button"
-                className={role === "manager" ? "selected role-option" : "role-option"}
-                onClick={() => setRole("manager")}
-              >
-                Manager
-              </button>
-            </div>
-
-            {role === "manager" ? (
-              <label>
-                Create your team
-                <input
-                  type="text"
-                  placeholder="e.g. Frontline Ops Team"
-                  value={teamName}
-                  onChange={(event) => setTeamName(event.target.value)}
-                />
-              </label>
-            ) : null}
-          </>
-        ) : null}
-
-        <div className="login-actions">
-          <a
-            className="help-link"
-            href="#"
-            onClick={(event) => {
-              event.preventDefault();
-              switchMode(mode === "login" ? "signup" : "login");
-            }}
-          >
-            {mode === "login"
-              ? "New here? Create an account"
-              : "Already have an account? Log in"}
-          </a>
-          <button
-            className="primary-btn btn-link"
-            type="button"
-            onClick={handleSubmit}
-            disabled={submitting}
-          >
-            {submitting
-              ? mode === "login"
-                ? "Logging in…"
-                : "Creating account…"
-              : mode === "login"
-                ? "Log in"
-                : "Create account"}
-          </button>
+        <div className="field">
+          <span className="field-label">Work Email</span>
+          <div className="input-wrap">
+            <MailIcon className="input-icon" aria-hidden />
+            <input
+              type="email"
+              placeholder="you@company.com"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+            />
+          </div>
         </div>
+
+        <div className="field">
+          <span className="field-label">Password</span>
+          <div className="input-wrap has-toggle">
+            <LockIcon className="input-icon" aria-hidden />
+            <input
+              type={showPassword ? "text" : "password"}
+              placeholder="••••••••••••"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+            />
+            <button
+              type="button"
+              className="pw-toggle"
+              onClick={() => setShowPassword((v) => !v)}
+              aria-label={showPassword ? "Hide password" : "Show password"}
+            >
+              {showPassword ? <EyeOffIcon aria-hidden /> : <EyeIcon aria-hidden />}
+            </button>
+          </div>
+        </div>
+
+        {mode === "signup" ? roleToggle : null}
+
+        {mode === "signup" && role === "manager" ? (
+          <div className="field">
+            <span className="field-label">Create your team</span>
+            <div className="input-wrap">
+              <PeopleIcon className="input-icon" aria-hidden />
+              <input
+                type="text"
+                placeholder="e.g. Frontline Ops Team"
+                value={teamName}
+                onChange={(event) => setTeamName(event.target.value)}
+              />
+            </div>
+          </div>
+        ) : null}
+
+        <button
+          className="sf-btn sf-btn-block login-continue"
+          type="button"
+          onClick={handleSubmit}
+          disabled={submitting}
+        >
+          {submitting
+            ? mode === "login"
+              ? "Signing in…"
+              : "Creating account…"
+            : mode === "login"
+              ? "Continue"
+              : "Create account"}
+          <ChevronRight className="btn-arrow" aria-hidden />
+        </button>
 
         <div className="oauth-divider">
           <span>or</span>
@@ -437,32 +435,42 @@ function LoginPage() {
           onClick={handleGoogleSignIn}
           disabled={isGoogleLoading}
         >
+          <GoogleIcon aria-hidden />
           {isGoogleLoading ? "Redirecting…" : "Continue with Google"}
+        </button>
+
+        {mode === "login" ? (
+          <button
+            type="button"
+            className="help-signin"
+            onClick={handleForgotPassword}
+            disabled={isSendingReset}
+          >
+            {isSendingReset ? "Sending…" : "Need help signing in?"}
+          </button>
+        ) : null}
+
+        <button
+          type="button"
+          className="help-signin"
+          onClick={() => switchMode(mode === "login" ? "signup" : "login")}
+        >
+          {mode === "login"
+            ? "New here? Create an account"
+            : "Already have an account? Log in"}
         </button>
 
         {error ? <p className="form-error">{error}</p> : null}
         {infoMessage ? <p className="form-info">{infoMessage}</p> : null}
-
-        <div className="dev-access">
-          <span className="dev-access-label">Quick access · for testing</span>
-          <div className="dev-access-btns">
-            <button
-              type="button"
-              className="dev-access-btn"
-              onClick={() => enterAs("new_hire")}
-            >
-              Enter as New Hire
-            </button>
-            <button
-              type="button"
-              className="dev-access-btn"
-              onClick={() => enterAs("manager")}
-            >
-              Enter as Manager
-            </button>
-          </div>
-        </div>
       </section>
+
+      <button
+        type="button"
+        className="creators-fab"
+        onClick={() => navigate("/meet-our-team")}
+      >
+        <PeopleIcon aria-hidden /> Meet our creators
+      </button>
     </main>
   );
 }
