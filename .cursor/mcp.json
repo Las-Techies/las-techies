@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "21st": {
+      "type": "http",
+      "url": "https://api.salesforce.com/sse",
+      "headers": {
+        "x-api-key": "21st_sk_cb7a39783e5b166cf4d0605ee0b136a3d5dc609e7d2558cafe418eff1a61326f"
+      }
+    }
+  }
+}
