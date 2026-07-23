@@ -4417,6 +4417,29 @@ label {
   flex: none;
 }
 
+.cfg-doc-summary {
+  flex: 1;
+  min-width: 0;
+  text-align: right;
+  font-size: 13px;
+  line-height: 1.4;
+  color: rgba(11, 42, 84, 0.72);
+}
+
+.cfg-doc-summary.error {
+  color: #c0392b;
+}
+
+.cfg-doc-summary a {
+  color: #1a7be0;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.cfg-doc-summary a:hover {
+  text-decoration: underline;
+}
+
 .cfg-field-control input[type="date"] {
   flex: none;
 }

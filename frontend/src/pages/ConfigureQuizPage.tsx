@@ -4,12 +4,13 @@ import { Link, useNavigate } from "react-router-dom";
 import AppNav from "../components/navigation/AppNav";
 import WizardSteps from "../components/navigation/WizardSteps";
 import mascot from "../assets/panda-peek.png";
-import { apiFetch, streamQuizGeneration } from "../api/client";
 import {
-  loadDeselectedDocumentIds,
-  loadUploadedDocuments,
-  saveQuizConfig,
-} from "../features/quiz/storage";
+  apiFetch,
+  listTeamDocuments,
+  streamQuizGeneration,
+  type TeamDocument,
+} from "../api/client";
+import { loadDeselectedDocumentIds, saveQuizConfig } from "../features/quiz/storage";
 import type { GeneratedQuiz, QuizDifficulty, QuizQuestion } from "../features/quiz/types";
 import { PencilIcon, RegenerateIcon } from "../components/icons/QuizIcons";
 import {
@@ -76,6 +77,16 @@ function ConfigureQuizPage() {
   const [isLoadingQuiz, setIsLoadingQuiz] = useState(true);
   const [generationStatus, setGenerationStatus] = useState("");
   const [error, setError] = useState("");
+  // Live team document library (every manager's uploads), pulled from the
+  // backend so the manager generates from the same source set the deployed
+  // app uses — not just a local cache.
+  const [teamDocuments, setTeamDocuments] = useState<TeamDocument[]>([]);
+  const [isLoadingDocuments, setIsLoadingDocuments] = useState(true);
+  const [documentsError, setDocumentsError] = useState("");
+  // Which documents are unchecked for quiz generation (managed on the Upload
+  // page). Read once on mount; stored as "deselected" so new uploads default
+  // to checked.
+  const [deselectedDocumentIds] = useState<Set<number>>(() => loadDeselectedDocumentIds());
   // Inline click-to-edit: at most one field (a question's prompt, or a
   // single option's text) is being edited at a time. Editing a field saves
   // automatically on blur/Enter — there's no separate edit form/Save button.
@@ -151,6 +162,37 @@ function ConfigureQuizPage() {
     };
   }, []);
 
+  // Loads every "ready" document visible to the team (any manager's uploads)
+  // from the backend, so this manager generates from the same live library
+  // the deployed app does, then narrows to the checked subset.
+  useEffect(() => {
+    let isMounted = true;
+
+    (async () => {
+      try {
+        const documents = await listTeamDocuments();
+        if (!isMounted) return;
+        setTeamDocuments(documents.filter((doc) => doc.status.toLowerCase() === "ready"));
+      } catch (err) {
+        if (isMounted) {
+          setDocumentsError(
+            err instanceof Error ? err.message : "Failed to load your team's documents."
+          );
+        }
+      } finally {
+        if (isMounted) setIsLoadingDocuments(false);
+      }
+    })();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // The documents this quiz will actually generate from — every "ready" team
+  // document except the ones unchecked on the Upload Content page.
+  const selectedDocuments = teamDocuments.filter((doc) => !deselectedDocumentIds.has(doc.id));
+
   // Topic Focus is intentionally excluded here — it's optional. Leaving it
   // blank just means the AI pulls questions from the whole document instead
   // of narrowing in on one topic.
@@ -168,15 +210,12 @@ function ConfigureQuizPage() {
       return;
     }
 
-    const documents = loadUploadedDocuments();
     // Respect the "use for quiz" checkboxes from the Upload page — generate
-    // only from documents the manager left checked.
-    const deselected = loadDeselectedDocumentIds();
-    const selectedDocuments = documents.filter((doc) => !deselected.has(doc.id));
+    // only from the live team documents the manager left checked.
     const documentIds = selectedDocuments.map((doc) => doc.id);
     if (documentIds.length === 0) {
       setError(
-        documents.length === 0
+        teamDocuments.length === 0
           ? "Please upload a document first before generating questions."
           : "Please go back to Upload Content and check at least one document before generating questions."
       );
@@ -455,6 +494,33 @@ function ConfigureQuizPage() {
                   value={form.moduleTitle}
                   onChange={(event) => updateForm("moduleTitle", event.target.value)}
                 />
+              </span>
+            </div>
+
+            <div className="cfg-field">
+              <span className="cfg-field-ic">
+                <ListIcon />
+              </span>
+              <span className="cfg-field-label">Source documents</span>
+              <span className="cfg-field-control">
+                {isLoadingDocuments ? (
+                  <span className="cfg-doc-summary">Loading your team's documents…</span>
+                ) : documentsError ? (
+                  <span className="cfg-doc-summary error">{documentsError}</span>
+                ) : teamDocuments.length === 0 ? (
+                  <span className="cfg-doc-summary">
+                    No documents yet — <Link to="/upload-content">upload one first</Link>.
+                  </span>
+                ) : selectedDocuments.length === 0 ? (
+                  <span className="cfg-doc-summary error">
+                    Nothing checked — <Link to="/upload-content">check a document</Link>.
+                  </span>
+                ) : (
+                  <span className="cfg-doc-summary">
+                    Using {selectedDocuments.map((doc) => doc.title).join(", ")}.{" "}
+                    <Link to="/upload-content">Change selection</Link>
+                  </span>
+                )}
               </span>
             </div>
 
