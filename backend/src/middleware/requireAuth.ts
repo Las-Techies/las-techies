@@ -3,8 +3,6 @@ import { env } from "../config/env";
 import { supabaseAdmin } from "../db/supabaseAdmin";
 import { findOrCreateUserFromSupabase } from "../models/user.model";
 
-const DEFAULT_TEAM_ID = 1;
-
 export async function requireAuth(
   req: Request,
   res: Response,
@@ -37,12 +35,16 @@ export async function requireAuth(
       "Unknown";
     const lastName =
       (supabaseUser.user_metadata?.last_name as string | undefined) ?? "";
-    // Team now rides along in the JWT like role/name do; fall back to the
-    // demo team when a user has no team_id set (GUS import comes later).
+    // Team now rides along in the JWT like role/name do. `null` here means
+    // "this session's metadata doesn't say" rather than "reset to the demo
+    // team" — findOrCreateUserFromSupabase only falls back to the demo team
+    // when creating a brand-new user; for an existing user it leaves their
+    // already-assigned team alone instead of overwriting it. A JWT can end
+    // up without team_id for reasons unrelated to the user's real team
+    // (e.g. a fresh OAuth sign-in/link exchange), so it shouldn't be treated
+    // as authoritative proof they have no team.
     const teamIdRaw = supabaseUser.user_metadata?.team_id;
-    const teamId = Number.isInteger(Number(teamIdRaw))
-      ? Number(teamIdRaw)
-      : DEFAULT_TEAM_ID;
+    const teamId = Number.isInteger(Number(teamIdRaw)) ? Number(teamIdRaw) : null;
 
     const user = await findOrCreateUserFromSupabase({
       supabaseUserId: supabaseUser.id,
