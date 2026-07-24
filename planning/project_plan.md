@@ -199,6 +199,41 @@ Relationship notes:
 | Added low-confidence fallback message + doc suggestions    | Sprint 4 | UX fallback               | Avoids showing weak answers and keeps user moving                |
 
 
+## Spec Reconciliation — Sprint 2 Midpoint
+
+### Sections audited
+- **Data model:** ⚠️ drift — spec still describes a `quiz_attempts` table and `quizzes.approved` / `published_at` fields that don't exist in `prisma/schema.prisma`. The shipped model uses a `QuizAssignment` table instead, and `Quiz` carries `passingScore` / `timeLimitMinutes` / `dueDate`. Four tables built this sprint are undocumented: `DocumentChunk` (pgvector RAG), `ChatConversation`, `ChatMessage`, and `Invite`.
+- **API contracts:** ⚠️ drift — documented `POST /api/auth/sync`, `GET /api/auth/me`, `POST /api/auth/logout`, the `POST /api/quiz-attempts/*` family, `GET /api/teams/:teamId/progress`, `POST /api/teams/import-gus`, and `POST /api/documents/import-confluence` were **not built**. Shipped routes differ: auth is handled entirely in `requireAuth` middleware; imports are `POST /api/documents/import/google-drive`, `.../google-drive-folder`, `.../github-repo`; learner flow is `POST /api/quizzes/:quizId/assignments` + `.../assignments/me/complete`; and there is an invites family (`POST /api/invites`, `GET /api/invites/:token`, `POST /api/invites/:token/accept`) plus `POST /api/library/chat` and conversation routes.
+- **State architecture:** ⚠️ drift — the workflow is mostly `localStorage`-backed (`features/quiz/storage.ts`), not the in-memory owners in the table. Doc selection is tracked as an inverse `deselectedDocumentIds` set rather than `selectedDocumentIds`, and there is added module-progress / quiz-attempt local state not listed in the spec.
+- **AI feature spec (quiz generation):** ✅ accurate — required question fields, the citation contract (`sourceDocumentId` / `sourceDocumentTitle` / `sourceSnippet`), citation validation with retry, and manager-only access all match `quizGenerator.ts` and `utils/prompts.ts`.
+- **AI feature spec (Library chatbot):** ⚠️ drift — spec was underspecified (route "TBD", raw_text context, no retrieval strategy). Actual implementation is a RAG pipeline: documents are chunked and embedded (pgvector, `vector(384)`) and answered via `POST /api/library/chat` with persisted conversations.
+
+### Gaps resolved
+- Updated the AI Feature spec sections above to note the chatbot is RAG-backed and the quiz-generation route/contract remain accurate (no code change needed there).
+- Flagged the `quiz_attempts` → `QuizAssignment` change and the new tables so `data_model.md` and `api_contracts.md` can be brought into line (tracked as Sprint 3 doc work; the divergences below capture current intent in the meantime).
+
+### Intentional divergences (spec updated to reflect these)
+- **`quiz_attempts` replaced by `QuizAssignment`.** We modeled the learner flow as a manager assigning a quiz to a hire who then completes it, rather than a full multi-attempt resource. Simpler and sufficient for MVP.
+- **Confluence import dropped; Google Drive/Doc + GitHub repo import added.** We had working Google + GitHub OAuth, so we built against those sources instead.
+- **No standalone `/api/auth/*` endpoints.** JWT verification and find-or-create happen in `requireAuth` middleware, so dedicated auth routes were unnecessary.
+- **Invites + RAG chatbot + document chunking added.** New capabilities (email invites, pgvector RAG "Ask Sage") built this sprint that weren't in the original scope.
+- **LLM provider auto-switches to OpenRouter in production** (gateway in dev). Recorded below.
+
+### Decisions recorded in Decisions Log
+See the new **Decisions Log** section below. Entries added this sprint: quiz-attempts → assignments, Confluence → Google/GitHub imports, auth-in-middleware, RAG chatbot via pgvector, email-invite onboarding flow, and OpenRouter-in-production. Cut features (quiz-attempts resource, Confluence import, GUS import, `/api/teams/:teamId/progress`, standalone auth endpoints) are marked out of scope for MVP.
+
+## Decisions Log
+
+| Decision | Sprint | What changed | Why |
+| --- | --- | --- | --- |
+| Replaced `quiz_attempts` table with `QuizAssignment` | Sprint 2 | Data model + learner API | A manager-assigns / hire-completes flow was enough for MVP; a full multi-attempt resource added complexity we didn't need yet |
+| Cut Confluence import; added Google Drive/Doc + GitHub repo import | Sprint 2 | Document ingestion | We had working Google/GitHub OAuth and no Confluence access; built against the sources we could actually reach |
+| Handle auth in `requireAuth` middleware instead of `/api/auth/*` endpoints | Sprint 2 | API surface | JWT verify + find-or-create user happens per request in middleware, so standalone auth routes were redundant |
+| Built the Library chatbot as a RAG pipeline (chunking + pgvector) | Sprint 2 | AI architecture | Grounding answers in retrieved chunks beats stuffing full `raw_text`; enables citations and scales past the context window |
+| Added email-invite onboarding flow (`Invite` table + public preview route) | Sprint 2 | Onboarding UX | Managers needed a way to bring new hires onto a team and assign a quiz in one step |
+| Auto-switch LLM provider to OpenRouter in production | Sprint 2 | AI infra | Gateway access is dev-only; OpenRouter keeps generation working in the deployed environment |
+| Cut GUS import and `GET /api/teams/:teamId/progress` for MVP | Sprint 2 | Scope | Team import and the aggregate progress dashboard are Sprint 3+ work; out of MVP scope |
+
 ## Project Management Checklist
 
 - Set up GitHub Issues by user story
