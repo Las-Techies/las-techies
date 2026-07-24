@@ -17,7 +17,7 @@ import {
   isSupportedGithubFile,
   listGithubRepoFiles,
   parseGithubRepoUrl,
-  extractTextFromGoogleDriveUrl,
+  extractTextFromGoogleDriveUrlWithToken,
 } from "../services/documentProcessor";
 import { embedDocument, embedDocumentsWithConcurrency } from "../services/documentEmbedder";
 import { getSignedFileUrl, uploadOriginalFile } from "../services/documentStorage";
@@ -59,7 +59,9 @@ type LinkedImportItem = {
 async function importLinkedGoogleDocs(
   teamId: number,
   uploadedByUserId: number,
-  links: string[]
+  links: string[],
+  masterDocTitle: string,
+  googleAccessToken?: string
 ): Promise<{
   imported: number;
   failed: number;
@@ -69,9 +71,17 @@ async function importLinkedGoogleDocs(
   let imported = 0;
   let failed = 0;
 
-  for (const link of links) {
+  for (const [index, link] of links.entries()) {
     try {
-      const linkedDoc = await extractTextFromGoogleDriveUrl(link);
+      const linkedDoc = await extractTextFromGoogleDriveUrlWithToken(
+        link,
+        googleAccessToken
+      );
+      const fallbackLinkedTitle = `${masterDocTitle} - Linked Document ${index + 1}`;
+      const resolvedLinkedTitle =
+        linkedDoc.title.startsWith("GoogleDoc-")
+          ? fallbackLinkedTitle
+          : linkedDoc.title;
 
       // Best-effort: if the PDF export failed or Storage is unreachable,
       // we still keep the extracted text so the document is usable (just
@@ -83,7 +93,7 @@ async function importLinkedGoogleDocs(
       const linkedDocument = await createDocument({
         teamId,
         uploadedByUserId,
-        title: linkedDoc.title,
+        title: resolvedLinkedTitle,
         sourceType: "google_drive",
         sourceUrl: link,
         rawText: linkedDoc.rawText,
@@ -116,7 +126,7 @@ async function importLinkedGoogleDocs(
       const failedLinkedDocument = await createDocument({
         teamId,
         uploadedByUserId,
-        title: "Linked Google Doc Import",
+        title: `${masterDocTitle} - Linked Document ${index + 1}`,
         sourceType: "google_drive",
         sourceUrl: link,
         rawText: null,
@@ -177,7 +187,8 @@ export async function uploadDocument(
       const linkedImport = await importLinkedGoogleDocs(
         user.teamId,
         user.id,
-        linkedGoogleDocUrls
+        linkedGoogleDocUrls,
+        file.originalname
       );
 
       // Best-effort: the chatbot's retrieval index shouldn't block the
@@ -404,6 +415,7 @@ export async function importGoogleDriveDocument(//import from google drive url
     }
 
     const url = req.body?.url?.trim();
+    const googleAccessToken = req.body?.googleAccessToken?.trim();
     if (!url) {
       return res
         .status(400)
@@ -411,7 +423,10 @@ export async function importGoogleDriveDocument(//import from google drive url
     }
 
     try {
-      const { title, rawText, originalFile } = await extractTextFromGoogleDriveUrl(url);
+      const { title, rawText, originalFile } = await extractTextFromGoogleDriveUrlWithToken(
+        url,
+        googleAccessToken
+      );
       const linkedGoogleDocUrls = extractGoogleDocLinks(rawText, 5);
 
       // Best-effort: if the PDF export failed or Storage is unreachable,
@@ -446,7 +461,9 @@ export async function importGoogleDriveDocument(//import from google drive url
       const linkedImport = await importLinkedGoogleDocs(
         user.teamId,
         user.id,
-        linkedGoogleDocUrls
+        linkedGoogleDocUrls,
+        title,
+        googleAccessToken
       );
 
       return res.status(201).json({

@@ -647,7 +647,7 @@ function LearnerModulePage() {
                       {visibleRecent.map((item) => (
                         <div className="recent-card" key={item.id}>
                           <DocIcon kind="file" />
-                          <div>
+                          <div className="recent-card-text">
                             <strong>{item.title}</strong>
                             <span>{item.addedLabel}</span>
                           </div>
