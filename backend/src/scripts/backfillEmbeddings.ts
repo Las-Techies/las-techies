@@ -3,10 +3,20 @@
 // up in `POST /api/library/chat` search results without needing a re-upload.
 //
 // Usage: `npx tsx src/scripts/backfillEmbeddings.ts`
+//
+// Pass --force to re-chunk/re-embed documents that already have chunks too
+// — needed after a chunking/embedding algorithm change (e.g. the
+// heading-boundary chunking fix) so already-embedded documents pick up the
+// new behavior instead of being skipped as "already embedded". Safe to
+// re-run: embedDocument() replaces a document's existing chunks rather than
+// appending to them.
+// Usage: `npx tsx src/scripts/backfillEmbeddings.ts --force`
 
 import { prisma } from "../db/client";
 import { embedDocument } from "../services/documentEmbedder";
 import { countChunksForDocument } from "../models/documentChunk.model";
+
+const force = process.argv.includes("--force");
 
 async function main() {
   const documents = await prisma.document.findMany({
@@ -14,13 +24,15 @@ async function main() {
     select: { id: true, teamId: true, title: true, rawText: true },
   });
 
-  console.log(`Found ${documents.length} ready document(s).`);
+  console.log(`Found ${documents.length} ready document(s).${force ? " (--force: re-embedding all)" : ""}`);
 
   for (const document of documents) {
-    const existingChunks = await countChunksForDocument(document.id);
-    if (existingChunks > 0) {
-      console.log(`SKIP (already embedded): [${document.id}] ${document.title}`);
-      continue;
+    if (!force) {
+      const existingChunks = await countChunksForDocument(document.id);
+      if (existingChunks > 0) {
+        console.log(`SKIP (already embedded): [${document.id}] ${document.title}`);
+        continue;
+      }
     }
 
     try {

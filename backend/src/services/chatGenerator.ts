@@ -7,8 +7,17 @@ import type { ChatSource } from "../models/chatMessage.model";
 // whether retrieved context is good enough to answer from at all. Tuned to
 // be conservative: a "low" result skips the LLM call entirely rather than
 // risking a confidently-hallucinated answer from weak context.
+//
+// MEDIUM was lowered from 0.4 to 0.35 after measuring real queries against
+// an actually-relevant, heading-isolated chunk (a "Key People" section with
+// named roles): a clearly-on-topic question like "who are the key people on
+// this team?" scored ~0.376 against it — all-MiniLM-L6-v2 tends to score
+// short question-vs-declarative-list pairs lower in absolute magnitude even
+// when genuinely relevant. For comparison, unrelated questions ("what's the
+// weather tomorrow?") scored ~0.01–0.13 against the same document, so 0.35
+// still leaves a wide margin against true negatives.
 const HIGH_SIMILARITY_THRESHOLD = 0.6;
-const MEDIUM_SIMILARITY_THRESHOLD = 0.4;
+const MEDIUM_SIMILARITY_THRESHOLD = 0.35;
 
 export type Confidence = "high" | "medium" | "low";
 
