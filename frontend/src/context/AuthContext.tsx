@@ -8,6 +8,7 @@ import {
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "../lib/supabaseClient";
 import { QUIZ_ATTEMPT_STORAGE_KEY } from "../features/quiz/types";
+import { clearGoogleDriveAccessToken } from "../features/auth/googleDriveToken";
 
 export type UserRole = "new_hire" | "manager";
 
@@ -94,6 +95,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // here doesn't inherit a previous person's results (the Results page keys
     // "have they attempted the quiz?" off this).
     localStorage.removeItem(QUIZ_ATTEMPT_STORAGE_KEY);
+    // Same idea for the snapshotted Google Drive token — it's tied to
+    // whoever was just signed in, and must not carry over to the next
+    // person who signs in on this tab.
+    clearGoogleDriveAccessToken();
   }
 
   // Sends a password-reset email. Supabase redirects the user back here
