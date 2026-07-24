@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import logoBadge from "../assets/sageforce-logo-badge.png";
 import mascot from "../assets/panda-cheer-fullhat.png";
 import { apiFetch } from "../api/client";
+import { findHighlightSpan } from "../features/quiz/citationMatch";
 import { loadQuizAttempt, loadQuizConfig } from "../features/quiz/storage";
 import type { GeneratedQuiz, QuizQuestion } from "../features/quiz/types";
 import {
@@ -66,6 +67,7 @@ function QuizResultsPage() {
   const attempt = useMemo(() => loadQuizAttempt(), []);
   const [passingScore, setPassingScore] = useState(70);
   const [quiz, setQuiz] = useState<GeneratedQuiz | null>(null);
+  const [isLoadingLatestQuiz, setIsLoadingLatestQuiz] = useState(!attempt);
   // Which review row's source document is open in the source modal.
   const [sourceModalRowId, setSourceModalRowId] = useState<number | null>(null);
   const [sourceTextByDocumentId, setSourceTextByDocumentId] = useState<Record<number, string>>({});
@@ -79,12 +81,17 @@ function QuizResultsPage() {
 
   useEffect(() => {
     setPassingScore(loadQuizConfig().passingScore);
-    if (attempt) return;
+    if (attempt) {
+      setIsLoadingLatestQuiz(false);
+      return;
+    }
+    setIsLoadingLatestQuiz(true);
     apiFetch<GeneratedQuiz | null>("/api/quizzes/mine/latest")
       .then((data) => setQuiz(data))
       .catch(() => {
-        /* keep sample content */
-      });
+        setQuiz(null);
+      })
+      .finally(() => setIsLoadingLatestQuiz(false));
   }, [attempt]);
 
   const reviewQuestions: QuizQuestion[] = attempt?.questions ?? quiz?.questionsPayload ?? [];
@@ -109,17 +116,13 @@ function QuizResultsPage() {
             : null,
         };
       })
-    : SAMPLE_ROWS;
+    : [];
 
   const totalQuestions = rows.length;
   const correctCount = rows.filter((row) => row.correct).length;
   const incorrectCount = Math.max(totalQuestions - correctCount, 0);
   const score =
-    attempt && totalQuestions > 0
-      ? Math.round((correctCount / totalQuestions) * 100)
-      : hasRealData
-        ? Math.round((correctCount / totalQuestions) * 100)
-        : 80;
+    totalQuestions > 0 ? Math.round((correctCount / totalQuestions) * 100) : 0;
   const didPass = score >= passingScore;
   const timeTaken =
     attempt?.startedAt && attempt?.submittedAt
@@ -177,10 +180,11 @@ function QuizResultsPage() {
     const normalizedSnippet = snippet?.trim() ?? "";
     if (!normalizedSnippet) return normalizedSource;
 
-    const start = normalizedSource.indexOf(normalizedSnippet);
-    if (start === -1) return normalizedSource;
+    const span = findHighlightSpan(normalizedSource, normalizedSnippet);
+    if (!span) return normalizedSource;
 
-    const end = start + normalizedSnippet.length;
+    const start = span.start;
+    const end = span.end;
     return (
       <>
         {normalizedSource.slice(0, start)}
@@ -304,27 +308,31 @@ function QuizResultsPage() {
               <ListIcon /> Review Your Answers
             </h2>
             <div className="review-scroll">
-              {rows.map((row) => (
-                <div className="review-item" key={row.id}>
-                  <span className={`review-mark ${row.correct ? "ok" : "no"}`}>
-                    {row.correct ? <CheckPlain /> : <XPlain />}
-                  </span>
-                  <span className="review-q">{row.text}</span>
-                  {row.citation ? (
-                    <button
-                      type="button"
-                      className="source-tag source-tag-btn"
-                      title="View source"
-                      aria-label={`View source for ${row.source}`}
-                      onClick={() => openSourceModal(row)}
-                    >
-                      <FileTextIcon aria-hidden /> Source: {row.source}
-                    </button>
-                  ) : (
-                    <span className="source-tag">Source: {row.source}</span>
-                  )}
-                </div>
-              ))}
+              {isLoadingLatestQuiz ? (
+                <p className="cfg-empty">Loading quiz results...</p>
+              ) : rows.length === 0 ? (
+                <p className="cfg-empty">No quiz results found yet.</p>
+              ) : (
+                rows.map((row) => (
+                  <div className="review-item" key={row.id}>
+                    <span className={`review-mark ${row.correct ? "ok" : "no"}`}>
+                      {row.correct ? <CheckPlain /> : <XPlain />}
+                    </span>
+                    <span className="review-q">{row.text}</span>
+                    {row.citation ? (
+                      <button
+                        type="button"
+                        className="source-icon-btn"
+                        title={`View source: ${row.source}`}
+                        aria-label={`View source for ${row.source}`}
+                        onClick={() => openSourceModal(row)}
+                      >
+                        <FileTextIcon aria-hidden />
+                      </button>
+                    ) : null}
+                  </div>
+                ))
+              )}
             </div>
           </section>
         </div>
