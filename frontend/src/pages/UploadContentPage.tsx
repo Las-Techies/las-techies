@@ -589,9 +589,6 @@ function UploadContentPage() {
               <span className="filetype-chip">
                 <span className="tag docx">W</span> DOCX
               </span>
-              <span className="filetype-chip">
-                <span className="tag pptx">P</span> PPTX
-              </span>
             </div>
             <span className="dropzone-secure">
               <ShieldIcon /> Secure upload. Your data is encrypted and protected.
@@ -673,9 +670,7 @@ function UploadContentPage() {
                     onClick={() =>
                       isSelectable && toggleDocumentSelected(upload.documentId as number)
                     }
-                  >
-                    <CheckPlain />
-                  </button>
+                  />
                   <span className={`file-ic tag ${badge.cls}`}>{badge.label}</span>
                   <span className="file-info">
                     <span className="file-name" title={upload.name}>
