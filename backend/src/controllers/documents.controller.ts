@@ -72,6 +72,14 @@ async function importLinkedGoogleDocs(
   for (const link of links) {
     try {
       const linkedDoc = await extractTextFromGoogleDriveUrl(link);
+
+      // Best-effort: if the PDF export failed or Storage is unreachable,
+      // we still keep the extracted text so the document is usable (just
+      // falls back to the text-only viewer instead of showing the real doc).
+      const stored = linkedDoc.originalFile
+        ? await uploadOriginalFile(teamId, linkedDoc.originalFile)
+        : null;
+
       const linkedDocument = await createDocument({
         teamId,
         uploadedByUserId,
@@ -80,6 +88,8 @@ async function importLinkedGoogleDocs(
         sourceUrl: link,
         rawText: linkedDoc.rawText,
         status: "ready",
+        storagePath: stored?.storagePath ?? null,
+        mimeType: stored?.mimeType ?? null,
       });
 
       // Best-effort: the chatbot's retrieval index shouldn't block the
@@ -401,8 +411,13 @@ export async function importGoogleDriveDocument(//import from google drive url
     }
 
     try {
-      const { title, rawText } = await extractTextFromGoogleDriveUrl(url);
+      const { title, rawText, originalFile } = await extractTextFromGoogleDriveUrl(url);
       const linkedGoogleDocUrls = extractGoogleDocLinks(rawText, 5);
+
+      // Best-effort: if the PDF export failed or Storage is unreachable,
+      // we still keep the extracted text so the document is usable (just
+      // falls back to the text-only viewer instead of showing the real doc).
+      const stored = originalFile ? await uploadOriginalFile(user.teamId, originalFile) : null;
 
       const document = await createDocument({
         teamId: user.teamId,
@@ -412,6 +427,8 @@ export async function importGoogleDriveDocument(//import from google drive url
         sourceUrl: url,
         rawText,
         status: "ready",
+        storagePath: stored?.storagePath ?? null,
+        mimeType: stored?.mimeType ?? null,
       });
 
       // Best-effort: the chatbot's retrieval index shouldn't block the
@@ -544,6 +561,14 @@ export async function importGoogleDriveFolder(//import from google drive folder 
     for (const file of supportedFiles) {
       try {
         const extracted = await extractTextFromGoogleDriveFile(file, googleAccessToken);
+
+        // Best-effort: if the export/download failed or Storage is
+        // unreachable, we still keep the extracted text so the document is
+        // usable (just falls back to the text-only viewer).
+        const stored = extracted.originalFile
+          ? await uploadOriginalFile(user.teamId, extracted.originalFile)
+          : null;
+
         const document = await createDocument({
           teamId: user.teamId,
           uploadedByUserId: user.id,
@@ -552,6 +577,8 @@ export async function importGoogleDriveFolder(//import from google drive folder 
           sourceUrl: extracted.sourceUrl,
           rawText: extracted.rawText,
           status: "ready",
+          storagePath: stored?.storagePath ?? null,
+          mimeType: stored?.mimeType ?? null,
         });
         imported += 1;
         items.push({
