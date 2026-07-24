@@ -466,7 +466,11 @@ export async function completeAssignment(req: Request, res: Response, next: Next
     }
 
     const score = typeof req.body?.score === "number" ? req.body.score : undefined;
-    const result = await markAssignmentComplete(quizId, user.id, score);
+    const timeTakenSeconds =
+      typeof req.body?.timeTakenSeconds === "number" && req.body.timeTakenSeconds >= 0
+        ? Math.round(req.body.timeTakenSeconds)
+        : undefined;
+    const result = await markAssignmentComplete(quizId, user.id, score, timeTakenSeconds);
     res.json({ updated: result.count > 0 });
   } catch (err) {
     next(err);

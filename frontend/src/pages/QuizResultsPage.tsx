@@ -32,6 +32,12 @@ type ReviewRow = {
   citation: Citation | null;
 };
 
+function formatDuration(totalSeconds: number): string {
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}m ${seconds.toString().padStart(2, "0")}s`;
+}
+
 // Sample content so the page is always demoable when opened without a real
 // submitted attempt. Mirrors the v3 wireframe.
 const SAMPLE_ROWS: ReviewRow[] = [
@@ -115,7 +121,19 @@ function QuizResultsPage() {
         ? Math.round((correctCount / totalQuestions) * 100)
         : 80;
   const didPass = score >= passingScore;
-  const timeTaken = attempt ? "—" : "12m 34s";
+  const timeTaken =
+    attempt?.startedAt && attempt?.submittedAt
+      ? formatDuration(
+          Math.max(
+            0,
+            Math.round(
+              (new Date(attempt.submittedAt).getTime() - new Date(attempt.startedAt).getTime()) / 1000
+            )
+          )
+        )
+      : attempt
+        ? "—" // older attempt saved before time tracking existed — nothing to compute
+        : "12m 34s"; // sample/demo state, no real attempt at all
 
   const activeSourceRow =
     sourceModalRowId != null ? rows.find((row) => row.id === sourceModalRowId) ?? null : null;
