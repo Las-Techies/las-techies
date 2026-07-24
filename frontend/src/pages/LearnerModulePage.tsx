@@ -18,8 +18,8 @@ import { saveModuleProgress } from "../features/quiz/storage";
 import type { GeneratedQuiz } from "../features/quiz/types";
 import { type SourceKind } from "../features/learner/data";
 
-type Filter = "All" | "Files" | "Confluence" | "Repos";
-const FILTERS: Filter[] = ["All", "Files", "Confluence", "Repos"];
+type Filter = "All" | "Files" | "Google Drive" | "GitHub";
+const FILTERS: Filter[] = ["All", "Files", "Google Drive", "GitHub"];
 
 // A document as rendered in the library. Backed by a real uploaded document;
 // `remoteId` lets "View source" fetch its original file (or extracted text,
@@ -104,7 +104,7 @@ const GREETING: ChatMessage = {
 };
 
 function DocIcon({ kind }: { kind: SourceKind }) {
-  if (kind === "confluence") {
+  if (kind === "google_drive") {
     return (
       <svg className="doc-icon confluence" viewBox="0 0 24 24" width="22" height="22" aria-hidden>
         <path
@@ -114,7 +114,7 @@ function DocIcon({ kind }: { kind: SourceKind }) {
       </svg>
     );
   }
-  if (kind === "repo") {
+  if (kind === "github") {
     return (
       <svg className="doc-icon repo" viewBox="0 0 24 24" width="22" height="22" aria-hidden>
         <path
@@ -299,7 +299,12 @@ function LearnerModulePage() {
             id: `doc-${doc.id}`,
             remoteId: doc.id,
             title: doc.title,
-            kind: "file",
+            kind:
+              doc.sourceType === "google_drive"
+                ? "google_drive"
+                : doc.sourceType === "github"
+                  ? "github"
+                  : "file",
             typeLabel: fileTypeLabel(doc.title),
             addedLabel: relativeAddedLabel(doc.createdAt),
             attribution: doc.isMine ? null : doc.uploadedByName,
@@ -404,14 +409,14 @@ function LearnerModulePage() {
 
   const filterToKind: Record<Exclude<Filter, "All">, SourceKind> = {
     Files: "file",
-    Confluence: "confluence",
-    Repos: "repo",
+    "Google Drive": "google_drive",
+    GitHub: "github",
   };
 
   const sections: { label: string; kind: SourceKind }[] = [
     { label: "Files", kind: "file" },
-    { label: "Confluence", kind: "confluence" },
-    { label: "Repos", kind: "repo" },
+    { label: "Google Drive", kind: "google_drive" },
+    { label: "GitHub", kind: "github" },
   ];
 
   const visibleSections =
@@ -423,6 +428,7 @@ function LearnerModulePage() {
 
   const recentAll = docs.map((doc) => ({
     id: doc.id,
+    kind: doc.kind,
     title: doc.title,
     addedLabel: doc.addedLabel,
   }));
@@ -646,7 +652,7 @@ function LearnerModulePage() {
                     <div className="recent-row">
                       {visibleRecent.map((item) => (
                         <div className="recent-card" key={item.id}>
-                          <DocIcon kind="file" />
+                          <DocIcon kind={item.kind} />
                           <div className="recent-card-text">
                             <strong>{item.title}</strong>
                             <span>{item.addedLabel}</span>
