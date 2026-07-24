@@ -216,7 +216,14 @@ function UploadContentPage() {
     try {
       setError("");
       setIsConnectingGithub(true);
-      const { error: oauthError } = await supabase.auth.signInWithOAuth({
+      // linkIdentity (not signInWithOAuth) — this user is already signed in
+      // via Google, and we're attaching GitHub as a second identity on that
+      // same account. signInWithOAuth would instead run a brand-new sign-in
+      // exchange and hand back a freshly minted session/JWT that isn't
+      // guaranteed to carry this account's custom user_metadata (like
+      // team_id), which previously reset managers back to the default demo
+      // team the moment they connected GitHub.
+      const { error: oauthError } = await supabase.auth.linkIdentity({
         provider: "github",
         options: {
           redirectTo: window.location.origin,
