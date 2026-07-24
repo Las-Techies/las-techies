@@ -2,7 +2,7 @@
 // comes from the backend; only these placeholder labels remain as fallbacks for
 // fields the backend does not yet provide (assigned-by, team, etc.).
 
-export type SourceKind = "file" | "confluence" | "repo";
+export type SourceKind = "file" | "google_drive" | "github";
 
 export const learnerModule = {
   title: "OSHA Basics 2026",

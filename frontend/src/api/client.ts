@@ -184,6 +184,7 @@ export function deleteChatConversation(conversationId: number): Promise<void> {
 export type TeamDocument = {
   id: number;
   title: string;
+  sourceType: "upload" | "google_drive" | "github" | string;
   status: string;
   createdAt: string;
   uploadedByUserId: number;

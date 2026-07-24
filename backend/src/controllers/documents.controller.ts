@@ -390,6 +390,7 @@ export async function getTeamDocuments(
         return {
           id: doc.id,
           title: doc.title,
+          sourceType: doc.sourceType,
           status: doc.status,
           createdAt: doc.createdAt,
           uploadedByUserId: doc.uploadedByUserId,

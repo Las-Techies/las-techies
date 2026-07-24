@@ -57,6 +57,7 @@ export function findDocumentsForTeam(teamId: number) {
     select: {
       id: true,
       title: true,
+      sourceType: true,
       status: true,
       createdAt: true,
       uploadedByUserId: true,
