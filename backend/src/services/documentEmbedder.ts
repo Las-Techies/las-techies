@@ -54,3 +54,37 @@ export async function embedDocument(document: {
 
   return { chunkCount: chunks.length };
 }
+
+// Caps how many documents embed at once during a bulk import (a Google
+// Drive folder or GitHub repo import can create up to 100 documents in one
+// request). Each embedDocument call runs the shared, in-process embedding
+// model and ends in a DB transaction against Supabase's pgbouncer pooler —
+// firing all of them at once would compete with every other request the
+// server is handling and risks exhausting the connection pool. A small
+// worker-pool keeps a few in flight at a time instead of either serializing
+// everything or firing it all unbounded.
+const BULK_EMBED_CONCURRENCY = 3;
+
+// Best-effort like embedDocument itself: one document's embedding failure
+// is logged and skipped, never thrown, so it can't take down the rest of
+// the batch or the caller.
+export async function embedDocumentsWithConcurrency(
+  documents: Array<{ id: number; teamId: number; title: string; rawText: string }>
+): Promise<void> {
+  let nextIndex = 0;
+
+  async function worker() {
+    while (nextIndex < documents.length) {
+      const document = documents[nextIndex++];
+      if (!document) continue;
+      try {
+        await embedDocument(document);
+      } catch (error) {
+        console.error(`Failed to embed document ${document.id} for chat retrieval:`, error);
+      }
+    }
+  }
+
+  const workerCount = Math.min(BULK_EMBED_CONCURRENCY, documents.length);
+  await Promise.all(Array.from({ length: workerCount }, worker));
+}

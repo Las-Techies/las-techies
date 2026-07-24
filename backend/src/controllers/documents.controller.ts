@@ -19,7 +19,7 @@ import {
   parseGithubRepoUrl,
   extractTextFromGoogleDriveUrl,
 } from "../services/documentProcessor";
-import { embedDocument } from "../services/documentEmbedder";
+import { embedDocument, embedDocumentsWithConcurrency } from "../services/documentEmbedder";
 import { getSignedFileUrl, uploadOriginalFile } from "../services/documentStorage";
 import { findQuizzesReferencingDocument } from "../models/quiz.model";
 
@@ -80,6 +80,18 @@ async function importLinkedGoogleDocs(
         sourceUrl: link,
         rawText: linkedDoc.rawText,
         status: "ready",
+      });
+
+      // Best-effort: the chatbot's retrieval index shouldn't block the
+      // import response, and a document is still useful for quiz
+      // generation even if embedding fails (e.g. model download hiccup).
+      embedDocument({
+        id: linkedDocument.id,
+        teamId,
+        title: linkedDocument.title,
+        rawText: linkedDoc.rawText,
+      }).catch((error) => {
+        console.error(`Failed to embed document ${linkedDocument.id} for chat retrieval:`, error);
       });
 
       imported += 1;
@@ -402,6 +414,18 @@ export async function importGoogleDriveDocument(//import from google drive url
         status: "ready",
       });
 
+      // Best-effort: the chatbot's retrieval index shouldn't block the
+      // import response, and a document is still useful for quiz
+      // generation even if embedding fails (e.g. model download hiccup).
+      embedDocument({
+        id: document.id,
+        teamId: document.teamId,
+        title: document.title,
+        rawText,
+      }).catch((error) => {
+        console.error(`Failed to embed document ${document.id} for chat retrieval:`, error);
+      });
+
       const linkedImport = await importLinkedGoogleDocs(
         user.teamId,
         user.id,
@@ -510,6 +534,12 @@ export async function importGoogleDriveFolder(//import from google drive folder 
 
     let imported = 0;
     let failed = 0;
+    const documentsToEmbed: Array<{
+      id: number;
+      teamId: number;
+      title: string;
+      rawText: string;
+    }> = [];
 
     for (const file of supportedFiles) {
       try {
@@ -530,6 +560,12 @@ export async function importGoogleDriveFolder(//import from google drive folder 
           status: "ready",
           createdAt: document.createdAt,
           sourceUrl: extracted.sourceUrl,
+        });
+        documentsToEmbed.push({
+          id: document.id,
+          teamId: document.teamId,
+          title: document.title,
+          rawText: extracted.rawText,
         });
       } catch (error) {
         const sourceUrl = file.webViewLink ?? `https://drive.google.com/file/d/${file.id}/view`;
@@ -553,6 +589,15 @@ export async function importGoogleDriveFolder(//import from google drive folder 
         });
       }
     }
+
+    // Best-effort and not awaited: the chatbot's retrieval index shouldn't
+    // block the import response, and documents are still usable for quiz
+    // generation even if embedding fails. Runs with a small concurrency cap
+    // (see embedDocumentsWithConcurrency) instead of firing all of them at
+    // once, since a folder import can produce up to 100 documents.
+    embedDocumentsWithConcurrency(documentsToEmbed).catch((error) => {
+      console.error("Failed to embed one or more imported Google Drive documents:", error);
+    });
 
     return res.status(200).json({
       data: {
@@ -612,6 +657,12 @@ export async function importGithubRepo(
 
     let imported = 0;
     let failed = 0;
+    const documentsToEmbed: Array<{
+      id: number;
+      teamId: number;
+      title: string;
+      rawText: string;
+    }> = [];
 
     for (const file of supportedFiles) {
       try {
@@ -640,6 +691,12 @@ export async function importGithubRepo(
           createdAt: document.createdAt,
           sourceUrl: extracted.sourceUrl,
         });
+        documentsToEmbed.push({
+          id: document.id,
+          teamId: document.teamId,
+          title: document.title,
+          rawText: extracted.rawText,
+        });
       } catch (error) {
         const sourceUrl = `https://github.com/${owner}/${repo}/blob/${branch}/${file.path}`;
         const failedDocument = await createDocument({
@@ -662,6 +719,15 @@ export async function importGithubRepo(
         });
       }
     }
+
+    // Best-effort and not awaited: the chatbot's retrieval index shouldn't
+    // block the import response, and documents are still usable for quiz
+    // generation even if embedding fails. Runs with a small concurrency cap
+    // (see embedDocumentsWithConcurrency) instead of firing all of them at
+    // once, since a repo import can produce up to 100 documents.
+    embedDocumentsWithConcurrency(documentsToEmbed).catch((error) => {
+      console.error("Failed to embed one or more imported GitHub documents:", error);
+    });
 
     return res.status(200).json({
       data: {
