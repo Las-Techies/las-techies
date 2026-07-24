@@ -889,6 +889,12 @@ label {
   font-size: 15px;
 }
 
+.module-subtitle {
+  margin: 4px 0 0;
+  color: #706e6b;
+  font-size: 15px;
+}
+
 .step-tabs {
   margin-top: 14px;
   display: flex;
