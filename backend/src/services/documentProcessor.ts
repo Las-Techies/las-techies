@@ -96,6 +96,40 @@ export async function extractTextFromGoogleDriveUrl(url: string): Promise<{
   rawText: string;
   originalFile?: OriginalFile | undefined;
 }> {
+  return extractTextFromGoogleDriveUrlWithToken(url);
+}
+
+async function extractGoogleDocTitleFromMetadata(
+  docId: string,
+  googleAccessToken?: string
+): Promise<string | null> {
+  const token = googleAccessToken?.trim();
+  if (!token) return null;
+
+  const response = await fetch(
+    `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(docId)}?fields=name`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }
+  );
+  if (!response.ok) {
+    return null;
+  }
+  const payload = (await response.json()) as { name?: string };
+  const name = payload.name?.trim();
+  return name || null;
+}
+
+export async function extractTextFromGoogleDriveUrlWithToken(
+  url: string,
+  googleAccessToken?: string
+): Promise<{
+  title: string;
+  rawText: string;
+  originalFile?: OriginalFile | undefined;
+}> {
   let parsedUrl: URL;
   try {
     parsedUrl = new URL(url);
@@ -112,8 +146,16 @@ export async function extractTextFromGoogleDriveUrl(url: string): Promise<{
     throw new Error("Invalid Google Docs URL.");
   }
 
+  const token = googleAccessToken?.trim();
+  const resolvedTitle = await extractGoogleDocTitleFromMetadata(docId, token);
   const exportUrl = `https://docs.google.com/document/d/${docId}/export?format=txt`;
-  const response = await fetch(exportUrl);
+  const response = token
+    ? await fetch(exportUrl, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+    : await fetch(exportUrl);
 
   if (!response.ok) {
     throw new Error(
@@ -126,7 +168,7 @@ export async function extractTextFromGoogleDriveUrl(url: string): Promise<{
     throw new Error("No readable text found in Google Doc.");
   }
 
-  const title = `GoogleDoc-${docId}`;
+  const title = resolvedTitle ?? `GoogleDoc-${docId}`;
   const originalFile = await tryExportGoogleDocAsPdf(docId, `${title}.pdf`);
 
   return {
