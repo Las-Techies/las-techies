@@ -4090,10 +4090,6 @@ label {
   background: #2f6fb3;
 }
 
-.tag.pptx {
-  background: #e08a2f;
-}
-
 .dropzone-secure {
   display: inline-flex;
   align-items: center;
@@ -4314,30 +4310,21 @@ label {
   flex: none;
   width: 22px;
   height: 22px;
-  display: grid;
-  place-items: center;
   border-radius: 999px;
   border: 2px solid rgba(11, 42, 84, 0.25);
   background: #fff;
-  color: transparent;
   cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  transition: background 0.15s ease, border-color 0.15s ease;
 }
 
 .file-check.selected {
   border-color: var(--sf-blue);
   background: var(--sf-blue);
-  color: #fff;
 }
 
 .file-check:disabled {
   opacity: 0.4;
   cursor: default;
-}
-
-.file-check svg {
-  width: 13px;
-  height: 13px;
 }
 
 .file-info {
