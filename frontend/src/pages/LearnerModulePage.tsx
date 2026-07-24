@@ -6,6 +6,7 @@ import {
   deleteChatConversation,
   getChatConversation,
   getDocumentFileUrl,
+  getMyTeam,
   listChatConversations,
   listTeamDocuments,
   sendChatMessage,
@@ -258,6 +259,7 @@ function LearnerModulePage() {
   const [isTyping, setIsTyping] = useState(false);
   const messagesRef = useRef<HTMLDivElement>(null);
   const [moduleTitle, setModuleTitle] = useState("");
+  const [teamName, setTeamName] = useState("");
   const [recentVisible, setRecentVisible] = useState(5);
   const [docs, setDocs] = useState<DisplayDoc[]>([]);
   const [loading, setLoading] = useState(true);
@@ -330,6 +332,17 @@ function LearnerModulePage() {
       })
       .catch(() => {
         /* keep default title */
+      });
+
+    // Header shows the team's name rather than the quiz title, so a manager
+    // previewing this page and a new hire completing it both see "their"
+    // module framed around the team, not whichever quiz happens to load.
+    getMyTeam()
+      .then((team) => {
+        if (!cancelled) setTeamName(team.name);
+      })
+      .catch(() => {
+        /* fall back to the generic "Onboarding module" heading */
       });
     return () => {
       cancelled = true;
@@ -578,10 +591,13 @@ function LearnerModulePage() {
     <div className="app-shell">
       <AppNav />
       <main className="page-wrap">
-        {loading && !moduleTitle ? (
+        {loading && !teamName ? (
           <div className="title-loading loading-line" style={{ maxWidth: 320 }} />
         ) : (
-          <h1>{moduleTitle || "Onboarding module"}</h1>
+          <>
+            <h1>{teamName || "Onboarding module"}</h1>
+            {moduleTitle ? <p className="module-subtitle">{moduleTitle}</p> : null}
+          </>
         )}
 
         {!loading && docs.length > 0 ? (

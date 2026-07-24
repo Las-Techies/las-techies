@@ -275,3 +275,15 @@ export function completeQuizAssignment(
     body: JSON.stringify(typeof score === "number" ? { score } : {}),
   });
 }
+
+export type MyTeam = {
+  id: number;
+  name: string;
+};
+
+// The caller's own team (id + name) — available to any signed-in role, so
+// UI like the learner module header can show the team's real name.
+export async function getMyTeam(): Promise<MyTeam> {
+  const res = await apiFetch<{ data: MyTeam }>("/api/teams/mine");
+  return res.data;
+}

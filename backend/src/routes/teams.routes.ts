@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { createTeamHandler } from "../controllers/teams.controller";
+import { createTeamHandler, getMyTeamHandler } from "../controllers/teams.controller";
 
 // requireAuth is applied globally in app.ts. Any signed-in user may create a
 // team (which makes them its manager); there's no pre-existing manager role to
@@ -7,5 +7,6 @@ import { createTeamHandler } from "../controllers/teams.controller";
 const router = Router();
 
 router.post("/", createTeamHandler);
+router.get("/mine", getMyTeamHandler);
 
 export default router;
