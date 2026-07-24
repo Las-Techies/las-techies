@@ -67,9 +67,34 @@ function getGoogleDocIdFromUrl(url: URL): string | null {
   return match?.[1] ?? null;
 }
 
+export type OriginalFile = {
+  buffer: Buffer;
+  mimetype: string;
+  originalname: string;
+};
+
+// Best-effort export of a Google Doc as a PDF, purely so the viewer can show
+// the real formatted document instead of always falling back to plain
+// extracted text. This is separate from (and never blocks) the text export
+// above — a failure here just means the document won't have a stored
+// original file, the same degraded-but-usable state a direct upload gets
+// into if Supabase Storage is unreachable.
+async function tryExportGoogleDocAsPdf(docId: string, originalname: string): Promise<OriginalFile | undefined> {
+  try {
+    const response = await fetch(`https://docs.google.com/document/d/${docId}/export?format=pdf`);
+    if (!response.ok) return undefined;
+    const buffer = Buffer.from(await response.arrayBuffer());
+    if (buffer.length === 0) return undefined;
+    return { buffer, mimetype: "application/pdf", originalname };
+  } catch {
+    return undefined;
+  }
+}
+
 export async function extractTextFromGoogleDriveUrl(url: string): Promise<{
   title: string;
   rawText: string;
+  originalFile?: OriginalFile | undefined;
 }> {
   let parsedUrl: URL;
   try {
@@ -101,9 +126,13 @@ export async function extractTextFromGoogleDriveUrl(url: string): Promise<{
     throw new Error("No readable text found in Google Doc.");
   }
 
+  const title = `GoogleDoc-${docId}`;
+  const originalFile = await tryExportGoogleDocAsPdf(docId, `${title}.pdf`);
+
   return {
-    title: `GoogleDoc-${docId}`,
+    title,
     rawText,
+    originalFile,
   };
 }
 
@@ -204,8 +233,9 @@ export async function listGoogleDriveFolderFiles(
 export async function extractTextFromGoogleDriveFile(
   file: GoogleDriveFile,
   googleAccessToken: string
-): Promise<{ title: string; rawText: string; sourceUrl: string }> {
+): Promise<{ title: string; rawText: string; sourceUrl: string; originalFile?: OriginalFile | undefined }> {
   let rawText = "";
+  let originalFile: OriginalFile | undefined;
 
   if (file.mimeType === "application/vnd.google-apps.document") {
     const params = new URLSearchParams({ mimeType: "text/plain" });
@@ -214,17 +244,39 @@ export async function extractTextFromGoogleDriveFile(
       googleAccessToken
     );
     rawText = (await response.text()).trim();
+
+    // Best-effort: also export a real PDF so the viewer can show the
+    // formatted document instead of falling back to plain extracted text.
+    // A failure here doesn't affect the text extraction above.
+    try {
+      const pdfParams = new URLSearchParams({ mimeType: "application/pdf" });
+      const pdfResponse = await googleDriveRequest(
+        `files/${file.id}/export?${pdfParams.toString()}`,
+        googleAccessToken
+      );
+      const buffer = Buffer.from(await pdfResponse.arrayBuffer());
+      if (buffer.length > 0) {
+        originalFile = { buffer, mimetype: "application/pdf", originalname: `${file.name}.pdf` };
+      }
+    } catch {
+      // Non-fatal — text extraction above already succeeded.
+    }
   } else {
     const response = await googleDriveRequest(
       `files/${file.id}?alt=media&supportsAllDrives=true`,
       googleAccessToken
     );
     const bytes = await response.arrayBuffer();
+    const buffer = Buffer.from(bytes);
     rawText = await extractTextFromDocument({
-      buffer: Buffer.from(bytes),
+      buffer,
       mimetype: file.mimeType,
       originalname: file.name,
     });
+    // This file (PDF/DOCX/etc.) already exists as a real file in Drive —
+    // the bytes we just downloaded to extract text from ARE the original,
+    // so no extra export call is needed to get a storable copy.
+    originalFile = { buffer, mimetype: file.mimeType, originalname: file.name };
   }
 
   if (!rawText) {
@@ -235,6 +287,7 @@ export async function extractTextFromGoogleDriveFile(
     title: file.name,
     rawText,
     sourceUrl: file.webViewLink ?? `https://drive.google.com/file/d/${file.id}/view`,
+    originalFile,
   };
 }
 
