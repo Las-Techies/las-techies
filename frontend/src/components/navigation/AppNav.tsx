@@ -33,6 +33,7 @@ function AppNav() {
   const navigate = useNavigate();
   const isWorkflowRoute = QUIZ_WORKFLOW_ROUTES.some((route) => route === location.pathname);
   const { user, signOut } = useAuth();
+  const email = user?.email ?? null;
   const firstName =
     (user?.user_metadata?.first_name as string | undefined) ?? "there";
   const effectiveRole =
@@ -108,6 +109,17 @@ function AppNav() {
 
         {isMenuOpen ? (
           <div className="app-nav-user-menu" role="menu">
+            {email ? (
+              <>
+                {/* Non-interactive: just identifies which account is signed
+                    in, truncated with a title tooltip if it's too long to
+                    fit on one line. */}
+                <div className="app-nav-user-menu-email" title={email}>
+                  {email}
+                </div>
+                <div className="app-nav-user-menu-divider" role="separator" />
+              </>
+            ) : null}
             <button type="button" role="menuitem" onClick={handleLogout}>
               Log out
             </button>
