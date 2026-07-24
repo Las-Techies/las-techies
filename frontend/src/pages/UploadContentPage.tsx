@@ -11,6 +11,10 @@ import {
   saveUploadedDocuments,
 } from "../features/quiz/storage";
 import {
+  loadGoogleDriveAccessToken,
+  saveGoogleDriveAccessToken,
+} from "../features/auth/googleDriveToken";
+import {
   ArrowRight,
   CheckPlain,
   CloudUploadIcon,
@@ -174,6 +178,16 @@ function UploadContentPage() {
       (identity) => identity.provider === "github"
     );
     setIsGithubConnected(hasGithubIdentity);
+
+    // Snapshot the Google Drive token now, while we can still be sure the
+    // session's provider_token is actually Google's — linking GitHub later
+    // in this session will overwrite it. If GitHub is already linked, the
+    // live token isn't trustworthy anymore, so don't stash it (that would
+    // just overwrite an earlier-captured, still-good Google token with a
+    // GitHub one).
+    if (!hasGithubIdentity && data.session?.provider_token) {
+      saveGoogleDriveAccessToken(data.session.provider_token);
+    }
   };
 
   useEffect(() => {
@@ -352,8 +366,14 @@ function UploadContentPage() {
     setIsImportingLink(true);
 
     try {
+      // Prefer the token snapshotted right after Google sign-in over the
+      // live session's provider_token — if GitHub has been connected since
+      // then, the live one is a GitHub token now, not Google's (Supabase
+      // only keeps one provider_token slot). Falls back to the live session
+      // for anyone who hasn't connected GitHub yet, so nothing changes for
+      // the common case.
       const { data } = await supabase.auth.getSession();
-      const googleAccessToken = data.session?.provider_token;
+      const googleAccessToken = loadGoogleDriveAccessToken() ?? data.session?.provider_token;
       if (!googleAccessToken) {
         throw new Error(
           "Missing Google provider token. Please sign out and sign in with Google again."
