@@ -30,6 +30,10 @@ function QuizTakingPage() {
   const [secondsLeft, setSecondsLeft] = useState(0);
   // Guards against the auto-submit-on-timeout effect firing more than once.
   const hasSubmittedRef = useRef(false);
+  // Set once the quiz's real questions are actually on screen (not on mount —
+  // that would also count the loading spinner toward the learner's time).
+  // Used to compute a real "time taken" instead of a hardcoded placeholder.
+  const startedAtRef = useRef<number | null>(null);
 
   // Loads the specific quiz this page was opened for (from the new hire's
   // assigned-quiz list); falls back to "my latest quiz" only when no quizId
@@ -43,6 +47,7 @@ function QuizTakingPage() {
     quizRequest
       .then((quiz) => {
         if (cancelled || !quiz || quiz.questionsPayload.length === 0) return;
+        startedAtRef.current = Date.now();
         setQuestions(quiz.questionsPayload);
         setQuizId(quiz.id);
         setTitle(quiz.title);
@@ -69,19 +74,33 @@ function QuizTakingPage() {
   const submitQuiz = () => {
     if (hasSubmittedRef.current) return;
     hasSubmittedRef.current = true;
+
+    const submittedAt = Date.now();
+    const startedAt = startedAtRef.current ?? submittedAt;
+    const timeTakenSeconds = Math.max(0, Math.round((submittedAt - startedAt) / 1000));
+
+    const correctCount = questions.reduce((count, q) => {
+      const correctOption = q.options.find((option) => option.isCorrect);
+      return correctOption && answers[q.id] === correctOption.id ? count + 1 : count;
+    }, 0);
+    const score = questions.length > 0 ? Math.round((correctCount / questions.length) * 100) : 0;
+
     saveQuizAttempt({
       quizId,
       title,
-      submittedAt: new Date().toISOString(),
+      startedAt: new Date(startedAt).toISOString(),
+      submittedAt: new Date(submittedAt).toISOString(),
       questions,
       answers,
     });
 
-    // Best-effort: marks this new hire's assignment complete so it drops off
-    // their "to do" list. Never blocks navigating to results — a failure here
-    // shouldn't stop the learner from seeing how they did.
+    // Best-effort: marks this new hire's assignment complete (and records
+    // their score/time) so it drops off their "to do" list and a manager can
+    // see real results instead of a blank/null row. Never blocks navigating
+    // to results — a failure here shouldn't stop the learner from seeing how
+    // they did.
     if (quizId) {
-      void completeQuizAssignment(quizId).catch(() => {
+      void completeQuizAssignment(quizId, score, timeTakenSeconds).catch(() => {
         /* non-fatal */
       });
     }

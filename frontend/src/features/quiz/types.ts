@@ -60,12 +60,15 @@ export type QuizCitation = {
 
 
 
-// A new hire's submitted attempt. Persisted client-side because the backend
-// has no attempt/scoring endpoint — we snapshot the exact questions answered
-// plus the chosen option per question so the results page can score locally.
+// A new hire's submitted attempt. Persisted client-side so the results page
+// can re-render the exact questions/answers/timing after navigating away
+// from the quiz — the score and time taken themselves are also sent to the
+// backend (see completeQuizAssignment) so a manager's view of assignment
+// status isn't limited to what's still sitting in this browser's storage.
 export type QuizAttempt = {
   quizId: number | null;
   title: string;
+  startedAt: string;
   submittedAt: string;
   questions: QuizQuestion[];
   answers: Record<number, number>;

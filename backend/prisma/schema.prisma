@@ -135,6 +135,7 @@ model QuizAssignment {
   assignedByUserId Int
   status           String    @default("pending") // pending | completed
   score            Int?
+  timeTakenSeconds Int?
   completedAt      DateTime?
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt

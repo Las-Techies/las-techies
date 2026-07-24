@@ -139,13 +139,19 @@ export async function findAssignedQuizzesForUser(userId: number) {
 
 // Scoped to the caller's own assignment row so a new hire can only mark
 // their own progress complete, never someone else's.
-export function markAssignmentComplete(quizId: number, userId: number, score?: number) {
+export function markAssignmentComplete(
+  quizId: number,
+  userId: number,
+  score?: number,
+  timeTakenSeconds?: number
+) {
   return prisma.quizAssignment.updateMany({
     where: { quizId, assignedToUserId: userId },
     data: {
       status: "completed",
       completedAt: new Date(),
       ...(typeof score === "number" ? { score } : {}),
+      ...(typeof timeTakenSeconds === "number" ? { timeTakenSeconds } : {}),
     },
   });
 }

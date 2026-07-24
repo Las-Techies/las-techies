@@ -33,6 +33,22 @@ type ReviewRow = {
   citation: Citation | null;
 };
 
+function formatDuration(totalSeconds: number): string {
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}m ${seconds.toString().padStart(2, "0")}s`;
+}
+
+// Sample content so the page is always demoable when opened without a real
+// submitted attempt. Mirrors the v3 wireframe.
+const SAMPLE_ROWS: ReviewRow[] = [
+  { id: 1, text: "What is Salesforce Customer 360?", correct: true, source: "Trailhead", citation: null },
+  { id: 2, text: "Which cloud allows you to automate service processes?", correct: true, source: "Help Docs", citation: null },
+  { id: 3, text: "What is the purpose of a Record Type?", correct: true, source: "Trailhead", citation: null },
+  { id: 4, text: "Which field type is used for long text and rich formatting?", correct: false, source: "Help Docs", citation: null },
+  { id: 5, text: "What is a validation rule used for?", correct: true, source: "Trailhead", citation: null },
+];
+
 const CONFETTI = [
   { left: "6%", top: "24%", bg: "#f6c445", rot: "18deg" },
   { left: "14%", top: "60%", bg: "#e0453a", rot: "-12deg" },
@@ -108,7 +124,19 @@ function QuizResultsPage() {
   const score =
     totalQuestions > 0 ? Math.round((correctCount / totalQuestions) * 100) : 0;
   const didPass = score >= passingScore;
-  const timeTaken = "—";
+  const timeTaken =
+    attempt?.startedAt && attempt?.submittedAt
+      ? formatDuration(
+          Math.max(
+            0,
+            Math.round(
+              (new Date(attempt.submittedAt).getTime() - new Date(attempt.startedAt).getTime()) / 1000
+            )
+          )
+        )
+      : attempt
+        ? "—" // older attempt saved before time tracking existed — nothing to compute
+        : "12m 34s"; // sample/demo state, no real attempt at all
 
   const activeSourceRow =
     sourceModalRowId != null ? rows.find((row) => row.id === sourceModalRowId) ?? null : null;

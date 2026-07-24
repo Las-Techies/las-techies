@@ -268,11 +268,16 @@ export function listAssignedQuizzes(): Promise<AssignedQuiz[]> {
 // Best-effort: marks the caller's own assignment for this quiz complete.
 export function completeQuizAssignment(
   quizId: number,
-  score?: number
+  score?: number,
+  timeTakenSeconds?: number
 ): Promise<{ updated: boolean }> {
+  const body: Record<string, number> = {};
+  if (typeof score === "number") body.score = score;
+  if (typeof timeTakenSeconds === "number") body.timeTakenSeconds = timeTakenSeconds;
+
   return apiFetch<{ updated: boolean }>(`/api/quizzes/${quizId}/assignments/me/complete`, {
     method: "POST",
-    body: JSON.stringify(typeof score === "number" ? { score } : {}),
+    body: JSON.stringify(body),
   });
 }
 
