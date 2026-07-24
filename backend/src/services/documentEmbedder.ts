@@ -9,7 +9,7 @@ import { replaceChunksForDocument } from "../models/documentChunk.model";
 // "give me an overview of my team" — folding in "Edge Onboarding Document —
 // OVERVIEW" gives the embedding model more surface area to match against,
 // without polluting the chunk's citable content shown to users/the LLM.
-function buildEmbeddingText(title: string, chunk: { content: string; heading?: string }): string {
+function buildEmbeddingText(title: string, chunk: { content: string; heading?: string | undefined }): string {
   const context = chunk.heading ? `${title} — ${chunk.heading}` : title;
   return `${context}\n\n${chunk.content}`;
 }

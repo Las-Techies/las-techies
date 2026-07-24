@@ -14,7 +14,7 @@ export type TextChunk = {
   // Nearest preceding heading-like paragraph, if any. Undefined for chunks
   // that appear before the first heading in the document (or in headingless
   // documents).
-  heading?: string;
+  heading?: string | undefined;
 };
 
 // Splits on blank lines first so paragraph boundaries are respected where
@@ -52,6 +52,17 @@ function isHeadingLike(paragraph: string): boolean {
 // heading was "in effect" when each chunk started, so a chunk's content can
 // be embedded alongside its section title without that title being stored
 // as part of the chunk's displayed/cited content.
+//
+// Every new heading also forces a hard chunk break, even if the running
+// buffer is nowhere near maxChars. Without this, several short sections
+// (e.g. a one-line "Your First Week" list followed immediately by a
+// four-line "Key People" list) can end up packed into a single chunk —
+// which means a single embedding vector ends up representing a blend of
+// unrelated topics, diluting the signal for a question that's sharply
+// about just one of them ("who are the key people on this team?") even
+// when that section's exact words are sitting right there in the chunk.
+// Splitting on headings keeps each section's embedding focused on that
+// section alone.
 export function chunkText(
   text: string,
   options?: { maxChars?: number; overlapChars?: number }
@@ -63,13 +74,24 @@ export function chunkText(
     p.length > maxChars ? hardSplit(p, maxChars) : [p]
   );
 
-  const chunks: { content: string; heading?: string }[] = [];
+  const chunks: { content: string; heading?: string | undefined }[] = [];
   let buffer = "";
   let currentHeading: string | undefined;
   let headingAtBufferStart: string | undefined;
 
   for (const paragraph of paragraphs) {
-    if (isHeadingLike(paragraph)) {
+    const startsNewHeading = isHeadingLike(paragraph);
+
+    // Hard break at the heading boundary itself (not carrying overlap
+    // forward here — overlap is only meant to stitch together a single
+    // section's own content that got split across chunks, not to blend
+    // the tail of one section into the start of the next).
+    if (startsNewHeading && buffer) {
+      chunks.push({ content: buffer, heading: headingAtBufferStart });
+      buffer = "";
+    }
+
+    if (startsNewHeading) {
       currentHeading = paragraph.trim();
     }
     if (!buffer) {
