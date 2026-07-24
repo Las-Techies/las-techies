@@ -3781,7 +3781,8 @@ label {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 12px 14px;
+  position: relative;
+  padding: 12px 44px 12px 14px;
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.72);
   border: 1px solid rgba(11, 42, 84, 0.07);
@@ -3848,6 +3849,34 @@ label {
   background: #e2ebf7;
   color: var(--sf-blue);
   border-color: rgba(47, 111, 179, 0.35);
+}
+
+.source-icon-btn {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  border: 1px solid rgba(47, 111, 179, 0.25);
+  background: #eef2f8;
+  color: #4d6482;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.source-icon-btn svg {
+  width: 12px;
+  height: 12px;
+}
+
+.source-icon-btn:hover {
+  background: #e2ebf7;
+  color: var(--sf-blue);
+  border-color: rgba(47, 111, 179, 0.45);
 }
 
 .review-more {
