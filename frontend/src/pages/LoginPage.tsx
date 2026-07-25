@@ -417,7 +417,7 @@ function LoginPage() {
         >
           {submitting
             ? mode === "login"
-              ? "Signing in…"
+              ? "Logging in…"
               : "Creating account…"
             : mode === "login"
               ? "Continue"
@@ -436,7 +436,7 @@ function LoginPage() {
           disabled={isGoogleLoading}
         >
           <GoogleIcon aria-hidden />
-          {isGoogleLoading ? "Redirecting…" : "Continue with Google"}
+          {isGoogleLoading ? "Logging in…" : "Continue with Google"}
         </button>
 
         {mode === "login" ? (

@@ -156,6 +156,7 @@ function ReviewPublishPage() {
   const displayPassingScore = quiz?.passingScore ?? quizConfig.passingScore;
   const displayTimeLimit = quiz?.timeLimitMinutes ?? quizConfig.timeLimit;
   const displayDueDateSource = quiz?.dueDate ?? quizConfig.dueDate;
+  const displayTopic = quizConfig.topic.trim() || "Onboarding Quiz";
 
   const formattedDueDate = useMemo(() => {
     if (!displayDueDateSource) return "Not set";
@@ -370,7 +371,7 @@ function ReviewPublishPage() {
               </div>
               <div>
                 <span>Topic</span>
-                <strong>{quizConfig.topic || "General"}</strong>
+                <strong>{displayTopic}</strong>
               </div>
               <div>
                 <span>Due Date</span>
@@ -553,9 +554,9 @@ function ReviewPublishPage() {
         {isPublishModalOpen ? (
           <div className="modal-backdrop" role="dialog" aria-modal="true">
             <div className="modal-card">
-              <h3>Publish Module</h3>
+              <h3>{displayTitle}</h3>
               <p>
-                Are you ready to publish this module to{" "}
+                Are you ready to publish this quiz to{" "}
                 <strong>
                   {selectedLearnerIds.length + selectedLearners.length} learner
                   {selectedLearnerIds.length + selectedLearners.length === 1 ? "" : "s"}

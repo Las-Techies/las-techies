@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import mascotLogo from "../assets/sageforce-mascot-transparent.png";
+import mascotLogo from "../assets/panda-login.png";
 import { useAuth } from "../context/AuthContext";
 import { apiFetch } from "../api/client";
 import { supabase } from "../lib/supabaseClient";

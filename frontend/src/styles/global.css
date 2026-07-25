@@ -4051,7 +4051,7 @@ label {
 
 .dropzone-body p {
   margin: 8px 0 0;
-  color: #46586f;
+  color: #2f435f;
   font-size: 15px;
 }
 
@@ -4095,7 +4095,7 @@ label {
   align-items: center;
   gap: 7px;
   font-size: 13px;
-  color: #6b7d95;
+  color: #4a607e;
 }
 
 .dropzone-secure svg {
@@ -4140,7 +4140,7 @@ label {
 
 .import-bar-text span {
   font-size: 13px;
-  color: #6b7d95;
+  color: #4a607e;
 }
 
 .import-connect {
@@ -4308,10 +4308,16 @@ label {
 
 .file-check {
   flex: none;
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  position: relative;
+  appearance: none;
+  -webkit-appearance: none;
   border-radius: 999px;
-  border: 2px solid rgba(11, 42, 84, 0.25);
+  border: 3px solid #6f7f9f;
   background: #fff;
   cursor: pointer;
   transition: background 0.15s ease, border-color 0.15s ease;
@@ -4319,7 +4325,23 @@ label {
 
 .file-check.selected {
   border-color: var(--sf-blue);
-  background: var(--sf-blue);
+  
+}
+
+.file-check.selected::before {
+  content: "";
+  position: absolute;
+  inset: 2px;
+  border-radius: 999px;
+  background: #fff;
+}
+
+.file-check.selected::after {
+  content: "";
+  position: absolute;
+  inset: 2px;
+  border-radius: 999px;
+  background: #1e4fd8;
 }
 
 .file-check:disabled {
@@ -4499,7 +4521,12 @@ label {
 .cfg-doc-summary {
   flex: 1;
   min-width: 0;
+  display: block;
+  max-width: 100%;
   text-align: right;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
   font-size: 13px;
   line-height: 1.4;
   color: rgba(11, 42, 84, 0.72);
@@ -4510,6 +4537,8 @@ label {
 }
 
 .cfg-doc-summary a {
+  display: inline-block;
+  margin-top: 4px;
   color: #1a7be0;
   font-weight: 600;
   text-decoration: none;

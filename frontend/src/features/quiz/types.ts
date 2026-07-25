@@ -79,7 +79,7 @@ export const QUIZ_ATTEMPT_STORAGE_KEY = "sageforce_quiz_attempt";
 
 export const DEFAULT_QUIZ_CONFIG: QuizConfig = {
   moduleTitle: "OSHA Basics 2026",
-  topic: "Workplace Safety",
+  topic: "",
   passingScore: 70,
   timeLimit: 30,
   questionCount: 3,

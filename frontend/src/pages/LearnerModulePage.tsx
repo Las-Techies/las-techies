@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import AppNav from "../components/navigation/AppNav";
+import { useAuth } from "../context/AuthContext";
+import { getPreviewRole } from "../features/auth/previewRole";
 import {
   apiFetch,
   deleteChatConversation,
@@ -236,6 +238,10 @@ function DeleteChatIcon() {
 
 function LearnerModulePage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const effectiveRole =
+    (user?.user_metadata?.role as string | undefined) ?? getPreviewRole() ?? "new_hire";
+  const isManager = effectiveRole === "manager";
   const [searchParams] = useSearchParams();
   // Which assigned quiz this module page is for. Falls back to "my latest"
   // (below) when arriving without a quizId, e.g. an old bookmark.
@@ -723,13 +729,15 @@ function LearnerModulePage() {
           <button className="secondary-btn" type="button" onClick={() => navigate("/home")}>
             ← Back
           </button>
-          <button
-            className="primary-btn"
-            type="button"
-            onClick={() => setConfirmStart(true)}
-          >
-            Take Quiz →
-          </button>
+          {!isManager ? (
+            <button
+              className="primary-btn"
+              type="button"
+              onClick={() => setConfirmStart(true)}
+            >
+              Take Quiz →
+            </button>
+          ) : null}
         </div>
       </main>
 

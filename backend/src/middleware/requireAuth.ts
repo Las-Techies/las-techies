@@ -3,6 +3,62 @@ import { env } from "../config/env";
 import { supabaseAdmin } from "../db/supabaseAdmin";
 import { findOrCreateUserFromSupabase } from "../models/user.model";
 
+function splitDisplayName(displayName: string): { firstName: string; lastName: string } {
+  const trimmed = displayName.trim();
+  if (!trimmed) return { firstName: "", lastName: "" };
+  const parts = trimmed.split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return { firstName: "", lastName: "" };
+  if (parts.length === 1) return { firstName: parts[0] ?? "", lastName: "" };
+  return {
+    firstName: parts[0] ?? "",
+    lastName: parts.slice(1).join(" "),
+  };
+}
+
+function deriveNameFromSupabaseUser(supabaseUser: any): { firstName: string; lastName: string } {
+  const metadata = (supabaseUser?.user_metadata ?? {}) as Record<string, unknown>;
+
+  const directFirst = String(metadata.first_name ?? "").trim();
+  const directLast = String(metadata.last_name ?? "").trim();
+  if (directFirst || directLast) {
+    return {
+      firstName: directFirst || "Unknown",
+      lastName: directLast,
+    };
+  }
+
+  const givenName = String(metadata.given_name ?? "").trim();
+  const familyName = String(metadata.family_name ?? "").trim();
+  if (givenName || familyName) {
+    return {
+      firstName: givenName || "Unknown",
+      lastName: familyName,
+    };
+  }
+
+  const fullName = String(metadata.full_name ?? metadata.name ?? "").trim();
+  if (fullName) {
+    const parsed = splitDisplayName(fullName);
+    return {
+      firstName: parsed.firstName || "Unknown",
+      lastName: parsed.lastName,
+    };
+  }
+
+  // Final fallback: derive something readable from the email prefix.
+  const email = String(supabaseUser?.email ?? "").trim();
+  const prefix = email.split("@")[0]?.trim() ?? "";
+  if (prefix) {
+    const parsed = splitDisplayName(prefix.replace(/[._-]+/g, " "));
+    return {
+      firstName: parsed.firstName || "Unknown",
+      lastName: parsed.lastName,
+    };
+  }
+
+  return { firstName: "Unknown", lastName: "" };
+}
+
 export async function requireAuth(
   req: Request,
   res: Response,
@@ -30,11 +86,7 @@ export async function requireAuth(
     const supabaseUser = data.user;
     const role =
       (supabaseUser.user_metadata?.role as string | undefined) ?? "new_hire";
-    const firstName =
-      (supabaseUser.user_metadata?.first_name as string | undefined) ??
-      "Unknown";
-    const lastName =
-      (supabaseUser.user_metadata?.last_name as string | undefined) ?? "";
+    const { firstName, lastName } = deriveNameFromSupabaseUser(supabaseUser);
     // Team now rides along in the JWT like role/name do. `null` here means
     // "this session's metadata doesn't say" rather than "reset to the demo
     // team" — findOrCreateUserFromSupabase only falls back to the demo team
