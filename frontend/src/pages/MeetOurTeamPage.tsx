@@ -6,7 +6,6 @@ import esmePhoto from "../assets/team-esme.png";
 import reynaPhoto from "../assets/team-reyna.png";
 import melaniePhoto from "../assets/team-melanie.png";
 import { ArrowLeft, GithubIcon, LinkedInIcon } from "../components/icons";
-import { useLastNonNull, useModalTransition } from "../hooks/useModalTransition";
 import { useAvatarGroupHover } from "../hooks/useAvatarGroupHover";
 
 type Member = {
@@ -50,14 +49,14 @@ const TEAM: Member[] = [
 
 function MeetOurTeamPage() {
   const navigate = useNavigate();
-  const [featuredId, setFeaturedId] = useState<string | null>(null);
-  const featured = TEAM.find((member) => member.id === featuredId) ?? null;
-  // Frozen copy so the modal keeps showing the last-featured teammate while
-  // it plays its close animation, instead of the content vanishing the
-  // instant `featuredId` resets to null.
-  const frozenFeatured = useLastNonNull(featured);
-  const teamModal = useModalTransition(Boolean(featured));
+  // Which teammate's bio panel is expanded — driven by hover (and by
+  // keyboard focus / click as fallbacks for people who can't hover).
+  const [openId, setOpenId] = useState<string | null>(null);
   const avatarGroup = useAvatarGroupHover<HTMLDivElement>();
+
+  const openAt = (id: string) => setOpenId(id);
+  const closeAt = (id: string) => setOpenId((current) => (current === id ? null : current));
+  const toggleAt = (id: string) => setOpenId((current) => (current === id ? null : id));
 
   return (
     <div className="app-shell">
@@ -77,59 +76,51 @@ function MeetOurTeamPage() {
         </div>
 
         <div className="team-row" ref={avatarGroup.rootRef} {...avatarGroup.rootProps}>
-          {TEAM.map((member, index) => (
-            <button
-              key={member.id}
-              type="button"
-              className={`team-member t-avatar ${featuredId === member.id ? "active" : ""}`}
-              onClick={() => setFeaturedId(member.id)}
-              {...avatarGroup.getItemProps(index)}
-            >
-              <img className="team-avatar" src={member.photo} alt={member.name} />
-              <span className="team-name">{member.name}</span>
-            </button>
-          ))}
-        </div>
-
-        {teamModal.shouldRender && frozenFeatured ? (
-          <div
-            className={`team-modal-backdrop t-modal-backdrop ${teamModal.phaseClassName}`}
-            role="dialog"
-            aria-modal="true"
-            onClick={() => setFeaturedId(null)}
-          >
-            <section
-              className={`glass team-feature t-modal ${teamModal.phaseClassName}`}
-              onClick={(event) => event.stopPropagation()}
-            >
-              <button
-                type="button"
-                className="team-feature-close"
-                aria-label="Close"
-                onClick={() => setFeaturedId(null)}
+          {TEAM.map((member, index) => {
+            const isOpen = openId === member.id;
+            return (
+              <div
+                key={member.id}
+                className={`team-member t-avatar ${isOpen ? "open" : ""}`}
+                onMouseEnter={() => {
+                  avatarGroup.getItemProps(index).onMouseEnter();
+                  openAt(member.id);
+                }}
+                onMouseLeave={() => closeAt(member.id)}
               >
-                ×
-              </button>
-              <img
-                className="team-feature-photo"
-                src={frozenFeatured.photo}
-                alt={frozenFeatured.name}
-              />
-              <div className="team-feature-body">
-                <h2>{frozenFeatured.name}</h2>
-                <p className="team-feature-bio">{frozenFeatured.bio}</p>
-                <div className="team-feature-links">
-                  <button type="button" className="team-social">
-                    <LinkedInIcon /> LinkedIn
-                  </button>
-                  <button type="button" className="team-social">
-                    <GithubIcon /> GitHub
-                  </button>
+                <button
+                  type="button"
+                  className="team-avatar-trigger"
+                  aria-expanded={isOpen}
+                  onClick={() => toggleAt(member.id)}
+                  onFocus={() => openAt(member.id)}
+                  onBlur={() => closeAt(member.id)}
+                >
+                  <img className="team-avatar" src={member.photo} alt={member.name} />
+                  <span className="team-name">{member.name}</span>
+                </button>
+
+                {/* transitions.dev "accordion" — grid-template-rows 0fr -> 1fr
+                    grows the bio panel vertically out of the photo on hover,
+                    instead of popping a modal over the whole page. */}
+                <div className="team-bio-acc" data-open={isOpen}>
+                  <div className="team-bio-acc-inner">
+                    <p className="team-bio-role">{member.role}</p>
+                    <p className="team-bio-text">{member.bio}</p>
+                    <div className="team-bio-links">
+                      <button type="button" className="team-social" tabIndex={isOpen ? 0 : -1}>
+                        <LinkedInIcon /> LinkedIn
+                      </button>
+                      <button type="button" className="team-social" tabIndex={isOpen ? 0 : -1}>
+                        <GithubIcon /> GitHub
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </section>
-          </div>
-        ) : null}
+            );
+          })}
+        </div>
       </main>
     </div>
   );
