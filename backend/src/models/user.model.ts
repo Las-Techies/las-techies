@@ -68,17 +68,39 @@ export async function findOrCreateUserFromSupabase(input: {
 }) {
   const existing = await findUserBySupabaseId(input.supabaseUserId);
   if (existing) {
+    const normalizedFirst = input.firstName.trim();
+    const normalizedLast = input.lastName.trim();
+    const existingFirst = existing.firstName.trim();
+    const existingLast = existing.lastName.trim();
+
+    const hasBetterIncomingName =
+      normalizedFirst !== "" &&
+      normalizedFirst.toLowerCase() !== "unknown" &&
+      (existingFirst === "" ||
+        existingFirst.toLowerCase() === "unknown" ||
+        existingLast === "");
+
+    const shouldSyncTeam = input.teamId !== null && existing.teamId !== input.teamId;
+    if (shouldSyncTeam || hasBetterIncomingName) {
+      return prisma.user.update({
+        where: { id: existing.id },
+        data: {
+          ...(shouldSyncTeam ? { teamId: input.teamId } : {}),
+          ...(hasBetterIncomingName
+            ? {
+                firstName: normalizedFirst,
+                lastName: normalizedLast,
+              }
+            : {}),
+        },
+      });
+    }
+
     // Keep an existing user's team in sync with their JWT, but only when the
     // JWT actually asserts a team — a missing/invalid claim must never
     // overwrite a real assignment (this is what previously reset managers
     // back to the demo team after linking a second OAuth identity). Other
     // fields (name/role) are still only applied on first creation for now.
-    if (input.teamId !== null && existing.teamId !== input.teamId) {
-      return prisma.user.update({
-        where: { id: existing.id },
-        data: { teamId: input.teamId },
-      });
-    }
     return existing;
   }
 

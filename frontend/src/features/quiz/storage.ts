@@ -31,7 +31,7 @@ export const loadQuizConfig = (): QuizConfig => {
 
     return {
       moduleTitle: parsed.moduleTitle?.trim() || DEFAULT_QUIZ_CONFIG.moduleTitle,
-      topic: parsed.topic?.trim() || DEFAULT_QUIZ_CONFIG.topic,
+      topic: typeof parsed.topic === "string" ? parsed.topic.trim() : DEFAULT_QUIZ_CONFIG.topic,
       passingScore: parsePositiveNumber(parsed.passingScore, DEFAULT_QUIZ_CONFIG.passingScore),
       timeLimit: parsePositiveNumber(parsed.timeLimit, DEFAULT_QUIZ_CONFIG.timeLimit),
       questionCount: parsePositiveNumber(parsed.questionCount, DEFAULT_QUIZ_CONFIG.questionCount),

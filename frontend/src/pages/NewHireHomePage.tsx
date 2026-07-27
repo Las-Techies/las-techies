@@ -4,6 +4,7 @@ import AppNav from "../components/navigation/AppNav";
 import mascot from "../assets/panda-home.png";
 import { listAssignedQuizzes, type AssignedQuiz } from "../api/client";
 import { useAuth } from "../context/AuthContext";
+import { getUserDisplayFirstName } from "../features/auth/userDisplayName";
 import { learnerModule } from "../features/learner/data";
 import {
   ArrowRight,
@@ -34,8 +35,7 @@ type QuizStep = {
 function NewHireHomePage() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const firstName =
-    (user?.user_metadata?.first_name as string | undefined) ?? "there";
+  const firstName = getUserDisplayFirstName(user);
 
   const [assignments, setAssignments] = useState<AssignedQuiz[]>([]);
   const [isLoading, setIsLoading] = useState(true);

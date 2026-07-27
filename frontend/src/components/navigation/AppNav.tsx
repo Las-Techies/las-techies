@@ -4,6 +4,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { QUIZ_WORKFLOW_ROUTES } from "../../features/quiz/workflow";
 import { useAuth } from "../../context/AuthContext";
 import { clearPreviewRole, getPreviewRole } from "../../features/auth/previewRole";
+import { getUserDisplayFirstName, getUserInitials } from "../../features/auth/userDisplayName";
 import logoBadge from "../../assets/sageforce-logo-badge.png";
 import {
   ChevronDown,
@@ -34,15 +35,12 @@ function AppNav() {
   const isWorkflowRoute = QUIZ_WORKFLOW_ROUTES.some((route) => route === location.pathname);
   const { user, signOut } = useAuth();
   const email = user?.email ?? null;
-  const firstName =
-    (user?.user_metadata?.first_name as string | undefined) ?? "there";
+  const firstName = getUserDisplayFirstName(user);
   const effectiveRole =
     (user?.user_metadata?.role as string | undefined) ?? getPreviewRole() ?? "new_hire";
   const isManager = effectiveRole === "manager";
   const role = isManager ? "Manager" : "New Hire";
-  const initials =
-    ((user?.user_metadata?.first_name as string | undefined)?.[0] ?? "") +
-    ((user?.user_metadata?.last_name as string | undefined)?.[0] ?? "");
+  const initials = getUserInitials(user);
   const navItems = isManager ? managerNavItems : newHireNavItems;
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
