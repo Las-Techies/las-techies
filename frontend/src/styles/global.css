@@ -15,6 +15,13 @@
   --duration-fast: 250ms;
   --ease-smooth-out: cubic-bezier(0.22, 1, 0.36, 1);
 
+  /* Quick hover/active feedback on buttons, chips, and options — the same
+     150ms ease value was hand-typed ~55 times across this file, so any
+     future re-tuning had to touch every call site. Tokenized here so it's
+     one edit instead of fifty-five. */
+  --ui-hover-dur: 0.15s;
+  --ui-hover-ease: ease;
+
   /* Plus-to-menu morph (Sage chat FAB -> panel) */
   --morph-open-dur: 350ms;
   --morph-close-dur: 250ms;
@@ -204,7 +211,7 @@ body::before {
   cursor: pointer;
   background: linear-gradient(180deg, #1a7be0 0%, #0b5cab 100%);
   box-shadow: 0 10px 22px rgba(11, 92, 171, 0.4);
-  transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
+  transition: transform var(--ui-hover-dur) var(--ui-hover-ease), box-shadow var(--ui-hover-dur) var(--ui-hover-ease), filter var(--ui-hover-dur) var(--ui-hover-ease);
 }
 
 .sf-btn:hover:not(:disabled) {
@@ -245,7 +252,7 @@ input:not([type="radio"]):not([type="checkbox"]) {
   padding: 10px 12px;
   font-size: 14px;
   color: #181818;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition: border-color var(--ui-hover-dur) var(--ui-hover-ease), box-shadow var(--ui-hover-dur) var(--ui-hover-ease);
 }
 
 input[type="radio"],
@@ -265,7 +272,7 @@ select {
   padding: 10px 12px;
   font-size: 14px;
   color: #181818;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition: border-color var(--ui-hover-dur) var(--ui-hover-ease), box-shadow var(--ui-hover-dur) var(--ui-hover-ease);
 }
 
 input:focus-visible {
@@ -483,7 +490,7 @@ label {
   font-weight: 600;
   color: #4a5b73;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all var(--ui-hover-dur) var(--ui-hover-ease);
 }
 
 .seg-opt svg {
@@ -570,7 +577,7 @@ label {
   font-weight: 700;
   cursor: pointer;
   box-shadow: 0 10px 26px rgba(9, 40, 82, 0.22);
-  transition: background 0.15s ease, transform 0.15s ease;
+  transition: background var(--ui-hover-dur) var(--ui-hover-ease), transform var(--ui-hover-dur) var(--ui-hover-ease);
 }
 
 .creators-fab:hover {
@@ -604,7 +611,7 @@ label {
   font-size: 15px;
   font-weight: 700;
   cursor: pointer;
-  transition: background 0.15s ease;
+  transition: background var(--ui-hover-dur) var(--ui-hover-ease);
 }
 
 .back-btn:hover {
@@ -624,7 +631,7 @@ label {
   font-weight: 600;
   border: 1px solid transparent;
   cursor: pointer;
-  transition: background-color 0.15s ease, border-color 0.15s ease;
+  transition: background-color var(--ui-hover-dur) var(--ui-hover-ease), border-color var(--ui-hover-dur) var(--ui-hover-ease);
 }
 
 .primary-btn:active,
@@ -751,7 +758,7 @@ label {
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease;
+  transition: background var(--ui-hover-dur) var(--ui-hover-ease), border-color var(--ui-hover-dur) var(--ui-hover-ease);
 }
 
 .dev-access-btn:hover {
@@ -791,7 +798,7 @@ label {
   font-weight: 600;
   color: #2e2e2e;
   cursor: pointer;
-  transition: background-color 0.15s ease, border-color 0.15s ease;
+  transition: background-color var(--ui-hover-dur) var(--ui-hover-ease), border-color var(--ui-hover-dur) var(--ui-hover-ease);
 }
 
 .google-btn svg {
@@ -891,7 +898,7 @@ label {
   color: #35475f;
   padding: 8px 14px;
   border-radius: 10px;
-  transition: background 0.15s ease, color 0.15s ease;
+  transition: background var(--ui-hover-dur) var(--ui-hover-ease), color var(--ui-hover-dur) var(--ui-hover-ease);
 }
 
 .app-nav-link svg {
@@ -930,7 +937,7 @@ label {
   padding: 6px 8px;
   border-radius: 12px;
   cursor: pointer;
-  transition: background-color 0.15s ease;
+  transition: background-color var(--ui-hover-dur) var(--ui-hover-ease);
 }
 
 .app-nav-user-trigger:hover,
@@ -1003,7 +1010,7 @@ label {
   font-size: 13px;
   color: #ba0517;
   cursor: pointer;
-  transition: background-color 0.15s ease;
+  transition: background-color var(--ui-hover-dur) var(--ui-hover-ease);
 }
 
 .app-nav-user-menu button:hover {
@@ -1187,7 +1194,7 @@ label {
   color: #ba0517;
   padding: 0;
   cursor: pointer;
-  transition: background 0.15s ease;
+  transition: background var(--ui-hover-dur) var(--ui-hover-ease);
 }
 
 .delete-icon-btn:hover:not(:disabled) {
@@ -1247,7 +1254,7 @@ label {
   align-items: center;
   gap: 6px;
   cursor: pointer;
-  transition: transform 0.15s ease, background-color 0.15s ease;
+  transition: transform var(--ui-hover-dur) var(--ui-hover-ease), background-color var(--ui-hover-dur) var(--ui-hover-ease);
 }
 
 .done-icon-btn span {
@@ -1339,7 +1346,7 @@ label {
   color: #4a4a4a;
   border: 1px solid transparent;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all var(--ui-hover-dur) var(--ui-hover-ease);
 }
 
 .difficulty-chips .selected {
@@ -1369,7 +1376,7 @@ label {
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
-  transition: opacity 0.15s ease, transform 0.15s ease;
+  transition: opacity var(--ui-hover-dur) var(--ui-hover-ease), transform var(--ui-hover-dur) var(--ui-hover-ease);
   z-index: 20;
 }
 
@@ -1399,7 +1406,7 @@ label {
   width: 100%;
   text-align: left;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all var(--ui-hover-dur) var(--ui-hover-ease);
 }
 
 .question-chip.selected {
@@ -1789,7 +1796,7 @@ main.mgr-page > section.dropzone > input.sr-only {
   background: #fff;
   color: #002080;
   cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease;
+  transition: background var(--ui-hover-dur) var(--ui-hover-ease), border-color var(--ui-hover-dur) var(--ui-hover-ease);
 }
 
 .icon-btn svg {
@@ -1836,7 +1843,7 @@ main.mgr-page > section.dropzone > input.sr-only {
   border-radius: 4px;
   padding: 2px 4px;
   margin: -2px -4px;
-  transition: background 0.15s ease;
+  transition: background var(--ui-hover-dur) var(--ui-hover-ease);
 }
 
 .editable-text:hover {
@@ -2269,7 +2276,7 @@ main.mgr-page > section.dropzone > input.sr-only {
   gap: 14px;
   padding: 12px 12px;
   border-radius: 12px;
-  transition: background 0.15s ease;
+  transition: background var(--ui-hover-dur) var(--ui-hover-ease);
 }
 
 .nh-step.current {
@@ -2429,7 +2436,7 @@ main.mgr-page > section.dropzone > input.sr-only {
   font-size: 13px;
   color: #3d3d3d;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all var(--ui-hover-dur) var(--ui-hover-ease);
 }
 
 .lib-chip.selected {
@@ -2484,7 +2491,7 @@ main.mgr-page > section.dropzone > input.sr-only {
   font-size: 20px;
   line-height: 1;
   cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+  transition: background var(--ui-hover-dur) var(--ui-hover-ease), border-color var(--ui-hover-dur) var(--ui-hover-ease), transform 0.1s ease;
 }
 
 .recent-more:hover {
@@ -2752,7 +2759,7 @@ main.mgr-page > section.dropzone > input.sr-only {
   border-radius: 999px;
   cursor: pointer;
   padding: 0;
-  transition: background-color 0.15s ease, border-color 0.15s ease;
+  transition: background-color var(--ui-hover-dur) var(--ui-hover-ease), border-color var(--ui-hover-dur) var(--ui-hover-ease);
 }
 
 .ai-head-btn:hover {
@@ -3382,7 +3389,7 @@ main.mgr-page > section.dropzone > input.sr-only {
   font-size: 15px;
   color: #2b2b2b;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all var(--ui-hover-dur) var(--ui-hover-ease);
 }
 
 .q-option:hover {
@@ -3714,7 +3721,7 @@ main.mgr-page > section.dropzone > input.sr-only {
   border: 1.5px solid rgba(11, 42, 84, 0.14);
   background: rgba(255, 255, 255, 0.85);
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all var(--ui-hover-dur) var(--ui-hover-ease);
 }
 
 .answer:hover {
@@ -3819,7 +3826,7 @@ main.mgr-page > section.dropzone > input.sr-only {
   font-size: 15px;
   font-weight: 700;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all var(--ui-hover-dur) var(--ui-hover-ease);
 }
 
 .ghost-btn:hover:not(:disabled) {
@@ -4221,7 +4228,7 @@ main.mgr-page > section.dropzone > input.sr-only {
   border: 1px solid transparent;
   cursor: pointer;
   font-weight: 600;
-  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  transition: background var(--ui-hover-dur) var(--ui-hover-ease), color var(--ui-hover-dur) var(--ui-hover-ease), border-color var(--ui-hover-dur) var(--ui-hover-ease);
 }
 
 .source-tag-btn svg {
@@ -4249,7 +4256,7 @@ main.mgr-page > section.dropzone > input.sr-only {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  transition: background var(--ui-hover-dur) var(--ui-hover-ease), color var(--ui-hover-dur) var(--ui-hover-ease), border-color var(--ui-hover-dur) var(--ui-hover-ease);
 }
 
 .source-icon-btn svg {
@@ -4383,7 +4390,7 @@ main.mgr-page > section.dropzone > input.sr-only {
   align-items: center;
   gap: 34px;
   cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease;
+  transition: background var(--ui-hover-dur) var(--ui-hover-ease), border-color var(--ui-hover-dur) var(--ui-hover-ease);
 }
 
 .dropzone.active {
@@ -4688,7 +4695,7 @@ main.mgr-page > section.dropzone > input.sr-only {
   border: 3px solid #6f7f9f;
   background: #fff;
   cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease;
+  transition: background var(--ui-hover-dur) var(--ui-hover-ease), border-color var(--ui-hover-dur) var(--ui-hover-ease);
 }
 
 .file-check.selected {
@@ -4945,7 +4952,7 @@ main.mgr-page > section.dropzone > input.sr-only {
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
-  transition: border-color 0.15s ease, background 0.15s ease;
+  transition: border-color var(--ui-hover-dur) var(--ui-hover-ease), background var(--ui-hover-dur) var(--ui-hover-ease);
 }
 
 .cfg-doc-toggle:hover {
@@ -5331,7 +5338,7 @@ main.mgr-page > section.dropzone > input.sr-only {
   border: 1px solid rgba(11, 42, 84, 0.1);
   background: rgba(255, 255, 255, 0.7);
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all var(--ui-hover-dur) var(--ui-hover-ease);
 }
 
 .qopt:hover {
@@ -5734,7 +5741,7 @@ main.mgr-page > section.dropzone > input.sr-only {
   border: 1px solid rgba(11, 42, 84, 0.1);
   background: rgba(255, 255, 255, 0.7);
   cursor: pointer;
-  transition: border-color 0.15s ease, background 0.15s ease;
+  transition: border-color var(--ui-hover-dur) var(--ui-hover-ease), background var(--ui-hover-dur) var(--ui-hover-ease);
 }
 
 .learner-roster-item:hover {
