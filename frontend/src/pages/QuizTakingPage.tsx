@@ -4,7 +4,7 @@ import logoBadge from "../assets/sageforce-logo-badge.png";
 import { apiFetch, completeQuizAssignment } from "../api/client";
 import { saveQuizAttempt } from "../features/quiz/storage";
 import type { GeneratedQuiz, QuizQuestion } from "../features/quiz/types";
-import { ArrowRight, ClockIcon } from "../components/icons";
+import { ArrowLeft, ArrowRight, ClockIcon } from "../components/icons";
 
 const LETTERS = ["A", "B", "C", "D", "E", "F"];
 
@@ -160,6 +160,15 @@ function QuizTakingPage() {
             <p className="cfg-empty">
               No quiz is available yet. Check back once your manager publishes one.
             </p>
+            <div className="quiz-panel-foot" style={{ justifyContent: "center" }}>
+              <button
+                className="ghost-btn btn-link"
+                type="button"
+                onClick={() => navigate("/learner-module")}
+              >
+                <ArrowLeft /> Back to Learner Module
+              </button>
+            </div>
           </section>
         ) : (
           <section className="glass quiz-panel">
