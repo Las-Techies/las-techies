@@ -98,15 +98,125 @@ export async function createInviteHandler(
     const team = await findTeamById(user.teamId);
     const teamName = team?.name ?? "your team";
     const link = `${env.appUrl}/signup?invite=${token}`;
+    const inviteExpiryDays = Math.max(1, Math.ceil(env.inviteExpiryHours / 24));
+    const inviteExpiryDaysLabel = `${inviteExpiryDays} day${inviteExpiryDays === 1 ? "" : "s"}`;
+    const pandaImageUrl =
+      "https://raw.githubusercontent.com/Las-Techies/las-techies/main/frontend/src/assets/panda-cheer-fullhat.png";
+    const escapedTeamName = teamName
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
 
     await sendMail({
       to: email,
-      subject: `You've been invited to join ${teamName} on SageForce`,
-      text: `You've been invited to take an onboarding quiz on SageForce.\n\nClick this link to create your account and get started:\n${link}\n\nThis link expires in ${env.inviteExpiryHours} hours.`,
+      subject: `🎉 You're invited to join ${teamName} on SageForce`,
+      text: `Welcome aboard! 🐼
+
+You've been invited to join ${teamName} on SageForce — your onboarding workspace where getting up to speed is actually kind of fun.
+
+Accept your invite:
+${link}
+
+New to SageForce?
+1) Click Accept Invite
+2) Create your account or continue with Google
+3) Finish setup and hop into your workspace
+
+Already have an account?
+1) Click Accept Invite
+2) Log in with your existing account
+3) You'll land straight in your workspace
+
+No pressure — if you didn't expect this invite, you can safely ignore this email.
+
+Heads up: this link expires in ${inviteExpiryDaysLabel}, so grab it while it's fresh!`,
       html: `
-        <p>You've been invited to take an onboarding quiz on <strong>SageForce</strong>.</p>
-        <p><a href="${link}">Click here to create your account and get started.</a></p>
-        <p style="color:#666">This link expires in ${env.inviteExpiryHours} hours.</p>
+        <div style="margin:0;padding:0;background:#eef4ff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#0e2a47;">
+          <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">Your invite to ${escapedTeamName} on SageForce is ready — let's get you onboarded. 🐼</div>
+          <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background:#eef4ff;padding:40px 12px;">
+            <tr>
+              <td align="center">
+                <!-- Panda peeking over the top of the card. Sits above the card with a
+                     negative bottom margin so its lower half tucks behind the header. -->
+                <img
+                  src="${pandaImageUrl}"
+                  alt="Celebrating SageForce panda"
+                  width="220"
+                  style="display:block;margin:0 auto -56px;position:relative;z-index:2;border:0;outline:none;text-decoration:none;max-width:70%;height:auto;"
+                />
+                <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="max-width:720px;background:#ffffff;border-radius:24px;overflow:hidden;border:1px solid #d6e4ff;box-shadow:0 16px 40px rgba(26,123,224,0.14);">
+                  <tr>
+                    <td style="background:linear-gradient(135deg,#1657c0 0%,#2f8bff 55%,#7bc0ff 100%);padding:64px 32px 34px;color:#ffffff;text-align:center;">
+                      <div style="font-size:13px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;opacity:0.85;">✦ SageForce</div>
+                      <div style="margin-top:10px;font-size:38px;line-height:1.15;font-weight:800;">You're invited! 🎉</div>
+                      <div style="margin-top:12px;font-size:19px;line-height:1.5;opacity:0.95;">
+                        Come join <strong>${escapedTeamName}</strong> on SageForce.
+                      </div>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding:38px 40px 10px;text-align:center;">
+                      <p style="margin:0 0 4px;font-size:19px;line-height:1.65;color:#173b63;">
+                        Welcome aboard! Your onboarding workspace is ready and waiting —
+                        it's where getting up to speed is actually kind of fun.
+                      </p>
+                      <div style="text-align:center;margin:30px 0 8px;">
+                        <a href="${link}" style="display:inline-block;background:#1a7be0;color:#ffffff;text-decoration:none;font-size:18px;font-weight:700;padding:18px 42px;border-radius:999px;box-shadow:0 6px 16px rgba(26,123,224,0.35);">
+                          Accept Invite →
+                        </a>
+                      </div>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding:20px 40px 4px;">
+                      <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="border-collapse:separate;border-spacing:0 16px;">
+                        <tr>
+                          <td style="background:#f6f9ff;border:1px solid #dbe8ff;border-radius:16px;padding:20px 22px;">
+                            <div style="font-size:18px;font-weight:700;color:#11365a;margin-bottom:10px;">🌱 New to SageForce?</div>
+                            <ol style="margin:0;padding-left:20px;color:#244e74;font-size:16px;line-height:1.75;">
+                              <li>Click <strong>Accept Invite</strong></li>
+                              <li>Create your account or continue with Google</li>
+                              <li>Finish setup and hop into your workspace</li>
+                            </ol>
+                          </td>
+                        </tr>
+                        <tr>
+                          <td style="background:#f6f9ff;border:1px solid #dbe8ff;border-radius:16px;padding:20px 22px;">
+                            <div style="font-size:18px;font-weight:700;color:#11365a;margin-bottom:10px;">👋 Already have an account?</div>
+                            <ol style="margin:0;padding-left:20px;color:#244e74;font-size:16px;line-height:1.75;">
+                              <li>Click <strong>Accept Invite</strong></li>
+                              <li>Log in with your existing account</li>
+                              <li>You'll land straight in your workspace</li>
+                            </ol>
+                          </td>
+                        </tr>
+                      </table>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding:10px 40px 16px;">
+                      <div style="font-size:14px;line-height:1.6;color:#395f86;">
+                        Button not working? Click here:
+                      </div>
+                      <a href="${link}" style="display:inline-block;color:#1a7be0;text-decoration:underline;font-size:14px;line-height:1.6;margin-top:4px;">Click here</a>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding:22px 40px 32px;border-top:1px solid #ebf2ff;font-size:13px;line-height:1.7;color:#6a86a5;">
+                      ⏳ This invite expires in <strong>${inviteExpiryDaysLabel}</strong>, so grab it while it's fresh.<br />
+                      No pressure — if you didn't expect this, you can safely ignore this email.
+                    </td>
+                  </tr>
+                </table>
+                <div style="max-width:720px;margin:18px auto 0;font-size:12px;line-height:1.5;color:#93a9c6;text-align:center;">
+                  Sent with 🐼 by SageForce
+                </div>
+              </td>
+            </tr>
+          </table>
+        </div>
       `,
     });
 
