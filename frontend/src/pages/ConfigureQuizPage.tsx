@@ -83,6 +83,11 @@ function ConfigureQuizPage() {
     questionsDetected: number;
     totalQuestions: number;
   } | null>(null);
+  // True for a few seconds right after a generation this session finishes
+  // successfully — powers the one-off mascot cameo below. Deliberately not
+  // tied to just "hasQuestions", so restoring a previously-saved quiz on
+  // page load doesn't replay the celebration every time.
+  const [justGenerated, setJustGenerated] = useState(false);
   const [error, setError] = useState("");
   // Live team document library (every manager's uploads), pulled from the
   // backend so the manager generates from the same source set the deployed
@@ -120,6 +125,14 @@ function ConfigureQuizPage() {
   const updateForm = <K extends keyof QuizFormState>(field: K, value: QuizFormState[K]) => {
     setForm((current) => ({ ...current, [field]: value }));
   };
+
+  // Auto-dismisses the mascot cameo a few seconds after it appears, same as
+  // a toast — it's a one-off celebration, not a permanent fixture.
+  useEffect(() => {
+    if (!justGenerated) return;
+    const timer = window.setTimeout(() => setJustGenerated(false), 3200);
+    return () => window.clearTimeout(timer);
+  }, [justGenerated]);
 
   // Restore whatever this manager most recently generated, so navigating
   // away (e.g. to Upload Content to add more documents) and back doesn't
@@ -234,6 +247,7 @@ function ConfigureQuizPage() {
     setStreamingQuestions([]);
     setGenerationStatus("Starting generation…");
     setGenerationProgress(null);
+    setJustGenerated(false);
     setIsGenerating(true);
 
     const count = Number.parseInt(form.questionCount, 10) || 3;
@@ -279,6 +293,7 @@ function ConfigureQuizPage() {
       );
 
       setQuiz(generatedQuiz);
+      setJustGenerated(true);
       saveQuizConfig({
         moduleTitle: form.moduleTitle.trim(),
         topic: form.topic.trim(),
@@ -673,7 +688,19 @@ function ConfigureQuizPage() {
           </div>
 
           <div className="cfg-ai-col">
-            <img className="mgr-peek" src={mascot} alt="" aria-hidden />
+            <img
+              className={`mgr-peek ${justGenerated ? "mgr-peek-celebrate" : ""}`}
+              src={mascot}
+              alt=""
+              aria-hidden
+            />
+            {justGenerated && hasQuestions ? (
+              <div className="gen-complete-bubble gen-complete-bubble-peek" role="status">
+                All {quiz!.questionsPayload.length} question
+                {quiz!.questionsPayload.length === 1 ? "" : "s"}{" "}
+                {quiz!.questionsPayload.length === 1 ? "is" : "are"} ready!
+              </div>
+            ) : null}
             <div className="glass cfg-card">
             <div className="cfg-head">
               <span className="cfg-badge ai">
