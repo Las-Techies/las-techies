@@ -22,15 +22,16 @@ const TEAM: Member[] = [
   {
     id: "frida",
     name: "Frida",
-    role: "Frontend Engineer",
+    role: "University of California, Berkeley",
     photo: fridaPhoto,
-    bio: "Frida shapes the SageForce experience end to end. She loves clean interfaces, delightful micro-interactions, and making complex flows feel effortless.",
-    // TODO: add Frida's LinkedIn/GitHub URLs once she shares them.
+    bio: "Frida is a junior at the University of California, Berkeley studying Computer Science and Data Science.",
+    linkedin: "https://www.linkedin.com/in/frida-arriaga/",
+    github: "https://github.com/fridaarriaga",
   },
   {
     id: "esme",
     name: "Esme",
-    role: "Backend Engineer",
+    role: "University of California, Berkeley",
     photo: esmePhoto,
     bio: "Esme builds the robust backend systems that power SageForce. She loves distributed systems, clean APIs, and turning complex problems into elegant solutions.",
     linkedin: "https://www.linkedin.com/in/esmebenitez/",
@@ -39,7 +40,7 @@ const TEAM: Member[] = [
   {
     id: "reyna",
     name: "Reyna",
-    role: "AI Engineer",
+    role: "University of Houston",
     photo: reynaPhoto,
     bio: "Reyna designs the AI that turns raw documents into sharp quiz questions. She's fascinated by LLMs, evaluation, and shipping models that actually help people.",
     linkedin: "https://www.linkedin.com/in/reyna-obreg%C3%B3n-8779322a8/",
@@ -48,7 +49,7 @@ const TEAM: Member[] = [
   {
     id: "melanie",
     name: "Melanie",
-    role: "Product Designer",
+    role: "University of Southern California",
     photo: melaniePhoto,
     bio: "Melanie makes sure every screen feels intuitive and on-brand. She champions the user, sweats the details, and keeps the whole product feeling cohesive.",
     linkedin: "https://www.linkedin.com/in/m3lanieperez/",
