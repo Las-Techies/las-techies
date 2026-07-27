@@ -7,6 +7,7 @@ import reynaPhoto from "../assets/team-reyna.png";
 import melaniePhoto from "../assets/team-melanie.png";
 import { ArrowLeft, GithubIcon, LinkedInIcon } from "../components/icons";
 import { useLastNonNull, useModalTransition } from "../hooks/useModalTransition";
+import { useAvatarGroupHover } from "../hooks/useAvatarGroupHover";
 
 type Member = {
   id: string;
@@ -56,6 +57,7 @@ function MeetOurTeamPage() {
   // instant `featuredId` resets to null.
   const frozenFeatured = useLastNonNull(featured);
   const teamModal = useModalTransition(Boolean(featured));
+  const avatarGroup = useAvatarGroupHover<HTMLDivElement>();
 
   return (
     <div className="app-shell">
@@ -74,13 +76,14 @@ function MeetOurTeamPage() {
           <img className="team-hero-mascot" src={mascot} alt="Waving panda" />
         </div>
 
-        <div className="team-row">
-          {TEAM.map((member) => (
+        <div className="team-row" ref={avatarGroup.rootRef} {...avatarGroup.rootProps}>
+          {TEAM.map((member, index) => (
             <button
               key={member.id}
               type="button"
-              className={`team-member ${featuredId === member.id ? "active" : ""}`}
+              className={`team-member t-avatar ${featuredId === member.id ? "active" : ""}`}
               onClick={() => setFeaturedId(member.id)}
+              {...avatarGroup.getItemProps(index)}
             >
               <img className="team-avatar" src={member.photo} alt={member.name} />
               <span className="team-name">{member.name}</span>
