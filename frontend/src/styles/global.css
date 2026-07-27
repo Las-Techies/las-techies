@@ -10,6 +10,74 @@
   --sf-glass: rgba(255, 255, 255, 0.62);
   --sf-glass-border: rgba(255, 255, 255, 0.7);
   --sf-glass-shadow: 0 22px 54px rgba(9, 40, 82, 0.22);
+
+  /* transitions.dev motion tokens (shared scale used by t-* transitions) */
+  --duration-fast: 250ms;
+  --ease-smooth-out: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* Plus-to-menu morph (Sage chat FAB -> panel) */
+  --morph-open-dur: 350ms;
+  --morph-close-dur: 250ms;
+  --morph-ease: cubic-bezier(0.34, 1.25, 0.64, 1);
+  --morph-close-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --morph-r-closed: 999px;
+  --morph-fade-dur: 200ms;
+  --morph-slide: 40px;
+  --morph-scale: 0.97;
+  --morph-blur: 2px;
+
+  /* Modal open / close (shared by every dialog in the app) */
+  --modal-open-dur: 250ms;
+  --modal-close-dur: 150ms;
+  --modal-scale: 0.96;
+  --modal-scale-close: 0.96;
+  --modal-ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* transitions.dev "modal open / close" — layered onto each dialog's own
+   surface class (`.modal-card`, `.doc-modal`, `.confirm-modal`,
+   `.team-feature`) via the shared `.t-modal` behavior class, driven by the
+   `useModalTransition` hook. `.t-modal-backdrop` fades the dimmed overlay
+   in step with it. See `useModalTransition.ts` for the is-open/is-closing
+   orchestration (delayed unmount so the close animation gets to play). */
+.t-modal-backdrop {
+  opacity: 0;
+  transition: opacity var(--modal-open-dur) var(--modal-ease);
+}
+.t-modal-backdrop.is-open {
+  opacity: 1;
+}
+.t-modal-backdrop.is-closing {
+  opacity: 0;
+  transition: opacity var(--modal-close-dur) var(--modal-ease);
+}
+
+.t-modal {
+  transform-origin: center;
+  transform: scale(var(--modal-scale));
+  opacity: 0;
+  transition:
+    transform var(--modal-open-dur) var(--modal-ease),
+    opacity var(--modal-open-dur) var(--modal-ease);
+  will-change: transform, opacity;
+}
+.t-modal.is-open {
+  transform: scale(1);
+  opacity: 1;
+}
+.t-modal.is-closing {
+  transform: scale(var(--modal-scale-close));
+  opacity: 0;
+  transition:
+    transform var(--modal-close-dur) var(--modal-ease),
+    opacity var(--modal-close-dur) var(--modal-ease);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .t-modal-backdrop,
+  .t-modal {
+    transition: none !important;
+  }
 }
 
 * {
@@ -1324,6 +1392,74 @@ label {
   border: 0;
 }
 
+main.mgr-page > section.dropzone > input.sr-only {
+  transition:
+    border-color 0.911s linear(
+      0,
+      0.0209,
+      0.0671,
+      0.129,
+      0.199,
+      0.2721,
+      0.3448,
+      0.4149,
+      0.4809,
+      0.542,
+      0.5978,
+      0.6482,
+      0.6934,
+      0.7336,
+      0.7691,
+      0.8004,
+      0.8278,
+      0.8517,
+      0.8725,
+      0.8906,
+      0.9062,
+      0.9197,
+      0.9313,
+      0.9413,
+      0.9499,
+      0.9573,
+      0.9636,
+      0.969,
+      0.9736,
+      0.9776,
+      0.9809,
+      0.9838,
+      0.9862,
+      0.9883,
+      0.9901,
+      0.9916,
+      0.9929,
+      0.994,
+      0.9949,
+      0.9957,
+      0.9963,
+      0.9969,
+      0.9974,
+      0.9978,
+      0.9981,
+      0.9984,
+      0.9986,
+      0.9989,
+      0.999,
+      0.9992,
+      0.9993,
+      0.9994,
+      0.9995,
+      0.9996,
+      0.9996,
+      0.9997,
+      0.9997,
+      0.9998,
+      0.9998,
+      0.9998,
+      1
+    ),
+    box-shadow 0.15s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
 .results-top {
   display: grid;
   grid-template-columns: 280px 1fr;
@@ -2427,73 +2563,128 @@ label {
   text-decoration: underline;
 }
 
-/* ===== Sage floating chat widget ===== */
-.chat-fab {
+/* ===== Sage floating chat widget =====
+   The FAB morphs into the chat panel in place (transitions.dev "plus to
+   menu morph" pattern) instead of the button disappearing and a separate
+   panel popping in next to it. `.chat-morph` owns the fixed position and
+   is the thing whose width/height/border-radius animate; the button and
+   the panel content are both always mounted inside it and cross-fade via
+   `data-open`, so the close direction gets a real animation too (previously
+   the panel just unmounted instantly on close). */
+.chat-morph {
   position: fixed;
   bottom: 24px;
   right: 24px;
   width: 56px;
   height: 56px;
+  border-radius: var(--morph-r-closed);
+  overflow: hidden;
+  box-shadow: 0 10px 24px rgba(11, 79, 148, 0.35);
+  z-index: 60;
+  transition:
+    width var(--morph-close-dur) var(--morph-close-ease),
+    height var(--morph-close-dur) var(--morph-close-ease),
+    border-radius var(--morph-close-dur) var(--morph-close-ease),
+    box-shadow var(--morph-close-dur) var(--morph-close-ease);
+}
+
+.chat-morph[data-open="true"] {
+  width: min(440px, 92vw);
+  height: calc(100vh - 120px);
+  border-radius: 18px;
+  box-shadow: -10px 0 34px rgba(2, 42, 84, 0.2);
+  transition:
+    width var(--morph-open-dur) var(--morph-ease),
+    height var(--morph-open-dur) var(--morph-ease),
+    border-radius var(--morph-open-dur) var(--morph-ease),
+    box-shadow var(--morph-open-dur) var(--morph-ease);
+}
+
+/* The FAB button itself: pinned to the bottom-right corner of `.chat-morph`
+   so it stays put while the box grows up-and-left out from underneath it,
+   then fades/slides out of the way once the panel content reveals. */
+.chat-morph-plus {
+  position: absolute;
+  inset: auto 0 0 auto;
+  width: 56px;
+  height: 56px;
   border-radius: 999px;
   border: none;
   background: #0b4f94;
+  color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  box-shadow: 0 10px 24px rgba(11, 79, 148, 0.35);
-  z-index: 60;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  transition:
+    opacity var(--morph-fade-dur) var(--morph-close-ease),
+    transform var(--morph-open-dur) var(--morph-close-ease),
+    filter var(--morph-fade-dur) var(--morph-close-ease),
+    box-shadow var(--duration-fast) var(--ease-smooth-out);
 }
 
-.chat-fab:hover {
+.chat-morph-plus:hover {
   transform: translateY(-2px);
   box-shadow: 0 14px 28px rgba(11, 79, 148, 0.42);
 }
 
-.chat-fab:active {
+.chat-morph-plus:active {
   transform: scale(0.95);
 }
 
-/* Doubled-up class selector (rather than plain .chat-widget-panel) so this
-   reliably wins over .ai-card's `position: relative` regardless of the two
-   rules' order in the file — same specificity single-class selectors would
-   otherwise let whichever is declared last silently take over `position`. *
-   Docked as a full-height sidebar (rather than a small floating box) so
-   there's real room to read longer answers. Sits below the pill nav (top
-   offset) and slides in from the right edge of the screen. */
-.ai-card.chat-widget-panel {
-  position: fixed;
-  top: 96px;
-  bottom: 16px;
-  right: 16px;
-  margin: 0;
-  width: min(440px, 92vw);
-  height: auto;
-  border-radius: 18px;
-  box-shadow: -10px 0 34px rgba(2, 42, 84, 0.2);
-  z-index: 59;
-  animation: chatSidebarSlideIn 0.22s ease;
+.chat-morph[data-open="true"] .chat-morph-plus {
+  opacity: 0;
+  transform: translateX(calc(-1 * var(--morph-slide))) scale(var(--morph-scale));
+  filter: blur(var(--morph-blur));
+  pointer-events: none;
 }
 
-@keyframes chatSidebarSlideIn {
-  from {
-    opacity: 0;
-    transform: translateX(24px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
+/* The panel content: starts slid in + scaled + blurred behind the FAB and
+   reveals as the box grows. Fills `.chat-morph` completely once open.
+   Doubled-up `.ai-card.chat-morph-menu` selector (matching the old
+   `.ai-card.chat-widget-panel` pattern) so this reliably wins over
+   `.ai-card`'s own `height: 540px` regardless of the two rules' source
+   order — a single-class `.chat-morph-menu` would tie on specificity and
+   let whichever is declared last silently win. */
+.ai-card.chat-morph-menu {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  transform: translateX(var(--morph-slide)) scale(var(--morph-scale));
+  filter: blur(var(--morph-blur));
+  pointer-events: none;
+  transition:
+    opacity var(--morph-fade-dur) var(--morph-close-ease),
+    transform var(--morph-open-dur) var(--morph-close-ease),
+    filter var(--morph-fade-dur) var(--morph-close-ease);
+}
+
+.chat-morph[data-open="true"] .ai-card.chat-morph-menu {
+  opacity: 1;
+  transform: translateX(0) scale(1);
+  filter: blur(0);
+  pointer-events: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-morph,
+  .chat-morph-plus,
+  .chat-morph-menu {
+    transition: none !important;
   }
 }
 
 @media (max-width: 480px) {
-  .ai-card.chat-widget-panel {
+  .chat-morph[data-open="true"] {
     top: 0;
     bottom: 0;
     left: 0;
     right: 0;
-    width: auto;
+    width: 100vw;
+    height: 100vh;
     border-radius: 0;
   }
 }
@@ -5591,7 +5782,10 @@ label {
   text-shadow: 0 1px 0 rgba(255, 255, 255, 0.45);
 }
 
-/* Featured member modal (opens on avatar click) */
+/* Featured member modal (opens on avatar click). Fade/scale handled by the
+   `.t-modal-backdrop` / `.t-modal` classes (see the modal open/close block
+   near the top of this file) instead of the old one-shot `fadeInUp`
+   keyframe, so it gets a proper close animation too. */
 .team-modal-backdrop {
   position: fixed;
   inset: 0;
@@ -5602,7 +5796,6 @@ label {
   background: rgba(9, 30, 62, 0.34);
   backdrop-filter: blur(3px);
   -webkit-backdrop-filter: blur(3px);
-  animation: fadeInUp 0.18s ease;
 }
 
 .team-feature {
@@ -5614,7 +5807,6 @@ label {
   align-items: center;
   background: rgba(244, 249, 255, 0.9);
   box-shadow: 0 40px 90px rgba(6, 28, 62, 0.4);
-  animation: fadeInUp 0.22s ease;
 }
 
 .team-feature-photo {

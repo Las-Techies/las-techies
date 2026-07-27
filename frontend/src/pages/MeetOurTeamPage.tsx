@@ -6,6 +6,7 @@ import esmePhoto from "../assets/team-esme.png";
 import reynaPhoto from "../assets/team-reyna.png";
 import melaniePhoto from "../assets/team-melanie.png";
 import { ArrowLeft, GithubIcon, LinkedInIcon } from "../components/icons";
+import { useLastNonNull, useModalTransition } from "../hooks/useModalTransition";
 
 type Member = {
   id: string;
@@ -50,6 +51,11 @@ function MeetOurTeamPage() {
   const navigate = useNavigate();
   const [featuredId, setFeaturedId] = useState<string | null>(null);
   const featured = TEAM.find((member) => member.id === featuredId) ?? null;
+  // Frozen copy so the modal keeps showing the last-featured teammate while
+  // it plays its close animation, instead of the content vanishing the
+  // instant `featuredId` resets to null.
+  const frozenFeatured = useLastNonNull(featured);
+  const teamModal = useModalTransition(Boolean(featured));
 
   return (
     <div className="app-shell">
@@ -82,15 +88,15 @@ function MeetOurTeamPage() {
           ))}
         </div>
 
-        {featured ? (
+        {teamModal.shouldRender && frozenFeatured ? (
           <div
-            className="team-modal-backdrop"
+            className={`team-modal-backdrop t-modal-backdrop ${teamModal.phaseClassName}`}
             role="dialog"
             aria-modal="true"
             onClick={() => setFeaturedId(null)}
           >
             <section
-              className="glass team-feature"
+              className={`glass team-feature t-modal ${teamModal.phaseClassName}`}
               onClick={(event) => event.stopPropagation()}
             >
               <button
@@ -101,10 +107,14 @@ function MeetOurTeamPage() {
               >
                 ×
               </button>
-              <img className="team-feature-photo" src={featured.photo} alt={featured.name} />
+              <img
+                className="team-feature-photo"
+                src={frozenFeatured.photo}
+                alt={frozenFeatured.name}
+              />
               <div className="team-feature-body">
-                <h2>{featured.name}</h2>
-                <p className="team-feature-bio">{featured.bio}</p>
+                <h2>{frozenFeatured.name}</h2>
+                <p className="team-feature-bio">{frozenFeatured.bio}</p>
                 <div className="team-feature-links">
                   <button type="button" className="team-social">
                     <LinkedInIcon /> LinkedIn
