@@ -10,6 +10,109 @@
   --sf-glass: rgba(255, 255, 255, 0.62);
   --sf-glass-border: rgba(255, 255, 255, 0.7);
   --sf-glass-shadow: 0 22px 54px rgba(9, 40, 82, 0.22);
+
+  /* transitions.dev motion tokens (shared scale used by t-* transitions) */
+  --duration-fast: 250ms;
+  --ease-smooth-out: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* Quick hover/active feedback on buttons, chips, and options — the same
+     150ms ease value was hand-typed ~55 times across this file, so any
+     future re-tuning had to touch every call site. Tokenized here so it's
+     one edit instead of fifty-five. */
+  --ui-hover-dur: 0.15s;
+  --ui-hover-ease: ease;
+
+  /* Plus-to-menu morph (Sage chat FAB -> panel) */
+  --morph-open-dur: 350ms;
+  --morph-close-dur: 250ms;
+  --morph-ease: cubic-bezier(0.34, 1.25, 0.64, 1);
+  --morph-close-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --morph-r-closed: 999px;
+  --morph-fade-dur: 200ms;
+  --morph-slide: 40px;
+  --morph-scale: 0.97;
+  --morph-blur: 2px;
+
+  /* Modal open / close (shared by every dialog in the app) */
+  --modal-open-dur: 250ms;
+  --modal-close-dur: 150ms;
+  --modal-scale: 0.96;
+  --modal-scale-close: 0.96;
+  --modal-ease: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* Avatar group hover (team page member row) */
+  --avatar-lift: -4px;
+  --avatar-dur: 320ms;
+  --avatar-scale: 1.05;
+  --avatar-falloff: 0.45;
+  --avatar-ease-in: cubic-bezier(0.22, 1, 0.36, 1);
+  --avatar-ease-out: cubic-bezier(0.34, 3.85, 0.64, 1);
+
+  /* Sliding pill tabs / segmented controls (e.g. difficulty selector) */
+  --tabs-dur: 250ms;
+  --tabs-ease: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* Success / fail check reveal (quiz results review list) */
+  --check-opacity-dur: 500ms;
+  --check-rotate-dur: 500ms;
+  --check-rotate-from: 80deg;
+  --check-bob-dur: 500ms;
+  --check-y-amount: 40px;
+  --check-blur-dur: 500ms;
+  --check-blur-from: 10px;
+  --check-path-dur: 500ms;
+  --check-path-delay: 80ms;
+  --check-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --check-ease-opacity: cubic-bezier(0.22, 1, 0.36, 1);
+  --check-ease-rotate: cubic-bezier(0.22, 1, 0.36, 1);
+  --check-ease-bob: cubic-bezier(0.34, 1.35, 0.64, 1);
+  --check-ease-path: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* transitions.dev "modal open / close" — layered onto each dialog's own
+   surface class (`.modal-card`, `.doc-modal`, `.confirm-modal`,
+   `.team-feature`) via the shared `.t-modal` behavior class, driven by the
+   `useModalTransition` hook. `.t-modal-backdrop` fades the dimmed overlay
+   in step with it. See `useModalTransition.ts` for the is-open/is-closing
+   orchestration (delayed unmount so the close animation gets to play). */
+.t-modal-backdrop {
+  opacity: 0;
+  transition: opacity var(--modal-open-dur) var(--modal-ease);
+}
+.t-modal-backdrop.is-open {
+  opacity: 1;
+}
+.t-modal-backdrop.is-closing {
+  opacity: 0;
+  transition: opacity var(--modal-close-dur) var(--modal-ease);
+}
+
+.t-modal {
+  transform-origin: center;
+  transform: scale(var(--modal-scale));
+  opacity: 0;
+  transition:
+    transform var(--modal-open-dur) var(--modal-ease),
+    opacity var(--modal-open-dur) var(--modal-ease);
+  will-change: transform, opacity;
+}
+.t-modal.is-open {
+  transform: scale(1);
+  opacity: 1;
+}
+.t-modal.is-closing {
+  transform: scale(var(--modal-scale-close));
+  opacity: 0;
+  transition:
+    transform var(--modal-close-dur) var(--modal-ease),
+    opacity var(--modal-close-dur) var(--modal-ease);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .t-modal-backdrop,
+  .t-modal {
+    transition: none !important;
+  }
 }
 
 * {
@@ -108,7 +211,7 @@ body::before {
   cursor: pointer;
   background: linear-gradient(180deg, #1a7be0 0%, #0b5cab 100%);
   box-shadow: 0 10px 22px rgba(11, 92, 171, 0.4);
-  transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
+  transition: transform var(--ui-hover-dur) var(--ui-hover-ease), box-shadow var(--ui-hover-dur) var(--ui-hover-ease), filter var(--ui-hover-dur) var(--ui-hover-ease);
 }
 
 .sf-btn:hover:not(:disabled) {
@@ -149,7 +252,7 @@ input:not([type="radio"]):not([type="checkbox"]) {
   padding: 10px 12px;
   font-size: 14px;
   color: #181818;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition: border-color var(--ui-hover-dur) var(--ui-hover-ease), box-shadow var(--ui-hover-dur) var(--ui-hover-ease);
 }
 
 input[type="radio"],
@@ -169,7 +272,7 @@ select {
   padding: 10px 12px;
   font-size: 14px;
   color: #181818;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition: border-color var(--ui-hover-dur) var(--ui-hover-ease), box-shadow var(--ui-hover-dur) var(--ui-hover-ease);
 }
 
 input:focus-visible {
@@ -387,7 +490,7 @@ label {
   font-weight: 600;
   color: #4a5b73;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all var(--ui-hover-dur) var(--ui-hover-ease);
 }
 
 .seg-opt svg {
@@ -474,7 +577,7 @@ label {
   font-weight: 700;
   cursor: pointer;
   box-shadow: 0 10px 26px rgba(9, 40, 82, 0.22);
-  transition: background 0.15s ease, transform 0.15s ease;
+  transition: background var(--ui-hover-dur) var(--ui-hover-ease), transform var(--ui-hover-dur) var(--ui-hover-ease);
 }
 
 .creators-fab:hover {
@@ -508,7 +611,7 @@ label {
   font-size: 15px;
   font-weight: 700;
   cursor: pointer;
-  transition: background 0.15s ease;
+  transition: background var(--ui-hover-dur) var(--ui-hover-ease);
 }
 
 .back-btn:hover {
@@ -528,7 +631,7 @@ label {
   font-weight: 600;
   border: 1px solid transparent;
   cursor: pointer;
-  transition: background-color 0.15s ease, border-color 0.15s ease;
+  transition: background-color var(--ui-hover-dur) var(--ui-hover-ease), border-color var(--ui-hover-dur) var(--ui-hover-ease);
 }
 
 .primary-btn:active,
@@ -655,7 +758,7 @@ label {
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease;
+  transition: background var(--ui-hover-dur) var(--ui-hover-ease), border-color var(--ui-hover-dur) var(--ui-hover-ease);
 }
 
 .dev-access-btn:hover {
@@ -695,7 +798,7 @@ label {
   font-weight: 600;
   color: #2e2e2e;
   cursor: pointer;
-  transition: background-color 0.15s ease, border-color 0.15s ease;
+  transition: background-color var(--ui-hover-dur) var(--ui-hover-ease), border-color var(--ui-hover-dur) var(--ui-hover-ease);
 }
 
 .google-btn svg {
@@ -795,7 +898,7 @@ label {
   color: #35475f;
   padding: 8px 14px;
   border-radius: 10px;
-  transition: background 0.15s ease, color 0.15s ease;
+  transition: background var(--ui-hover-dur) var(--ui-hover-ease), color var(--ui-hover-dur) var(--ui-hover-ease);
 }
 
 .app-nav-link svg {
@@ -834,7 +937,7 @@ label {
   padding: 6px 8px;
   border-radius: 12px;
   cursor: pointer;
-  transition: background-color 0.15s ease;
+  transition: background-color var(--ui-hover-dur) var(--ui-hover-ease);
 }
 
 .app-nav-user-trigger:hover,
@@ -907,7 +1010,7 @@ label {
   font-size: 13px;
   color: #ba0517;
   cursor: pointer;
-  transition: background-color 0.15s ease;
+  transition: background-color var(--ui-hover-dur) var(--ui-hover-ease);
 }
 
 .app-nav-user-menu button:hover {
@@ -1091,7 +1194,7 @@ label {
   color: #ba0517;
   padding: 0;
   cursor: pointer;
-  transition: background 0.15s ease;
+  transition: background var(--ui-hover-dur) var(--ui-hover-ease);
 }
 
 .delete-icon-btn:hover:not(:disabled) {
@@ -1151,7 +1254,7 @@ label {
   align-items: center;
   gap: 6px;
   cursor: pointer;
-  transition: transform 0.15s ease, background-color 0.15s ease;
+  transition: transform var(--ui-hover-dur) var(--ui-hover-ease), background-color var(--ui-hover-dur) var(--ui-hover-ease);
 }
 
 .done-icon-btn span {
@@ -1243,7 +1346,7 @@ label {
   color: #4a4a4a;
   border: 1px solid transparent;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all var(--ui-hover-dur) var(--ui-hover-ease);
 }
 
 .difficulty-chips .selected {
@@ -1273,7 +1376,7 @@ label {
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
-  transition: opacity 0.15s ease, transform 0.15s ease;
+  transition: opacity var(--ui-hover-dur) var(--ui-hover-ease), transform var(--ui-hover-dur) var(--ui-hover-ease);
   z-index: 20;
 }
 
@@ -1303,7 +1406,7 @@ label {
   width: 100%;
   text-align: left;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all var(--ui-hover-dur) var(--ui-hover-ease);
 }
 
 .question-chip.selected {
@@ -1322,6 +1425,74 @@ label {
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
+}
+
+main.mgr-page > section.dropzone > input.sr-only {
+  transition:
+    border-color 0.911s linear(
+      0,
+      0.0209,
+      0.0671,
+      0.129,
+      0.199,
+      0.2721,
+      0.3448,
+      0.4149,
+      0.4809,
+      0.542,
+      0.5978,
+      0.6482,
+      0.6934,
+      0.7336,
+      0.7691,
+      0.8004,
+      0.8278,
+      0.8517,
+      0.8725,
+      0.8906,
+      0.9062,
+      0.9197,
+      0.9313,
+      0.9413,
+      0.9499,
+      0.9573,
+      0.9636,
+      0.969,
+      0.9736,
+      0.9776,
+      0.9809,
+      0.9838,
+      0.9862,
+      0.9883,
+      0.9901,
+      0.9916,
+      0.9929,
+      0.994,
+      0.9949,
+      0.9957,
+      0.9963,
+      0.9969,
+      0.9974,
+      0.9978,
+      0.9981,
+      0.9984,
+      0.9986,
+      0.9989,
+      0.999,
+      0.9992,
+      0.9993,
+      0.9994,
+      0.9995,
+      0.9996,
+      0.9996,
+      0.9997,
+      0.9997,
+      0.9998,
+      0.9998,
+      0.9998,
+      1
+    ),
+    box-shadow 0.15s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .results-top {
@@ -1625,7 +1796,7 @@ label {
   background: #fff;
   color: #002080;
   cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease;
+  transition: background var(--ui-hover-dur) var(--ui-hover-ease), border-color var(--ui-hover-dur) var(--ui-hover-ease);
 }
 
 .icon-btn svg {
@@ -1672,7 +1843,7 @@ label {
   border-radius: 4px;
   padding: 2px 4px;
   margin: -2px -4px;
-  transition: background 0.15s ease;
+  transition: background var(--ui-hover-dur) var(--ui-hover-ease);
 }
 
 .editable-text:hover {
@@ -2105,7 +2276,7 @@ label {
   gap: 14px;
   padding: 12px 12px;
   border-radius: 12px;
-  transition: background 0.15s ease;
+  transition: background var(--ui-hover-dur) var(--ui-hover-ease);
 }
 
 .nh-step.current {
@@ -2265,7 +2436,7 @@ label {
   font-size: 13px;
   color: #3d3d3d;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all var(--ui-hover-dur) var(--ui-hover-ease);
 }
 
 .lib-chip.selected {
@@ -2320,7 +2491,7 @@ label {
   font-size: 20px;
   line-height: 1;
   cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+  transition: background var(--ui-hover-dur) var(--ui-hover-ease), border-color var(--ui-hover-dur) var(--ui-hover-ease), transform 0.1s ease;
 }
 
 .recent-more:hover {
@@ -2427,73 +2598,128 @@ label {
   text-decoration: underline;
 }
 
-/* ===== Sage floating chat widget ===== */
-.chat-fab {
+/* ===== Sage floating chat widget =====
+   The FAB morphs into the chat panel in place (transitions.dev "plus to
+   menu morph" pattern) instead of the button disappearing and a separate
+   panel popping in next to it. `.chat-morph` owns the fixed position and
+   is the thing whose width/height/border-radius animate; the button and
+   the panel content are both always mounted inside it and cross-fade via
+   `data-open`, so the close direction gets a real animation too (previously
+   the panel just unmounted instantly on close). */
+.chat-morph {
   position: fixed;
   bottom: 24px;
   right: 24px;
   width: 56px;
   height: 56px;
+  border-radius: var(--morph-r-closed);
+  overflow: hidden;
+  box-shadow: 0 10px 24px rgba(11, 79, 148, 0.35);
+  z-index: 60;
+  transition:
+    width var(--morph-close-dur) var(--morph-close-ease),
+    height var(--morph-close-dur) var(--morph-close-ease),
+    border-radius var(--morph-close-dur) var(--morph-close-ease),
+    box-shadow var(--morph-close-dur) var(--morph-close-ease);
+}
+
+.chat-morph[data-open="true"] {
+  width: min(440px, 92vw);
+  height: calc(100vh - 120px);
+  border-radius: 18px;
+  box-shadow: -10px 0 34px rgba(2, 42, 84, 0.2);
+  transition:
+    width var(--morph-open-dur) var(--morph-ease),
+    height var(--morph-open-dur) var(--morph-ease),
+    border-radius var(--morph-open-dur) var(--morph-ease),
+    box-shadow var(--morph-open-dur) var(--morph-ease);
+}
+
+/* The FAB button itself: pinned to the bottom-right corner of `.chat-morph`
+   so it stays put while the box grows up-and-left out from underneath it,
+   then fades/slides out of the way once the panel content reveals. */
+.chat-morph-plus {
+  position: absolute;
+  inset: auto 0 0 auto;
+  width: 56px;
+  height: 56px;
   border-radius: 999px;
   border: none;
   background: #0b4f94;
+  color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  box-shadow: 0 10px 24px rgba(11, 79, 148, 0.35);
-  z-index: 60;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  transition:
+    opacity var(--morph-fade-dur) var(--morph-close-ease),
+    transform var(--morph-open-dur) var(--morph-close-ease),
+    filter var(--morph-fade-dur) var(--morph-close-ease),
+    box-shadow var(--duration-fast) var(--ease-smooth-out);
 }
 
-.chat-fab:hover {
+.chat-morph-plus:hover {
   transform: translateY(-2px);
   box-shadow: 0 14px 28px rgba(11, 79, 148, 0.42);
 }
 
-.chat-fab:active {
+.chat-morph-plus:active {
   transform: scale(0.95);
 }
 
-/* Doubled-up class selector (rather than plain .chat-widget-panel) so this
-   reliably wins over .ai-card's `position: relative` regardless of the two
-   rules' order in the file — same specificity single-class selectors would
-   otherwise let whichever is declared last silently take over `position`. *
-   Docked as a full-height sidebar (rather than a small floating box) so
-   there's real room to read longer answers. Sits below the pill nav (top
-   offset) and slides in from the right edge of the screen. */
-.ai-card.chat-widget-panel {
-  position: fixed;
-  top: 96px;
-  bottom: 16px;
-  right: 16px;
-  margin: 0;
-  width: min(440px, 92vw);
-  height: auto;
-  border-radius: 18px;
-  box-shadow: -10px 0 34px rgba(2, 42, 84, 0.2);
-  z-index: 59;
-  animation: chatSidebarSlideIn 0.22s ease;
+.chat-morph[data-open="true"] .chat-morph-plus {
+  opacity: 0;
+  transform: translateX(calc(-1 * var(--morph-slide))) scale(var(--morph-scale));
+  filter: blur(var(--morph-blur));
+  pointer-events: none;
 }
 
-@keyframes chatSidebarSlideIn {
-  from {
-    opacity: 0;
-    transform: translateX(24px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
+/* The panel content: starts slid in + scaled + blurred behind the FAB and
+   reveals as the box grows. Fills `.chat-morph` completely once open.
+   Doubled-up `.ai-card.chat-morph-menu` selector (matching the old
+   `.ai-card.chat-widget-panel` pattern) so this reliably wins over
+   `.ai-card`'s own `height: 540px` regardless of the two rules' source
+   order — a single-class `.chat-morph-menu` would tie on specificity and
+   let whichever is declared last silently win. */
+.ai-card.chat-morph-menu {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  transform: translateX(var(--morph-slide)) scale(var(--morph-scale));
+  filter: blur(var(--morph-blur));
+  pointer-events: none;
+  transition:
+    opacity var(--morph-fade-dur) var(--morph-close-ease),
+    transform var(--morph-open-dur) var(--morph-close-ease),
+    filter var(--morph-fade-dur) var(--morph-close-ease);
+}
+
+.chat-morph[data-open="true"] .ai-card.chat-morph-menu {
+  opacity: 1;
+  transform: translateX(0) scale(1);
+  filter: blur(0);
+  pointer-events: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-morph,
+  .chat-morph-plus,
+  .chat-morph-menu {
+    transition: none !important;
   }
 }
 
 @media (max-width: 480px) {
-  .ai-card.chat-widget-panel {
+  .chat-morph[data-open="true"] {
     top: 0;
     bottom: 0;
     left: 0;
     right: 0;
-    width: auto;
+    width: 100vw;
+    height: 100vh;
     border-radius: 0;
   }
 }
@@ -2533,7 +2759,7 @@ label {
   border-radius: 999px;
   cursor: pointer;
   padding: 0;
-  transition: background-color 0.15s ease, border-color 0.15s ease;
+  transition: background-color var(--ui-hover-dur) var(--ui-hover-ease), border-color var(--ui-hover-dur) var(--ui-hover-ease);
 }
 
 .ai-head-btn:hover {
@@ -3163,7 +3389,7 @@ label {
   font-size: 15px;
   color: #2b2b2b;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all var(--ui-hover-dur) var(--ui-hover-ease);
 }
 
 .q-option:hover {
@@ -3495,7 +3721,7 @@ label {
   border: 1.5px solid rgba(11, 42, 84, 0.14);
   background: rgba(255, 255, 255, 0.85);
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all var(--ui-hover-dur) var(--ui-hover-ease);
 }
 
 .answer:hover {
@@ -3600,7 +3826,7 @@ label {
   font-size: 15px;
   font-weight: 700;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all var(--ui-hover-dur) var(--ui-hover-ease);
 }
 
 .ghost-btn:hover:not(:disabled) {
@@ -3910,6 +4136,73 @@ label {
   color: #fff;
 }
 
+/* transitions.dev "success check", adapted for both outcomes since the
+   correct/incorrect icons share the same stroke-based shape: each mark
+   fades in, rotates upright, settles with a Y-bob, and draws its stroke
+   path. `--stagger` (set inline per row in QuizResultsPage) cascades the
+   reveal down the review list instead of popping in all at once. */
+.t-success-check {
+  transform-origin: center;
+  opacity: 0;
+  will-change: transform, opacity, filter;
+}
+.t-success-check svg {
+  overflow: visible;
+}
+.t-success-check svg path {
+  stroke-dasharray: 20;
+  stroke-dashoffset: 20;
+}
+/* The X icon draws two line segments in one path (~34 total length vs. the
+   checkmark's ~20), so it needs its own dasharray to draw cleanly. */
+.review-mark.no.t-success-check svg path {
+  stroke-dasharray: 34;
+  stroke-dashoffset: 34;
+}
+
+.t-success-check[data-state="in"] {
+  animation:
+    t-check-fade   var(--check-opacity-dur) var(--check-ease-opacity) var(--stagger, 0ms) forwards,
+    t-check-rotate var(--check-rotate-dur)  var(--check-ease-rotate)  var(--stagger, 0ms) forwards,
+    t-check-blur   var(--check-blur-dur)    var(--check-ease-out)     var(--stagger, 0ms) forwards,
+    t-check-bob    var(--check-bob-dur)     var(--check-ease-bob)     var(--stagger, 0ms) forwards;
+}
+.t-success-check[data-state="in"] svg path {
+  animation: t-check-draw var(--check-path-dur) var(--check-ease-path)
+    calc(var(--check-path-delay, 0ms) + var(--stagger, 0ms)) forwards;
+}
+
+@keyframes t-check-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes t-check-rotate {
+  from { transform: rotate(var(--check-rotate-from)); }
+  to { transform: rotate(0deg); }
+}
+@keyframes t-check-blur {
+  from { filter: blur(var(--check-blur-from)); }
+  to { filter: blur(0); }
+}
+@keyframes t-check-bob {
+  from { translate: 0 var(--check-y-amount); }
+  to { translate: 0 0; }
+}
+@keyframes t-check-draw {
+  to { stroke-dashoffset: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .t-success-check {
+    animation: none !important;
+    opacity: 1;
+  }
+  .t-success-check svg path {
+    animation: none !important;
+    stroke-dashoffset: 0 !important;
+  }
+}
+
 .review-q {
   flex: 1;
   font-size: 14.5px;
@@ -3935,7 +4228,7 @@ label {
   border: 1px solid transparent;
   cursor: pointer;
   font-weight: 600;
-  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  transition: background var(--ui-hover-dur) var(--ui-hover-ease), color var(--ui-hover-dur) var(--ui-hover-ease), border-color var(--ui-hover-dur) var(--ui-hover-ease);
 }
 
 .source-tag-btn svg {
@@ -3963,7 +4256,7 @@ label {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  transition: background var(--ui-hover-dur) var(--ui-hover-ease), color var(--ui-hover-dur) var(--ui-hover-ease), border-color var(--ui-hover-dur) var(--ui-hover-ease);
 }
 
 .source-icon-btn svg {
@@ -4097,7 +4390,7 @@ label {
   align-items: center;
   gap: 34px;
   cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease;
+  transition: background var(--ui-hover-dur) var(--ui-hover-ease), border-color var(--ui-hover-dur) var(--ui-hover-ease);
 }
 
 .dropzone.active {
@@ -4402,7 +4695,7 @@ label {
   border: 3px solid #6f7f9f;
   background: #fff;
   cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease;
+  transition: background var(--ui-hover-dur) var(--ui-hover-ease), border-color var(--ui-hover-dur) var(--ui-hover-ease);
 }
 
 .file-check.selected {
@@ -4659,7 +4952,7 @@ label {
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
-  transition: border-color 0.15s ease, background 0.15s ease;
+  transition: border-color var(--ui-hover-dur) var(--ui-hover-ease), background var(--ui-hover-dur) var(--ui-hover-ease);
 }
 
 .cfg-doc-toggle:hover {
@@ -4800,6 +5093,7 @@ label {
 }
 
 .diff-seg {
+  position: relative;
   display: inline-flex;
   gap: 6px;
   padding: 4px;
@@ -4807,7 +5101,31 @@ label {
   background: #eef1f6;
 }
 
+/* transitions.dev "tabs sliding" — a single pill slides + resizes behind
+   whichever difficulty is active (JS writes its position/width from
+   getBoundingClientRect via useSlidingPill) instead of each button
+   getting its own background flipped on instantly. */
+.diff-seg-pill {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  left: 0;
+  width: 0;
+  border-radius: 8px;
+  background: #1a7be0;
+  box-shadow: 0 4px 10px rgba(26, 123, 224, 0.3);
+  transform: translateX(0);
+  transition:
+    transform var(--tabs-dur) var(--tabs-ease),
+    width var(--tabs-dur) var(--tabs-ease);
+  will-change: transform, width;
+  pointer-events: none;
+  z-index: 0;
+}
+
 .diff-seg button {
+  position: relative;
+  z-index: 1;
   border: none;
   background: none;
   padding: 7px 14px;
@@ -4816,12 +5134,17 @@ label {
   font-weight: 700;
   color: #6b7d95;
   cursor: pointer;
+  transition: color var(--tabs-dur) var(--tabs-ease);
 }
 
 .diff-seg button.on {
-  background: #1a7be0;
   color: #fff;
-  box-shadow: 0 4px 10px rgba(26, 123, 224, 0.3);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .diff-seg-pill {
+    transition: none !important;
+  }
 }
 
 /* Difficulty option wrapper + animated hover tooltip */
@@ -5015,7 +5338,7 @@ label {
   border: 1px solid rgba(11, 42, 84, 0.1);
   background: rgba(255, 255, 255, 0.7);
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all var(--ui-hover-dur) var(--ui-hover-ease);
 }
 
 .qopt:hover {
@@ -5418,7 +5741,7 @@ label {
   border: 1px solid rgba(11, 42, 84, 0.1);
   background: rgba(255, 255, 255, 0.7);
   cursor: pointer;
-  transition: border-color 0.15s ease, background 0.15s ease;
+  transition: border-color var(--ui-hover-dur) var(--ui-hover-ease), background var(--ui-hover-dur) var(--ui-hover-ease);
 }
 
 .learner-roster-item:hover {
@@ -5563,6 +5886,26 @@ label {
   width: 190px;
 }
 
+/* transitions.dev "avatar group hover" — lifting one card gently lifts its
+   neighbors with a power-falloff (see the `.t-avatar` rule + the inline
+   --shift/--scale-active writes in MeetOurTeamPage.tsx), then everything
+   snaps back with a bouncy overshoot on mouse-leave. `.team-member` carries
+   the transform (not just `.team-avatar`) so the name label lifts with its
+   photo as one card. */
+.t-avatar {
+  transform-origin: center;
+  transform: translateY(var(--shift, 0px)) scale(var(--scale-active, 1));
+  transition: transform var(--avatar-dur) var(--avatar-ease-in);
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .t-avatar {
+    transition: none !important;
+    transform: none !important;
+  }
+}
+
 .team-avatar {
   width: 150px;
   height: 150px;
@@ -5570,11 +5913,10 @@ label {
   object-fit: cover;
   border: 4px solid rgba(255, 255, 255, 0.85);
   box-shadow: 0 16px 34px rgba(3, 30, 70, 0.28);
-  transition: transform 0.18s ease, box-shadow 0.18s ease;
+  transition: box-shadow 0.18s ease;
 }
 
 .team-member:hover .team-avatar {
-  transform: translateY(-4px);
   box-shadow: 0 22px 40px rgba(3, 30, 70, 0.34);
 }
 
@@ -5591,7 +5933,10 @@ label {
   text-shadow: 0 1px 0 rgba(255, 255, 255, 0.45);
 }
 
-/* Featured member modal (opens on avatar click) */
+/* Featured member modal (opens on avatar click). Fade/scale handled by the
+   `.t-modal-backdrop` / `.t-modal` classes (see the modal open/close block
+   near the top of this file) instead of the old one-shot `fadeInUp`
+   keyframe, so it gets a proper close animation too. */
 .team-modal-backdrop {
   position: fixed;
   inset: 0;
@@ -5602,7 +5947,6 @@ label {
   background: rgba(9, 30, 62, 0.34);
   backdrop-filter: blur(3px);
   -webkit-backdrop-filter: blur(3px);
-  animation: fadeInUp 0.18s ease;
 }
 
 .team-feature {
@@ -5614,7 +5958,6 @@ label {
   align-items: center;
   background: rgba(244, 249, 255, 0.9);
   box-shadow: 0 40px 90px rgba(6, 28, 62, 0.4);
-  animation: fadeInUp 0.22s ease;
 }
 
 .team-feature-photo {

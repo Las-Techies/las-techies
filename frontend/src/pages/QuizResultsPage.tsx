@@ -5,6 +5,7 @@ import logoBadge from "../assets/sageforce-logo-badge.png";
 import mascot from "../assets/panda-cheer-fullhat.png";
 import { apiFetch } from "../api/client";
 import { findHighlightSpan } from "../features/quiz/citationMatch";
+import { useLastNonNull, useModalTransition } from "../hooks/useModalTransition";
 import { loadQuizAttempt, loadQuizConfig } from "../features/quiz/storage";
 import type { GeneratedQuiz, QuizQuestion } from "../features/quiz/types";
 import {
@@ -140,6 +141,11 @@ function QuizResultsPage() {
 
   const activeSourceRow =
     sourceModalRowId != null ? rows.find((row) => row.id === sourceModalRowId) ?? null : null;
+  // Frozen copy so the modal keeps showing the last-viewed source while it
+  // plays its close animation, instead of the content vanishing the instant
+  // `sourceModalRowId` resets to null.
+  const frozenSourceRow = useLastNonNull(activeSourceRow?.citation ? activeSourceRow : null);
+  const sourceModal = useModalTransition(Boolean(activeSourceRow?.citation));
 
   const openSourceModal = (row: ReviewRow) => {
     if (!row.citation) return;
@@ -313,9 +319,13 @@ function QuizResultsPage() {
               ) : rows.length === 0 ? (
                 <p className="cfg-empty">No quiz results found yet.</p>
               ) : (
-                rows.map((row) => (
+                rows.map((row, index) => (
                   <div className="review-item" key={row.id}>
-                    <span className={`review-mark ${row.correct ? "ok" : "no"}`}>
+                    <span
+                      className={`review-mark t-success-check ${row.correct ? "ok" : "no"}`}
+                      data-state="in"
+                      style={{ "--stagger": `${Math.min(index, 10) * 45}ms` } as CSSProperties}
+                    >
                       {row.correct ? <CheckPlain /> : <XPlain />}
                     </span>
                     <span className="review-q">{row.text}</span>
@@ -346,21 +356,21 @@ function QuizResultsPage() {
           </button>
         </div>
 
-        {activeSourceRow?.citation ? (
+        {sourceModal.shouldRender && frozenSourceRow ? (
           <div
-            className="modal-backdrop"
+            className={`modal-backdrop t-modal-backdrop ${sourceModal.phaseClassName}`}
             role="dialog"
             aria-modal="true"
             onClick={() => setSourceModalRowId(null)}
           >
             <div
-              className="modal-card rp-source-modal"
+              className={`modal-card rp-source-modal t-modal ${sourceModal.phaseClassName}`}
               onClick={(event) => event.stopPropagation()}
             >
               <div className="rp-source-head">
                 <div>
                   <span className="rp-source-eyebrow">Source document</span>
-                  <h3>{activeSourceRow.citation.sourceDocumentTitle}</h3>
+                  <h3>{frozenSourceRow.citation!.sourceDocumentTitle}</h3>
                 </div>
                 <button
                   type="button"
@@ -372,19 +382,19 @@ function QuizResultsPage() {
                 </button>
               </div>
               <div className="rp-source-body">
-                {sourceLoadingByDocumentId[activeSourceRow.citation.sourceDocumentId] ? (
+                {sourceLoadingByDocumentId[frozenSourceRow.citation!.sourceDocumentId] ? (
                   <p className="cfg-empty">Loading source…</p>
-                ) : sourceErrorByDocumentId[activeSourceRow.citation.sourceDocumentId] ? (
+                ) : sourceErrorByDocumentId[frozenSourceRow.citation!.sourceDocumentId] ? (
                   <p className="form-error">
-                    {sourceErrorByDocumentId[activeSourceRow.citation.sourceDocumentId]}
+                    {sourceErrorByDocumentId[frozenSourceRow.citation!.sourceDocumentId]}
                   </p>
                 ) : (
                   <div className="rp-source-page">
                     {renderHighlightedSource(
-                      sourceTextByDocumentId[activeSourceRow.citation.sourceDocumentId] ??
+                      sourceTextByDocumentId[frozenSourceRow.citation!.sourceDocumentId] ??
                         "No extracted text available for this document.",
-                      activeSourceRow.citation.sourceSnippet,
-                      activeSourceRow.id
+                      frozenSourceRow.citation!.sourceSnippet,
+                      frozenSourceRow.id
                     )}
                   </div>
                 )}

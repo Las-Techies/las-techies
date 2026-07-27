@@ -20,3 +20,11 @@ backend/.cache/
 .shots/
 .v2preview/
 dist/
+
+# transitions-refine (npx transitions-refine live) local relay state —
+# points at localhost, never meant to be committed. `frontend/index.html`'s
+# injected <script> tag is stripped automatically by `transitions-refine
+# stop` and shouldn't be committed either.
+.agents/
+.refine-relay.json
+.refine-relay.log

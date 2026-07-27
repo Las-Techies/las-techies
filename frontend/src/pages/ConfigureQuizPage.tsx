@@ -11,6 +11,7 @@ import {
   type TeamDocument,
 } from "../api/client";
 import { loadDeselectedDocumentIds, saveQuizConfig } from "../features/quiz/storage";
+import { useSlidingPill } from "../hooks/useSlidingPill";
 import type { GeneratedQuiz, QuizDifficulty, QuizQuestion } from "../features/quiz/types";
 import { PencilIcon, RegenerateIcon } from "../components/icons/QuizIcons";
 import {
@@ -73,6 +74,7 @@ function ConfigureQuizPage() {
     dueDate: "",
     difficulty: "Medium",
   });
+  const difficultyPill = useSlidingPill<HTMLSpanElement, HTMLSpanElement>(form.difficulty);
   const [isGenerating, setIsGenerating] = useState(false);
   const [quiz, setQuiz] = useState<GeneratedQuiz | null>(null);
   // Questions revealed one-by-one as the model streams them, before the final
@@ -711,11 +713,13 @@ function ConfigureQuizPage() {
               </span>
               <span className="cfg-field-label">Difficulty</span>
               <span className="cfg-field-control">
-                <span className="diff-seg">
+                <span className="diff-seg" ref={difficultyPill.containerRef}>
+                  <span className="diff-seg-pill" ref={difficultyPill.pillRef} aria-hidden="true" />
                   {(["Easy", "Medium", "Hard"] as const).map((value) => (
                     <span className="diff-opt" key={value}>
                       <button
                         type="button"
+                        ref={difficultyPill.setItemRef(value)}
                         className={form.difficulty === value ? "on" : ""}
                         onClick={() => updateForm("difficulty", value)}
                       >
