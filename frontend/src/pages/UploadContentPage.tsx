@@ -81,6 +81,11 @@ type GooglePickerPickerBuilder = {
 };
 
 type GooglePickerNamespace = NonNullable<NonNullable<Window["google"]>["picker"]>;
+type PickerDocumentPayload = Record<string, unknown> & {
+  id?: string;
+  mimeType?: string;
+  type?: string;
+};
 
 const extBadge = (name: string): { label: string; cls: string } => {
   const ext = fileExt(name);
@@ -634,27 +639,37 @@ function UploadContentPage() {
             }
             if (action !== googlePicker.Action.PICKED) return;
 
-            const pickedDocs =
-              (pickerData[googlePicker.Response.DOCUMENTS] as Array<Record<string, string>>) ?? [];
+            const pickedDocs = ((pickerData[googlePicker.Response.DOCUMENTS] as
+              | PickerDocumentPayload[]
+              | undefined) ?? []) as PickerDocumentPayload[];
 
             const pickedFolders = pickedDocs
-              .filter(
-                (doc) =>
-                  doc[googlePicker.Document.TYPE] === "application/vnd.google-apps.folder"
-              )
-              .map((doc) => doc[googlePicker.Document.ID])
+              .filter((doc) => {
+                const mimeType =
+                  String(doc.mimeType ?? doc[googlePicker.Document.TYPE] ?? "").trim();
+                return mimeType === "application/vnd.google-apps.folder";
+              })
+              .map((doc) => String(doc.id ?? doc[googlePicker.Document.ID] ?? "").trim())
               .filter(Boolean);
 
             const pickedGoogleDocs = pickedDocs
-              .filter(
-                (doc) =>
-                  doc[googlePicker.Document.TYPE] === "application/vnd.google-apps.document"
-              )
-              .map((doc) => doc[googlePicker.Document.ID])
+              .filter((doc) => {
+                const mimeType =
+                  String(doc.mimeType ?? doc[googlePicker.Document.TYPE] ?? "").trim();
+                return mimeType === "application/vnd.google-apps.document";
+              })
+              .map((doc) => String(doc.id ?? doc[googlePicker.Document.ID] ?? "").trim())
               .filter(Boolean)
               .map((docId) => `${GOOGLE_DOC_URL_PREFIX}${docId}`);
 
             void (async () => {
+              if (pickedFolders.length === 0 && pickedGoogleDocs.length === 0) {
+                setError(
+                  "No supported Google Docs or folders were selected. Please pick a Google Doc or Drive folder."
+                );
+                resolve();
+                return;
+              }
               if (pickedFolders.length > 0) {
                 await handleGoogleDriveFolderImport(pickedFolders[0]);
               }
