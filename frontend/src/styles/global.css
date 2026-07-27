@@ -20,13 +20,13 @@ body {
   margin: 0;
   min-height: 100vh;
   color: #0b1f3a;
-  background-color: #4a97e4;
+  background-color: #58a5ec;
   background-image:
-    radial-gradient(1300px 340px at 28% 24%, rgba(255, 255, 255, 0.38), transparent 62%),
-    radial-gradient(1100px 300px at 72% 52%, rgba(206, 236, 255, 0.32), transparent 62%),
-    radial-gradient(1500px 950px at 6% -6%, rgba(196, 226, 251, 0.6), transparent 55%),
-    radial-gradient(1200px 820px at 98% 108%, rgba(18, 74, 146, 0.42), transparent 55%),
-    linear-gradient(152deg, #aedaf8 0%, #7cbaf1 34%, #4f9be6 66%, #3181d8 100%);
+    radial-gradient(1200px 520px at 22% 6%, rgba(255, 255, 255, 0.68), transparent 60%),
+    radial-gradient(1050px 640px at 80% 22%, rgba(255, 255, 255, 0.34), transparent 62%),
+    radial-gradient(900px 900px at 6% 92%, rgba(255, 255, 255, 0.22), transparent 60%),
+    radial-gradient(1300px 900px at 60% 122%, rgba(41, 116, 199, 0.4), transparent 60%),
+    linear-gradient(155deg, #93c9f7 0%, #66acef 40%, #4d98e7 72%, #3f8ce0 100%);
   background-attachment: fixed;
 }
 
@@ -47,6 +47,33 @@ body::before {
     radial-gradient(1.6px 1.6px at 52% 80%, rgba(255, 255, 255, 0.7), transparent 60%),
     radial-gradient(1.4px 1.4px at 34% 46%, rgba(255, 255, 255, 0.65), transparent 60%);
   opacity: 0.55;
+}
+
+/* Soft light halo that trails the cursor (see CursorGlow.tsx) */
+.cursor-glow {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 760px;
+  height: 760px;
+  margin: -380px 0 0 -380px;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 0;
+  mix-blend-mode: screen;
+  will-change: transform;
+  background: radial-gradient(
+    circle,
+    rgba(255, 255, 255, 0.4) 0%,
+    rgba(214, 236, 255, 0.22) 34%,
+    rgba(255, 255, 255, 0) 70%
+  );
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cursor-glow {
+    display: none;
+  }
 }
 
 /* Keep interactive content above the sparkle layer */
@@ -206,7 +233,7 @@ label {
   flex-direction: column;
   align-items: center;
   width: fit-content;
-  color: #fff;
+  color: var(--sf-navy);
 }
 
 .login-wordmark {
@@ -217,7 +244,7 @@ label {
   font-weight: 800;
   letter-spacing: -0.02em;
   line-height: 1;
-  text-shadow: 0 6px 22px rgba(3, 30, 70, 0.32);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
 }
 
 .login-wordmark svg {
@@ -230,8 +257,8 @@ label {
   text-align: center;
   font-size: 18px;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.92);
-  text-shadow: 0 2px 12px rgba(3, 30, 70, 0.28);
+  color: rgba(6, 32, 66, 0.72);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
 }
 
 .login-card {
@@ -462,7 +489,7 @@ label {
 
 /* "Back to login" button on the Meet Our Team page */
 .team-topbar {
-  max-width: 1160px;
+  max-width: 1680px;
   margin: 20px auto 0;
   padding: 0 8px;
 }
@@ -708,7 +735,7 @@ label {
 }
 
 .app-nav {
-  max-width: 1200px;
+  max-width: 1680px;
   margin: 18px auto 0;
   padding: 9px 14px 9px 16px;
   border-radius: 20px;
@@ -888,9 +915,9 @@ label {
 }
 
 .page-wrap {
-  max-width: 1100px;
+  max-width: 1680px;
   margin: 0 auto;
-  padding: 24px;
+  padding: 24px clamp(20px, 3vw, 40px);
 }
 
 .page-wrap h1 {
@@ -1916,9 +1943,9 @@ label {
 
 /* ===== New Hire Home ===== */
 .nh-home {
-  max-width: 1200px;
+  max-width: 1680px;
   margin: 0 auto;
-  padding: 34px 40px 60px;
+  padding: 34px clamp(20px, 3vw, 44px) 60px;
 }
 
 .nh-hero {
@@ -1935,15 +1962,15 @@ label {
   line-height: 1.02;
   letter-spacing: -0.02em;
   font-weight: 800;
-  color: #fff;
-  text-shadow: 0 4px 20px rgba(3, 30, 70, 0.28);
+  color: var(--sf-navy);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.45);
 }
 
 .nh-hero-sub {
   margin: 12px 0 0;
   font-size: 18px;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.92);
+  color: rgba(6, 32, 66, 0.72);
   text-shadow: 0 2px 10px rgba(3, 30, 70, 0.22);
 }
 
@@ -3245,7 +3272,7 @@ label {
    Shared: minimal top bar (quiz taking / results), wizard step indicator
    ========================================================================= */
 .slim-topbar {
-  max-width: 1120px;
+  max-width: 1680px;
   margin: 20px auto 0;
   padding: 12px 22px;
   border-radius: 20px;
@@ -3324,7 +3351,7 @@ label {
   flex-direction: column;
   align-items: center;
   gap: 8px;
-  color: rgba(255, 255, 255, 0.85);
+  color: rgba(6, 32, 66, 0.55);
 }
 
 .wizard-num {
@@ -3335,21 +3362,22 @@ label {
   place-items: center;
   font-size: 14px;
   font-weight: 700;
-  background: rgba(255, 255, 255, 0.28);
-  color: #fff;
-  border: 1px solid rgba(255, 255, 255, 0.5);
+  background: #fff;
+  color: var(--sf-blue);
+  border: 1px solid rgba(11, 92, 171, 0.3);
 }
 
 .wizard-step.active .wizard-num {
-  background: #fff;
-  color: var(--sf-blue);
-  border-color: #fff;
+  background: linear-gradient(180deg, #1a7be0 0%, #0b5cab 100%);
+  color: #fff;
+  border-color: transparent;
   box-shadow: 0 4px 12px rgba(9, 40, 82, 0.25);
 }
 
 .wizard-step.done .wizard-num {
-  background: rgba(255, 255, 255, 0.9);
-  color: var(--sf-blue);
+  background: linear-gradient(180deg, #1a7be0 0%, #0b5cab 100%);
+  color: #fff;
+  border-color: transparent;
 }
 
 .wizard-label {
@@ -3359,7 +3387,7 @@ label {
 }
 
 .wizard-step.active .wizard-label {
-  color: #fff;
+  color: var(--sf-navy);
 }
 
 .wizard-connector {
@@ -3367,21 +3395,21 @@ label {
   height: 2px;
   min-width: 42px;
   margin: 17px 6px 0;
-  background: rgba(255, 255, 255, 0.45);
+  background: rgba(6, 32, 66, 0.2);
   border-radius: 2px;
 }
 
 .wizard-connector.done {
-  background: #fff;
+  background: var(--sf-blue);
 }
 
 /* =========================================================================
    Quiz Taking
    ========================================================================= */
 .quiz-stage {
-  max-width: 900px;
+  max-width: 1120px;
   margin: 0 auto;
-  padding: 30px 24px 56px;
+  padding: 30px clamp(20px, 3vw, 40px) 56px;
 }
 
 .quiz-panel {
@@ -3615,9 +3643,9 @@ label {
    Quiz Results
    ========================================================================= */
 .results-stage {
-  max-width: 1120px;
+  max-width: 1680px;
   margin: 0 auto;
-  padding: 8px 24px 56px;
+  padding: 8px clamp(20px, 3vw, 40px) 56px;
   position: relative;
 }
 
@@ -3643,15 +3671,15 @@ label {
   line-height: 1;
   font-weight: 800;
   letter-spacing: -0.02em;
-  color: #fff;
-  text-shadow: 0 6px 22px rgba(3, 30, 70, 0.3);
+  color: var(--sf-navy);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.45);
 }
 
 .results-hero p {
   margin: 0;
   max-width: 420px;
   font-size: 17px;
-  color: rgba(255, 255, 255, 0.92);
+  color: rgba(6, 32, 66, 0.72);
   line-height: 1.45;
 }
 
@@ -3996,9 +4024,9 @@ label {
    Manager: Upload + Configure shared page frame
    ========================================================================= */
 .mgr-page {
-  max-width: 1200px;
+  max-width: 1680px;
   margin: 0 auto;
-  padding: 26px 40px 56px;
+  padding: 26px clamp(20px, 3vw, 44px) 56px;
 }
 
 .mgr-hero {
@@ -4014,14 +4042,14 @@ label {
   font-size: 52px;
   font-weight: 800;
   letter-spacing: -0.02em;
-  color: #fff;
-  text-shadow: 0 5px 20px rgba(3, 30, 70, 0.3);
+  color: var(--sf-navy);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.45);
 }
 
 .mgr-hero p {
   margin: 8px 0 0;
   font-size: 16px;
-  color: rgba(255, 255, 255, 0.9);
+  color: rgba(6, 32, 66, 0.72);
   max-width: 380px;
   line-height: 1.4;
 }
@@ -5424,21 +5452,22 @@ label {
    Marketing nav + Meet Our Team
    ========================================================================= */
 .mkt-nav {
-  max-width: 1160px;
+  max-width: 1680px;
   margin: 20px auto 0;
   padding: 12px 14px 12px 22px;
   border-radius: 22px;
   display: flex;
   align-items: center;
   gap: 20px;
-  background: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.55);
   backdrop-filter: blur(16px) saturate(140%);
   -webkit-backdrop-filter: blur(16px) saturate(140%);
-  border: 1px solid rgba(255, 255, 255, 0.32);
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  box-shadow: 0 14px 34px rgba(9, 40, 82, 0.18);
 }
 
 .mkt-nav .brand-name {
-  color: #fff;
+  color: var(--sf-navy);
 }
 
 .mkt-links {
@@ -5453,7 +5482,7 @@ label {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  color: rgba(255, 255, 255, 0.92);
+  color: #35475f;
   font-size: 15px;
   font-weight: 600;
   cursor: pointer;
@@ -5476,9 +5505,9 @@ label {
 }
 
 .team-stage {
-  max-width: 1160px;
+  max-width: 1680px;
   margin: 0 auto;
-  padding: 20px 40px 60px;
+  padding: 20px clamp(20px, 3vw, 44px) 60px;
   position: relative;
 }
 
@@ -5497,14 +5526,14 @@ label {
   font-size: 76px;
   font-weight: 800;
   letter-spacing: -0.01em;
-  color: #fff;
-  text-shadow: 0 6px 24px rgba(3, 30, 70, 0.3);
+  color: var(--sf-navy);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.45);
 }
 
 .team-hero p {
   margin: 10px 0 0;
   font-size: 20px;
-  color: rgba(255, 255, 255, 0.9);
+  color: rgba(6, 32, 66, 0.72);
 }
 
 .team-hero-mascot {
@@ -5558,8 +5587,8 @@ label {
   font-size: 24px;
   font-weight: 700;
   letter-spacing: 0.01em;
-  color: #fff;
-  text-shadow: 0 3px 14px rgba(3, 30, 70, 0.28);
+  color: var(--sf-navy);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.45);
 }
 
 /* Featured member modal (opens on avatar click) */
