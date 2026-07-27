@@ -7,13 +7,14 @@ import {
   findLatestPublishedQuizForTeam,
   findQuizById,
   findQuizByIdForTeam,
+  findTeamQuizzesWithAssignments,
   isValidQuizStatus,
   markAssignmentComplete,
   updateQuizQuestions,
   updateQuizStatus,
 } from "../models/quiz.model";
 import { findDocumentByIdForTeam } from "../models/document.model";
-import { findUsersByIdsForTeam } from "../models/user.model";
+import { findTeamMembersByRole, findUsersByIdsForTeam } from "../models/user.model";
 import { generateQuiz as generateQuizQuestions } from "../services/quizGenerator";
 import type { GenerationConfig, QuizQuestion } from "../services/quizTypes";
 
@@ -448,6 +449,84 @@ export async function getAssignedQuizzes(req: Request, res: Response, next: Next
         status: assignment.status,
       }))
     );
+  } catch (err) {
+    next(err);
+  }
+}
+
+function average(values: number[]): number | null {
+  if (values.length === 0) return null;
+  return Math.round(values.reduce((sum, value) => sum + value, 0) / values.length);
+}
+
+// Powers the manager dashboard (GET /api/quizzes/manager/dashboard): one
+// call returns everything needed to render both a per-quiz view ("how did
+// each published quiz perform") and a per-learner view ("how is each new
+// hire doing across everything they've been assigned"), team-wide rather
+// than scoped to just the requesting manager — new hires belong to the
+// team, not to whichever manager happened to create a given quiz.
+export async function getManagerDashboard(req: Request, res: Response, next: NextFunction) {
+  try {
+    const user = (req as any).user;
+    const [{ quizzes, joinedAssignments }, learners] = await Promise.all([
+      findTeamQuizzesWithAssignments(user.teamId),
+      findTeamMembersByRole(user.teamId, "new_hire"),
+    ]);
+
+    const quizSummaries = quizzes.map((quiz) => {
+      const forThisQuiz = joinedAssignments
+        .filter((entry) => entry.assignment.quizId === quiz.id)
+        .map((entry) => entry.assignment);
+      const completed = forThisQuiz.filter((assignment) => assignment.status === "completed");
+      const scores = completed
+        .map((assignment) => assignment.score)
+        .filter((score): score is number => typeof score === "number");
+      const times = completed
+        .map((assignment) => assignment.timeTakenSeconds)
+        .filter((time): time is number => typeof time === "number");
+
+      return {
+        id: quiz.id,
+        title: quiz.title,
+        status: quiz.status,
+        createdAt: quiz.createdAt,
+        dueDate: quiz.dueDate,
+        passingScore: quiz.passingScore,
+        assignedCount: forThisQuiz.length,
+        completedCount: completed.length,
+        averageScore: average(scores),
+        averageTimeTakenSeconds: average(times),
+      };
+    });
+
+    const learnerSummaries = learners.map((learner) => {
+      const assignments = joinedAssignments
+        .filter((entry) => entry.assignment.assignedToUserId === learner.id)
+        .map(({ assignment, quiz }) => ({
+          quizId: quiz.id,
+          quizTitle: quiz.title,
+          status: assignment.status,
+          score: assignment.score,
+          timeTakenSeconds: assignment.timeTakenSeconds,
+          completedAt: assignment.completedAt,
+          dueDate: quiz.dueDate,
+        }))
+        .sort((a, b) => {
+          if (a.status !== b.status) return a.status === "completed" ? 1 : -1;
+          const aDue = a.dueDate ? new Date(a.dueDate).getTime() : Infinity;
+          const bDue = b.dueDate ? new Date(b.dueDate).getTime() : Infinity;
+          return aDue - bDue;
+        });
+
+      return {
+        id: learner.id,
+        name: `${learner.firstName} ${learner.lastName}`.trim(),
+        email: learner.email,
+        assignments,
+      };
+    });
+
+    res.json({ data: { quizzes: quizSummaries, learners: learnerSummaries } });
   } catch (err) {
     next(err);
   }

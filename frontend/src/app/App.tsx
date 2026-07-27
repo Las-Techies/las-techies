@@ -10,6 +10,7 @@ import ReviewPublishPage from "../pages/ReviewPublishPage";
 import UploadContentPage from "../pages/UploadContentPage";
 import RequireRole from "../components/RequireRole";
 import MeetOurTeamPage from "../pages/MeetOurTeamPage";
+import ManagerDashboardPage from "../pages/ManagerDashboardPage";
 
 function App() {
   return (
@@ -51,6 +52,14 @@ function App() {
         }
       />
       <Route path="/quiz-results" element={<QuizResultsPage />} />
+      <Route
+        path="/manager-dashboard"
+        element={
+          <RequireRole role="manager">
+            <ManagerDashboardPage />
+          </RequireRole>
+        }
+      />
       <Route path="/meet-our-team" element={<MeetOurTeamPage />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
