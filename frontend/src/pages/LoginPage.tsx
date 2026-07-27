@@ -336,7 +336,7 @@ function LoginPage() {
               <div className="input-wrap">
                 <input
                   type="text"
-                  placeholder="Frida"
+                  placeholder="First Name"
                   value={firstName}
                   onChange={(event) => setFirstName(event.target.value)}
                   style={{ paddingLeft: 14 }}
@@ -348,7 +348,7 @@ function LoginPage() {
               <div className="input-wrap">
                 <input
                   type="text"
-                  placeholder="Arriaga"
+                  placeholder="Last Name"
                   value={lastName}
                   onChange={(event) => setLastName(event.target.value)}
                   style={{ paddingLeft: 14 }}

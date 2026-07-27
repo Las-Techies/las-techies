@@ -461,7 +461,7 @@ function ReviewPublishPage() {
             <div className="learner-email-input">
               <input
                 type="email"
-                placeholder="Enter learner's email"
+                placeholder="Enter learner's email or Google Group email" 
                 value={learnerEmail}
                 onChange={(event) => setLearnerEmail(event.target.value)}
                 onKeyDown={(event) => {
