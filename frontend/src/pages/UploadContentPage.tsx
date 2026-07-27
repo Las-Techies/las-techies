@@ -39,54 +39,8 @@ const GOOGLE_DOC_URL_PREFIX = "https://docs.google.com/document/d/";
 const GOOGLE_PICKER_API_KEY = import.meta.env.VITE_GOOGLE_PICKER_API_KEY ?? "";
 const GOOGLE_PICKER_APP_ID = import.meta.env.VITE_GOOGLE_PICKER_APP_ID ?? "";
 
-declare global {
-  interface Window {
-    gapi?: {
-      load: (library: string, callback: { callback: () => void }) => void;
-    };
-    google?: {
-      picker?: {
-        Action: { PICKED: string; CANCEL: string };
-        Feature: { MULTISELECT_ENABLED: string };
-        ViewId: { DOCS: string; FOLDERS: string };
-        Response: { ACTION: string; DOCUMENTS: string };
-        Document: { ID: string; NAME: string; TYPE: string };
-        DocsView: new (viewId?: string) => GooglePickerDocsView;
-        PickerBuilder: new () => {
-          setDeveloperKey: (key: string) => GooglePickerPickerBuilder;
-          setAppId: (appId: string) => GooglePickerPickerBuilder;
-          setOAuthToken: (token: string) => GooglePickerPickerBuilder;
-          addView: (view: unknown) => GooglePickerPickerBuilder;
-          enableFeature: (feature: string) => GooglePickerPickerBuilder;
-          setCallback: (
-            callback: (data: Record<string, unknown>) => void
-          ) => GooglePickerPickerBuilder;
-          build: () => { setVisible: (visible: boolean) => void };
-        };
-      };
-    };
-  }
-}
-
-type GooglePickerDocsView = {
-  setIncludeFolders: (include: boolean) => GooglePickerDocsView;
-  setSelectFolderEnabled: (enabled: boolean) => GooglePickerDocsView;
-  setMimeTypes: (mimeTypes: string) => GooglePickerDocsView;
-};
-
-type GooglePickerPickerBuilder = {
-  setDeveloperKey: (key: string) => GooglePickerPickerBuilder;
-  setAppId: (appId: string) => GooglePickerPickerBuilder;
-  setOAuthToken: (token: string) => GooglePickerPickerBuilder;
-  addView: (view: unknown) => GooglePickerPickerBuilder;
-  enableFeature: (feature: string) => GooglePickerPickerBuilder;
-  setCallback: (
-    callback: (data: Record<string, unknown>) => void
-  ) => GooglePickerPickerBuilder;
-  build: () => { setVisible: (visible: boolean) => void };
-};
-
-type GooglePickerNamespace = NonNullable<NonNullable<Window["google"]>["picker"]>;
+// `window.gapi` / `window.google` (Picker + GIS) are declared in
+// src/types/google.d.ts.
 type PickerDocumentPayload = Record<string, unknown> & {
   id?: string;
   mimeType?: string;
@@ -361,7 +315,7 @@ function UploadContentPage() {
     if (!token) {
       setNeedsGoogleReconsent(true);
       throw new Error(
-        "Your Google Drive access has expired. Reconnect Google to import this folder."
+        "Your Google Drive access has expired. Reconnect Google to import from Drive."
       );
     }
 
@@ -470,7 +424,11 @@ function UploadContentPage() {
 
   };
 
-  const handleGoogleDriveImport = async (url: string) => {
+  // presetToken lets a caller that already holds a Drive token reuse it. The
+  // Picker flow needs this: requesting a token opens a Google popup, and by the
+  // time the Picker's callback runs we're no longer inside the user's click, so
+  // a second popup would be blocked.
+  const handleGoogleDriveImport = async (url: string, presetToken?: string) => {
     const trimmedUrl = url.trim();
     if (!trimmedUrl) {
       setError("Please paste a Google Docs link.");
@@ -498,9 +456,11 @@ function UploadContentPage() {
       // unauthenticated, so a link the manager could open themselves would
       // fail — or worse, Google would serve its HTML sign-in page with a 200
       // and the backend would store that as the document's text.
-      const googleAccessToken = isGoogleDriveAuthConfigured()
-        ? await requestGoogleDriveAccessToken()
-        : undefined;
+      const googleAccessToken =
+        presetToken ??
+        (isGoogleDriveAuthConfigured()
+          ? await requestGoogleDriveAccessToken()
+          : undefined);
 
       const res = await apiFetch<UploadResponse>("/api/documents/import/google-drive", {
         method: "POST",
@@ -536,7 +496,11 @@ function UploadContentPage() {
     }
   };
 
-  const handleGoogleDriveFolderImport = async (folderInputRaw: string) => {
+  // See handleGoogleDriveImport for why presetToken exists.
+  const handleGoogleDriveFolderImport = async (
+    folderInputRaw: string,
+    presetToken?: string
+  ) => {
     const folderInput = folderInputRaw.trim();
     if (!folderInput) {
       setError("Please paste a Google Drive folder URL or folder ID.");
@@ -548,7 +512,7 @@ function UploadContentPage() {
     setIsImportingLink(true);
 
     try {
-      const googleAccessToken = await resolveGoogleDriveToken();
+      const googleAccessToken = presetToken ?? (await resolveGoogleDriveToken());
 
       const res = await apiFetch<GoogleDriveFolderImportResponse>(
         "/api/documents/import/google-drive-folder",
@@ -679,16 +643,13 @@ function UploadContentPage() {
     setIsGooglePickerLoading(true);
 
     try {
-      const { data } = await supabase.auth.getSession();
-      const googleAccessToken = loadGoogleDriveAccessToken() ?? data.session?.provider_token;
-      if (!googleAccessToken) {
-        throw new Error(
-          "Missing Google provider token. Please sign out and sign in with Google again."
-        );
-      }
+      // Must be the first await in this handler: with GIS this opens Google's
+      // popup, and browsers only allow that while the click is still being
+      // handled. Loading the Picker scripts first would get it blocked.
+      const googleAccessToken = await resolveGoogleDriveToken();
 
       await ensureGooglePickerReady();
-      const googlePicker = window.google?.picker as GooglePickerNamespace | undefined;
+      const googlePicker = window.google?.picker;
       if (!googlePicker) {
         throw new Error("Google Picker failed to initialize.");
       }
@@ -748,11 +709,15 @@ function UploadContentPage() {
                 resolve();
                 return;
               }
+              // Reuse the token we already got — see presetToken's comment.
               if (pickedFolders.length > 0) {
-                await handleGoogleDriveFolderImport(pickedFolders[0]);
+                await handleGoogleDriveFolderImport(
+                  pickedFolders[0],
+                  googleAccessToken
+                );
               }
               for (const docUrl of pickedGoogleDocs) {
-                await handleGoogleDriveImport(docUrl);
+                await handleGoogleDriveImport(docUrl, googleAccessToken);
               }
               resolve();
             })().catch((err) => {
@@ -767,7 +732,14 @@ function UploadContentPage() {
         picker.setVisible(true);
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to open Google Drive Picker.");
+      const message =
+        err instanceof Error ? err.message : "Failed to open Google Drive Picker.";
+      // Google rejecting the token here means the grant is gone, not that the
+      // Picker is broken — offer the reconnect affordance instead.
+      if (isGoogleAuthFailure(message)) {
+        setNeedsGoogleReconsent(true);
+      }
+      setError(message);
     } finally {
       setIsGooglePickerLoading(false);
     }

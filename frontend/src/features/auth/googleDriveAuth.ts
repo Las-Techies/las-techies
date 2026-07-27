@@ -23,34 +23,9 @@
 const GIS_SCRIPT_SRC = "https://accounts.google.com/gsi/client";
 const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.readonly";
 
-type TokenResponse = {
-  access_token?: string;
-  error?: string;
-  error_description?: string;
-};
-
-type TokenClient = {
-  requestAccessToken: () => void;
-};
-
-type TokenClientConfig = {
-  client_id: string;
-  scope: string;
-  callback: (response: TokenResponse) => void;
-  error_callback?: (error: { type?: string; message?: string }) => void;
-};
-
-declare global {
-  interface Window {
-    google?: {
-      accounts: {
-        oauth2: {
-          initTokenClient: (config: TokenClientConfig) => TokenClient;
-        };
-      };
-    };
-  }
-}
+// `window.google` (both the GIS and Picker namespaces) is declared in
+// src/types/google.d.ts — they share one runtime object, so they share one
+// declaration.
 
 let scriptPromise: Promise<void> | null = null;
 
