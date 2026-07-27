@@ -161,7 +161,7 @@ function InviteSignupPage() {
                   First Name
                   <input
                     type="text"
-                    placeholder="Frida"
+                    placeholder="First Name"
                     value={firstName}
                     onChange={(event) => setFirstName(event.target.value)}
                   />
@@ -170,7 +170,7 @@ function InviteSignupPage() {
                   Last Name
                   <input
                     type="text"
-                    placeholder="Arriaga"
+                    placeholder="Last Name"
                     value={lastName}
                     onChange={(event) => setLastName(event.target.value)}
                   />
