@@ -1,4 +1,11 @@
-import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type MouseEvent as ReactMouseEvent,
+  type ReactNode,
+} from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import AppNav from "../components/navigation/AppNav";
 import { useAuth } from "../context/AuthContext";
@@ -55,6 +62,80 @@ function embedSrcFor(url: string, mimeType: string | null): string {
 }
 
 type ChatMessage = { role: "assistant" | "user"; text: string; sources?: ChatSource[] };
+
+// Sage's answers are plain prose, but occasionally include "**bold**"
+// emphasis, markdown links, or bullet/numbered lists (e.g. when listing out
+// several people or steps). Rather than pull in a full markdown dependency
+// for a chat bubble, this gives just those common patterns real structure.
+function renderInlineMarkdown(text: string, keyPrefix: string): ReactNode[] {
+  const pattern = /\*\*(.+?)\*\*|\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)|(https?:\/\/[^\s]+)/g;
+  const nodes: ReactNode[] = [];
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+  let i = 0;
+
+  while ((match = pattern.exec(text))) {
+    if (match.index > lastIndex) nodes.push(text.slice(lastIndex, match.index));
+
+    if (match[1] !== undefined) {
+      nodes.push(<strong key={`${keyPrefix}-${i++}`}>{match[1]}</strong>);
+    } else if (match[2] !== undefined && match[3] !== undefined) {
+      nodes.push(
+        <a key={`${keyPrefix}-${i++}`} href={match[3]} target="_blank" rel="noreferrer">
+          {match[2]}
+        </a>
+      );
+    } else if (match[4] !== undefined) {
+      nodes.push(
+        <a key={`${keyPrefix}-${i++}`} href={match[4]} target="_blank" rel="noreferrer">
+          {match[4]}
+        </a>
+      );
+    }
+    lastIndex = match.index + match[0].length;
+  }
+
+  if (lastIndex < text.length) nodes.push(text.slice(lastIndex));
+  return nodes;
+}
+
+function renderMessageText(text: string): ReactNode {
+  const lines = text.split("\n");
+  const blocks: ReactNode[] = [];
+  let listItems: string[] = [];
+
+  const flushList = () => {
+    if (listItems.length === 0) return;
+    const items = listItems;
+    blocks.push(
+      <ul key={`list-${blocks.length}`}>
+        {items.map((item, i) => (
+          <li key={i}>{renderInlineMarkdown(item, `li-${blocks.length}-${i}`)}</li>
+        ))}
+      </ul>
+    );
+    listItems = [];
+  };
+
+  lines.forEach((line, idx) => {
+    const bulletMatch = line.match(/^\s*[-*•]\s+(.*)$/);
+    const numberedMatch = line.match(/^\s*\d+[.)]\s+(.*)$/);
+    if (bulletMatch) {
+      listItems.push(bulletMatch[1]);
+      return;
+    }
+    if (numberedMatch) {
+      listItems.push(numberedMatch[1]);
+      return;
+    }
+    flushList();
+    if (line.trim() === "") return;
+    blocks.push(<p key={`p-${idx}`}>{renderInlineMarkdown(line, `p-${idx}`)}</p>);
+  });
+  flushList();
+
+  return blocks.length > 0 ? blocks : text;
+}
 
 const fileTypeLabel = (title: string): string => {
   const ext = title.split(".").pop()?.toLowerCase() ?? "";
@@ -741,14 +822,16 @@ function LearnerModulePage() {
         </div>
       </main>
 
-      <button
-        type="button"
-        className={`chat-fab ${isChatOpen ? "open" : ""}`}
-        onClick={() => setIsChatOpen((open) => !open)}
-        aria-label={isChatOpen ? "Close Ask Sage chat" : "Open Ask Sage chat"}
-      >
-        {isChatOpen ? <span className="chat-fab-close" aria-hidden>✕</span> : <ChatBubbleIcon />}
-      </button>
+      {!isChatOpen ? (
+        <button
+          type="button"
+          className="chat-fab"
+          onClick={() => setIsChatOpen(true)}
+          aria-label="Open Ask Sage chat"
+        >
+          <ChatBubbleIcon />
+        </button>
+      ) : null}
 
       {isChatOpen ? (
         <div className="card ai-card chat-widget-panel">
@@ -775,6 +858,15 @@ function LearnerModulePage() {
                 onClick={toggleHistory}
               >
                 <HistoryIcon />
+              </button>
+              <button
+                type="button"
+                className="ai-head-btn"
+                title="Close chat"
+                aria-label="Close Ask Sage chat"
+                onClick={() => setIsChatOpen(false)}
+              >
+                ✕
               </button>
             </div>
 
@@ -849,7 +941,9 @@ function LearnerModulePage() {
                         </span>
                       ) : null}
                       <div>
-                        <div className={`bubble ${message.role}`}>{message.text}</div>
+                        <div className={`bubble ${message.role}`}>
+                          {message.role === "assistant" ? renderMessageText(message.text) : message.text}
+                        </div>
                         {sourceTitles.length > 0 ? (
                           <p className="bubble-sources">Sources: {sourceTitles.join(", ")}</p>
                         ) : null}
