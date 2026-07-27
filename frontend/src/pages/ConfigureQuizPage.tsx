@@ -76,6 +76,13 @@ function ConfigureQuizPage() {
   // quiz to restore, on first mount only.
   const [isLoadingQuiz, setIsLoadingQuiz] = useState(true);
   const [generationStatus, setGenerationStatus] = useState("");
+  // Real progress from the backend's SSE "progress" events (questions
+  // detected so far in the LLM's streamed output vs. how many were asked
+  // for) — drives the progress bar's fill %, not a fake/timed animation.
+  const [generationProgress, setGenerationProgress] = useState<{
+    questionsDetected: number;
+    totalQuestions: number;
+  } | null>(null);
   const [error, setError] = useState("");
   // Live team document library (every manager's uploads), pulled from the
   // backend so the manager generates from the same source set the deployed
@@ -226,6 +233,7 @@ function ConfigureQuizPage() {
     setQuiz(null);
     setStreamingQuestions([]);
     setGenerationStatus("Starting generation…");
+    setGenerationProgress(null);
     setIsGenerating(true);
 
     const count = Number.parseInt(form.questionCount, 10) || 3;
@@ -254,6 +262,10 @@ function ConfigureQuizPage() {
                 ? `Retrying (attempt ${event.attempt})… generating questions…`
                 : "Generating questions…"
             );
+            setGenerationProgress({
+              questionsDetected: event.questionsDetected,
+              totalQuestions: event.totalQuestions,
+            });
           } else if (event.type === "question") {
             // Place each question at its index so a retry (which re-streams
             // from index 0) overwrites rather than appends.
@@ -284,6 +296,7 @@ function ConfigureQuizPage() {
     } finally {
       setIsGenerating(false);
       setGenerationStatus("");
+      setGenerationProgress(null);
     }
   };
 
@@ -850,9 +863,30 @@ function ConfigureQuizPage() {
               {isGenerating ? (
                 <div className="qcard-generating">
                   <SparkleIcon style={{ width: 18, height: 18 }} />
-                  <span className="loading-line" />
+                  <div className="gen-progress-track">
+                    <div
+                      className="gen-progress-fill"
+                      style={{
+                        width: `${
+                          generationProgress
+                            ? Math.min(
+                                100,
+                                Math.round(
+                                  (generationProgress.questionsDetected /
+                                    Math.max(1, generationProgress.totalQuestions)) *
+                                    100
+                                )
+                              )
+                            : 4
+                        }%`,
+                      }}
+                    />
+                  </div>
                   <span style={{ whiteSpace: "nowrap" }}>
                     {generationStatus || "Generating questions…"}
+                    {generationProgress
+                      ? ` (${generationProgress.questionsDetected} of ${generationProgress.totalQuestions})`
+                      : ""}
                   </span>
                 </div>
               ) : null}

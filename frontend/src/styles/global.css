@@ -4856,10 +4856,23 @@ label {
   font-weight: 600;
 }
 
-.qcard-generating .loading-line {
+.gen-progress-track {
   flex: 1;
-  height: 14px;
-  margin: 0;
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(1, 118, 211, 0.12);
+  overflow: hidden;
+}
+
+.gen-progress-fill {
+  height: 100%;
+  min-width: 10px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #0176d3, #4fb0ff);
+  /* Real % from the backend's live "questions detected" count, so this
+     slides toward the true value on each SSE update rather than looping
+     indefinitely or faking a timed animation. */
+  transition: width 0.6s cubic-bezier(0.22, 0.9, 0.3, 1);
 }
 
 .cfg-empty {
