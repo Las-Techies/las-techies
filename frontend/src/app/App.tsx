@@ -11,10 +11,13 @@ import UploadContentPage from "../pages/UploadContentPage";
 import RequireRole from "../components/RequireRole";
 import MeetOurTeamPage from "../pages/MeetOurTeamPage";
 import ManagerDashboardPage from "../pages/ManagerDashboardPage";
+import CursorGlow from "../components/CursorGlow";
 
 function App() {
   return (
-    <Routes>
+    <>
+      <CursorGlow />
+      <Routes>
       <Route path="/" element={<LoginPage />} />
       <Route path="/signup" element={<InviteSignupPage />} />
       <Route
@@ -62,7 +65,8 @@ function App() {
       />
       <Route path="/meet-our-team" element={<MeetOurTeamPage />} />
       <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+      </Routes>
+    </>
   );
 }
 
