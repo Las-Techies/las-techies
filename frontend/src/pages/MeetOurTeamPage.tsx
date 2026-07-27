@@ -14,6 +14,8 @@ type Member = {
   role: string;
   photo: string;
   bio: string;
+  linkedin?: string;
+  github?: string;
 };
 
 const TEAM: Member[] = [
@@ -23,6 +25,7 @@ const TEAM: Member[] = [
     role: "Frontend Engineer",
     photo: fridaPhoto,
     bio: "Frida shapes the SageForce experience end to end. She loves clean interfaces, delightful micro-interactions, and making complex flows feel effortless.",
+    // TODO: add Frida's LinkedIn/GitHub URLs once she shares them.
   },
   {
     id: "esme",
@@ -30,6 +33,8 @@ const TEAM: Member[] = [
     role: "Backend Engineer",
     photo: esmePhoto,
     bio: "Esme builds the robust backend systems that power SageForce. She loves distributed systems, clean APIs, and turning complex problems into elegant solutions.",
+    linkedin: "https://www.linkedin.com/in/esmebenitez/",
+    github: "https://github.com/EsmeBenitez",
   },
   {
     id: "reyna",
@@ -37,6 +42,8 @@ const TEAM: Member[] = [
     role: "AI Engineer",
     photo: reynaPhoto,
     bio: "Reyna designs the AI that turns raw documents into sharp quiz questions. She's fascinated by LLMs, evaluation, and shipping models that actually help people.",
+    linkedin: "https://www.linkedin.com/in/reyna-obreg%C3%B3n-8779322a8/",
+    github: "https://github.com/reyna1008",
   },
   {
     id: "melanie",
@@ -44,6 +51,8 @@ const TEAM: Member[] = [
     role: "Product Designer",
     photo: melaniePhoto,
     bio: "Melanie makes sure every screen feels intuitive and on-brand. She champions the user, sweats the details, and keeps the whole product feeling cohesive.",
+    linkedin: "https://www.linkedin.com/in/m3lanieperez/",
+    github: "https://github.com/melanienperez",
   },
 ];
 
@@ -108,12 +117,28 @@ function MeetOurTeamPage() {
                     <p className="team-bio-role">{member.role}</p>
                     <p className="team-bio-text">{member.bio}</p>
                     <div className="team-bio-links">
-                      <button type="button" className="team-social" tabIndex={isOpen ? 0 : -1}>
-                        <LinkedInIcon /> LinkedIn
-                      </button>
-                      <button type="button" className="team-social" tabIndex={isOpen ? 0 : -1}>
-                        <GithubIcon /> GitHub
-                      </button>
+                      {member.linkedin ? (
+                        <a
+                          href={member.linkedin}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="team-social"
+                          tabIndex={isOpen ? 0 : -1}
+                        >
+                          <LinkedInIcon /> LinkedIn
+                        </a>
+                      ) : null}
+                      {member.github ? (
+                        <a
+                          href={member.github}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="team-social"
+                          tabIndex={isOpen ? 0 : -1}
+                        >
+                          <GithubIcon /> GitHub
+                        </a>
+                      ) : null}
                     </div>
                   </div>
                 </div>

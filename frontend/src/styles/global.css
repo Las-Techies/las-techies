@@ -6005,7 +6005,14 @@ main.mgr-page > section.dropzone > input.sr-only {
   color: #263a54;
   font-size: 14px;
   font-weight: 600;
+  text-decoration: none;
   cursor: pointer;
+  transition: background var(--ui-hover-dur) var(--ui-hover-ease), border-color var(--ui-hover-dur) var(--ui-hover-ease);
+}
+
+.team-social:hover {
+  background: #fff;
+  border-color: #1a7be0;
 }
 
 .team-social svg {
