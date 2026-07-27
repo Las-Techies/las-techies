@@ -45,7 +45,17 @@ export async function apiFetch<T>(
 }
 
 export type QuizGenerationEvent =
-  | { type: "progress"; attempt: number; questionsDetected: number; totalQuestions: number }
+  | {
+      type: "progress";
+      attempt: number;
+      questionsDetected: number;
+      totalQuestions: number;
+      // Large quizzes are generated in ~10-question batches server-side
+      // (backend/src/services/quizGenerator.ts) — batch/totalBatches let
+      // the UI show which chunk is in flight, not just an overall count.
+      batch: number;
+      totalBatches: number;
+    }
   | { type: "question"; index: number; question: QuizQuestion }
   | { type: "done"; quiz: GeneratedQuiz }
   | { type: "error"; message: string };

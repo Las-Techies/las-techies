@@ -32,6 +32,12 @@ import {
 
 const DIFFICULTY_VALUES: QuizDifficulty[] = ["Easy", "Medium", "Hard"];
 
+// Kept in sync with the backend's own cap (quizzes.controller.ts) — this is
+// just the UI-facing half of it (input max + a friendly error instead of
+// silently clamping); the backend still enforces it independently since a
+// request could otherwise bypass this.
+const MAX_QUIZ_QUESTIONS = 30;
+
 function toDifficultyLabel(value: unknown): QuizDifficulty | null {
   if (typeof value !== "string") return null;
   return DIFFICULTY_VALUES.find((d) => d.toLowerCase() === value.toLowerCase()) ?? null;
@@ -245,6 +251,13 @@ function ConfigureQuizPage() {
       return;
     }
 
+    const parsedCount = Number.parseInt(form.questionCount, 10);
+    const count = Number.isFinite(parsedCount) ? parsedCount : 3;
+    if (count < 1 || count > MAX_QUIZ_QUESTIONS) {
+      setError(`Number of questions must be between 1 and ${MAX_QUIZ_QUESTIONS}.`);
+      return;
+    }
+
     setError("");
     setQuiz(null);
     setStreamingQuestions([]);
@@ -252,8 +265,6 @@ function ConfigureQuizPage() {
     setGenerationProgress(null);
     setJustGenerated(false);
     setIsGenerating(true);
-
-    const count = Number.parseInt(form.questionCount, 10) || 3;
 
     try {
       const generatedQuiz = await streamQuizGeneration(
@@ -274,10 +285,12 @@ function ConfigureQuizPage() {
         },
         (event) => {
           if (event.type === "progress") {
+            const batchLabel =
+              event.totalBatches > 1 ? ` (batch ${event.batch} of ${event.totalBatches})` : "";
             setGenerationStatus(
               event.attempt > 1
-                ? `Retrying (attempt ${event.attempt})… generating questions…`
-                : "Generating questions…"
+                ? `Retrying${batchLabel} (attempt ${event.attempt})… generating questions…`
+                : `Generating questions…${batchLabel}`
             );
             setGenerationProgress({
               questionsDetected: event.questionsDetected,
@@ -653,7 +666,7 @@ function ConfigureQuizPage() {
                 <input
                   type="number"
                   min={1}
-                  max={50}
+                  max={MAX_QUIZ_QUESTIONS}
                   placeholder="e.g. 10"
                   style={{ width: 90 }}
                   value={form.questionCount}

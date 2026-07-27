@@ -110,10 +110,25 @@ async function getDocumentSource(id: number, teamId: number): Promise<QuizSource
   };
 }
 
+// Kept in sync with the frontend's input `max` (ConfigureQuizPage.tsx) —
+// enforced here too since the frontend limit is only a UI hint and this is
+// the actual guard against a request bypassing it. 30 is also a practical
+// ceiling: even with batching, more than a handful of batches per quiz
+// stops being a great UX (long generation time, lots of source-document
+// context re-sent per batch).
+const MAX_QUIZ_QUESTIONS = 30;
+
 function parseConfig(raw: any): GenerationConfig | null {
   if (!raw || typeof raw !== "object") return null;
   const { numQuestions, difficulty, questionTypes, topic } = raw;
-  if (typeof numQuestions !== "number" || numQuestions < 1) return null;
+  if (
+    typeof numQuestions !== "number" ||
+    !Number.isFinite(numQuestions) ||
+    numQuestions < 1 ||
+    numQuestions > MAX_QUIZ_QUESTIONS
+  ) {
+    return null;
+  }
   if (!["easy", "medium", "hard"].includes(difficulty)) return null;
   if (!Array.isArray(questionTypes) || questionTypes.length === 0) return null;
 
@@ -202,13 +217,18 @@ export async function generateQuiz(req: Request, res: Response, next: NextFuncti
     );
 
     const questions = await generateQuizQuestions(sourceDocuments, config, {
-      onProgress: ({ attempt, questionsDetected }) => {
+      onProgress: ({ attempt, questionsDetected, batch, totalBatches }) => {
         send({
           type: "progress",
           attempt,
           questionsDetected,
           totalQuestions: config.numQuestions,
+          batch,
+          totalBatches,
         });
+      },
+      onQuestion: (index, question) => {
+        send({ type: "question", index, question });
       },
     });
 
