@@ -95,6 +95,14 @@ export const ChevronDown = (props: IconProps) => (
   </svg>
 );
 
+export const MoreHorizontal = (props: IconProps) => (
+  <svg {...base(props)} fill="currentColor" stroke="none">
+    <circle cx="5" cy="12" r="1.6" />
+    <circle cx="12" cy="12" r="1.6" />
+    <circle cx="19" cy="12" r="1.6" />
+  </svg>
+);
+
 export const CheckIcon = (props: IconProps) => (
   <svg {...base(props)}>
     <path d="M4 12l5 5L20 6" />

@@ -34,6 +34,65 @@ import {
 import { supabase } from "../lib/supabaseClient";
 
 const fileExt = (name: string) => name.split(".").pop()?.toLowerCase() ?? "";
+const GOOGLE_API_SCRIPT_ID = "google-api-js";
+const GOOGLE_DOC_URL_PREFIX = "https://docs.google.com/document/d/";
+const GOOGLE_PICKER_API_KEY = import.meta.env.VITE_GOOGLE_PICKER_API_KEY ?? "";
+const GOOGLE_PICKER_APP_ID = import.meta.env.VITE_GOOGLE_PICKER_APP_ID ?? "";
+
+declare global {
+  interface Window {
+    gapi?: {
+      load: (library: string, callback: { callback: () => void }) => void;
+    };
+    google?: {
+      picker?: {
+        Action: { PICKED: string; CANCEL: string };
+        Feature: { MULTISELECT_ENABLED: string };
+        ViewId: { DOCS: string; FOLDERS: string };
+        Response: { ACTION: string; DOCUMENTS: string };
+        Document: { ID: string; NAME: string; TYPE: string };
+        DocsView: new (viewId?: string) => GooglePickerDocsView;
+        PickerBuilder: new () => {
+          setDeveloperKey: (key: string) => GooglePickerPickerBuilder;
+          setAppId: (appId: string) => GooglePickerPickerBuilder;
+          setOAuthToken: (token: string) => GooglePickerPickerBuilder;
+          addView: (view: unknown) => GooglePickerPickerBuilder;
+          enableFeature: (feature: string) => GooglePickerPickerBuilder;
+          setCallback: (
+            callback: (data: Record<string, unknown>) => void
+          ) => GooglePickerPickerBuilder;
+          build: () => { setVisible: (visible: boolean) => void };
+        };
+      };
+    };
+  }
+}
+
+type GooglePickerDocsView = {
+  setIncludeFolders: (include: boolean) => GooglePickerDocsView;
+  setSelectFolderEnabled: (enabled: boolean) => GooglePickerDocsView;
+  setMimeTypes: (mimeTypes: string) => GooglePickerDocsView;
+};
+
+type GooglePickerPickerBuilder = {
+  setDeveloperKey: (key: string) => GooglePickerPickerBuilder;
+  setAppId: (appId: string) => GooglePickerPickerBuilder;
+  setOAuthToken: (token: string) => GooglePickerPickerBuilder;
+  addView: (view: unknown) => GooglePickerPickerBuilder;
+  enableFeature: (feature: string) => GooglePickerPickerBuilder;
+  setCallback: (
+    callback: (data: Record<string, unknown>) => void
+  ) => GooglePickerPickerBuilder;
+  build: () => { setVisible: (visible: boolean) => void };
+};
+
+type GooglePickerNamespace = NonNullable<NonNullable<Window["google"]>["picker"]>;
+type PickerDocumentPayload = Record<string, unknown> & {
+  id?: string;
+  mimeType?: string;
+  type?: string;
+};
+
 const extBadge = (name: string): { label: string; cls: string } => {
   const ext = fileExt(name);
   if (ext === "pdf") return { label: "PDF", cls: "pdf" };
@@ -151,6 +210,7 @@ function UploadContentPage() {
   const [deletingKeys, setDeletingKeys] = useState<Set<string>>(new Set());
   const [linkInput, setLinkInput] = useState("");
   const [isImportingLink, setIsImportingLink] = useState(false);
+  const [isGooglePickerLoading, setIsGooglePickerLoading] = useState(false);
   const [isGithubConnected, setIsGithubConnected] = useState(false);
   const [isConnectingGithub, setIsConnectingGithub] = useState(false);
   // Set when Google's token is missing or Google itself rejected it, so the
@@ -323,6 +383,49 @@ function UploadContentPage() {
   };
 
   const onPickFile = () => fileInputRef.current?.click();
+
+  const loadGoogleApiScript = async () => {
+    if (window.gapi) return;
+
+    await new Promise<void>((resolve, reject) => {
+      const existingScript = document.getElementById(
+        GOOGLE_API_SCRIPT_ID
+      ) as HTMLScriptElement | null;
+      if (existingScript) {
+        existingScript.addEventListener("load", () => resolve(), { once: true });
+        existingScript.addEventListener(
+          "error",
+          () => reject(new Error("Failed to load Google API script.")),
+          { once: true }
+        );
+        return;
+      }
+
+      const script = document.createElement("script");
+      script.id = GOOGLE_API_SCRIPT_ID;
+      script.src = "https://apis.google.com/js/api.js";
+      script.async = true;
+      script.defer = true;
+      script.onload = () => resolve();
+      script.onerror = () => reject(new Error("Failed to load Google API script."));
+      document.body.appendChild(script);
+    });
+  };
+
+  const ensureGooglePickerReady = async () => {
+    await loadGoogleApiScript();
+    await new Promise<void>((resolve, reject) => {
+      window.gapi?.load("picker", {
+        callback: () => resolve(),
+      });
+
+      window.setTimeout(() => {
+        if (!window.google?.picker) {
+          reject(new Error("Google Picker failed to initialize."));
+        }
+      }, 5000);
+    });
+  };
 
   const uploadFiles = async (files: FileList | File[]) => {
     const fileArray = Array.from(files);
@@ -564,6 +667,112 @@ function UploadContentPage() {
     );
   };
 
+  const handlePickFromGoogleDrive = async () => {
+    if (!GOOGLE_PICKER_API_KEY || !GOOGLE_PICKER_APP_ID) {
+      setError(
+        "Google Picker is not configured. Set VITE_GOOGLE_PICKER_API_KEY and VITE_GOOGLE_PICKER_APP_ID in frontend .env."
+      );
+      return;
+    }
+
+    setError("");
+    setIsGooglePickerLoading(true);
+
+    try {
+      const { data } = await supabase.auth.getSession();
+      const googleAccessToken = loadGoogleDriveAccessToken() ?? data.session?.provider_token;
+      if (!googleAccessToken) {
+        throw new Error(
+          "Missing Google provider token. Please sign out and sign in with Google again."
+        );
+      }
+
+      await ensureGooglePickerReady();
+      const googlePicker = window.google?.picker as GooglePickerNamespace | undefined;
+      if (!googlePicker) {
+        throw new Error("Google Picker failed to initialize.");
+      }
+
+      await new Promise<void>((resolve) => {
+        const docsView = new googlePicker.DocsView(googlePicker.ViewId.DOCS)
+          .setMimeTypes("application/vnd.google-apps.document")
+          .setIncludeFolders(true);
+
+        const folderView = new googlePicker.DocsView(googlePicker.ViewId.FOLDERS)
+          .setIncludeFolders(true)
+          .setSelectFolderEnabled(true);
+
+        const picker = new googlePicker.PickerBuilder()
+          .setDeveloperKey(GOOGLE_PICKER_API_KEY)
+          .setAppId(GOOGLE_PICKER_APP_ID)
+          .setOAuthToken(googleAccessToken)
+          .addView(docsView)
+          .addView(folderView)
+          .enableFeature(googlePicker.Feature.MULTISELECT_ENABLED)
+          .setCallback((pickerData: Record<string, unknown>) => {
+            const action = pickerData[googlePicker.Response.ACTION] as string | undefined;
+            if (action === googlePicker.Action.CANCEL) {
+              resolve();
+              return;
+            }
+            if (action !== googlePicker.Action.PICKED) return;
+
+            const pickedDocs = ((pickerData[googlePicker.Response.DOCUMENTS] as
+              | PickerDocumentPayload[]
+              | undefined) ?? []) as PickerDocumentPayload[];
+
+            const pickedFolders = pickedDocs
+              .filter((doc) => {
+                const mimeType =
+                  String(doc.mimeType ?? doc[googlePicker.Document.TYPE] ?? "").trim();
+                return mimeType === "application/vnd.google-apps.folder";
+              })
+              .map((doc) => String(doc.id ?? doc[googlePicker.Document.ID] ?? "").trim())
+              .filter(Boolean);
+
+            const pickedGoogleDocs = pickedDocs
+              .filter((doc) => {
+                const mimeType =
+                  String(doc.mimeType ?? doc[googlePicker.Document.TYPE] ?? "").trim();
+                return mimeType === "application/vnd.google-apps.document";
+              })
+              .map((doc) => String(doc.id ?? doc[googlePicker.Document.ID] ?? "").trim())
+              .filter(Boolean)
+              .map((docId) => `${GOOGLE_DOC_URL_PREFIX}${docId}`);
+
+            void (async () => {
+              if (pickedFolders.length === 0 && pickedGoogleDocs.length === 0) {
+                setError(
+                  "No supported Google Docs or folders were selected. Please pick a Google Doc or Drive folder."
+                );
+                resolve();
+                return;
+              }
+              if (pickedFolders.length > 0) {
+                await handleGoogleDriveFolderImport(pickedFolders[0]);
+              }
+              for (const docUrl of pickedGoogleDocs) {
+                await handleGoogleDriveImport(docUrl);
+              }
+              resolve();
+            })().catch((err) => {
+              setError(
+                err instanceof Error ? err.message : "Google Drive Picker import failed."
+              );
+              resolve();
+            });
+          })
+          .build();
+
+        picker.setVisible(true);
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to open Google Drive Picker.");
+    } finally {
+      setIsGooglePickerLoading(false);
+    }
+  };
+
   const handleDelete = async (upload: UploadedItem) => {
     if (upload.documentId === null) return;
     if (!window.confirm(`Delete "${upload.name}"? This can't be undone.`)) return;
@@ -699,6 +908,14 @@ function UploadContentPage() {
           >
             <GithubIcon />
             {isGithubConnected ? "Connected" : isConnectingGithub ? "Connecting…" : "Connect GitHub"}
+          </button>
+          <button
+            className="import-connect"
+            type="button"
+            onClick={() => void handlePickFromGoogleDrive()}
+            disabled={isGooglePickerLoading || isImportingLink}
+          >
+            {isGooglePickerLoading ? "Opening Drive…" : "Pick from Google Drive"}
           </button>
           <input
             type="text"

@@ -76,6 +76,18 @@ function ConfigureQuizPage() {
   // quiz to restore, on first mount only.
   const [isLoadingQuiz, setIsLoadingQuiz] = useState(true);
   const [generationStatus, setGenerationStatus] = useState("");
+  // Real progress from the backend's SSE "progress" events (questions
+  // detected so far in the LLM's streamed output vs. how many were asked
+  // for) — drives the progress bar's fill %, not a fake/timed animation.
+  const [generationProgress, setGenerationProgress] = useState<{
+    questionsDetected: number;
+    totalQuestions: number;
+  } | null>(null);
+  // True for a few seconds right after a generation this session finishes
+  // successfully — powers the one-off mascot cameo below. Deliberately not
+  // tied to just "hasQuestions", so restoring a previously-saved quiz on
+  // page load doesn't replay the celebration every time.
+  const [justGenerated, setJustGenerated] = useState(false);
   const [error, setError] = useState("");
   // Live team document library (every manager's uploads), pulled from the
   // backend so the manager generates from the same source set the deployed
@@ -87,6 +99,9 @@ function ConfigureQuizPage() {
   // page). Read once on mount; stored as "deselected" so new uploads default
   // to checked.
   const [deselectedDocumentIds] = useState<Set<number>>(() => loadDeselectedDocumentIds());
+  // The source-documents list collapses into an expandable row so the
+  // settings card stays compact when many documents are selected.
+  const [isDocsExpanded, setIsDocsExpanded] = useState(false);
   // Inline click-to-edit: at most one field (a question's prompt, or a
   // single option's text) is being edited at a time. Editing a field saves
   // automatically on blur/Enter — there's no separate edit form/Save button.
@@ -113,6 +128,14 @@ function ConfigureQuizPage() {
   const updateForm = <K extends keyof QuizFormState>(field: K, value: QuizFormState[K]) => {
     setForm((current) => ({ ...current, [field]: value }));
   };
+
+  // Auto-dismisses the mascot cameo a few seconds after it appears, same as
+  // a toast — it's a one-off celebration, not a permanent fixture.
+  useEffect(() => {
+    if (!justGenerated) return;
+    const timer = window.setTimeout(() => setJustGenerated(false), 3200);
+    return () => window.clearTimeout(timer);
+  }, [justGenerated]);
 
   // Restore whatever this manager most recently generated, so navigating
   // away (e.g. to Upload Content to add more documents) and back doesn't
@@ -226,6 +249,8 @@ function ConfigureQuizPage() {
     setQuiz(null);
     setStreamingQuestions([]);
     setGenerationStatus("Starting generation…");
+    setGenerationProgress(null);
+    setJustGenerated(false);
     setIsGenerating(true);
 
     const count = Number.parseInt(form.questionCount, 10) || 3;
@@ -254,6 +279,10 @@ function ConfigureQuizPage() {
                 ? `Retrying (attempt ${event.attempt})… generating questions…`
                 : "Generating questions…"
             );
+            setGenerationProgress({
+              questionsDetected: event.questionsDetected,
+              totalQuestions: event.totalQuestions,
+            });
           } else if (event.type === "question") {
             // Place each question at its index so a retry (which re-streams
             // from index 0) overwrites rather than appends.
@@ -267,6 +296,7 @@ function ConfigureQuizPage() {
       );
 
       setQuiz(generatedQuiz);
+      setJustGenerated(true);
       saveQuizConfig({
         moduleTitle: form.moduleTitle.trim(),
         topic: form.topic.trim(),
@@ -284,6 +314,7 @@ function ConfigureQuizPage() {
     } finally {
       setIsGenerating(false);
       setGenerationStatus("");
+      setGenerationProgress(null);
     }
   };
 
@@ -497,31 +528,59 @@ function ConfigureQuizPage() {
               </span>
             </div>
 
-            <div className="cfg-field">
-              <span className="cfg-field-ic">
-                <ListIcon />
-              </span>
-              <span className="cfg-field-label">Source documents</span>
-              <span className="cfg-field-control">
-                {isLoadingDocuments ? (
-                  <span className="cfg-doc-summary">Loading your team's documents…</span>
-                ) : documentsError ? (
-                  <span className="cfg-doc-summary error">{documentsError}</span>
-                ) : teamDocuments.length === 0 ? (
-                  <span className="cfg-doc-summary">
-                    No documents yet — <Link to="/upload-content">upload one first</Link>.
-                  </span>
-                ) : selectedDocuments.length === 0 ? (
-                  <span className="cfg-doc-summary error">
-                    Nothing checked — <Link to="/upload-content">check a document</Link>.
-                  </span>
-                ) : (
-                  <span className="cfg-doc-summary">
-                    Using {selectedDocuments.map((doc) => doc.title).join(", ")}.{" "}
-                    <Link to="/upload-content">Change selection</Link>
-                  </span>
-                )}
-              </span>
+            <div className="cfg-field cfg-field-docs">
+              <div className="cfg-docs-head">
+                <span className="cfg-field-ic">
+                  <ListIcon />
+                </span>
+                <span className="cfg-field-label">Source documents</span>
+                <span className="cfg-field-control">
+                  {isLoadingDocuments ? (
+                    <span className="cfg-doc-summary">Loading your team's documents…</span>
+                  ) : documentsError ? (
+                    <span className="cfg-doc-summary error">{documentsError}</span>
+                  ) : teamDocuments.length === 0 ? (
+                    <span className="cfg-doc-summary">
+                      No documents yet — <Link to="/upload-content">upload one first</Link>.
+                    </span>
+                  ) : selectedDocuments.length === 0 ? (
+                    <span className="cfg-doc-summary error">
+                      Nothing checked — <Link to="/upload-content">check a document</Link>.
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      className="cfg-doc-toggle"
+                      aria-expanded={isDocsExpanded}
+                      onClick={() => setIsDocsExpanded((open) => !open)}
+                    >
+                      <span className="cfg-doc-toggle-label">
+                        {selectedDocuments.length}{" "}
+                        {selectedDocuments.length === 1 ? "document" : "documents"}
+                      </span>
+                      <ChevronDown
+                        className={`cfg-doc-chevron${isDocsExpanded ? " open" : ""}`}
+                        aria-hidden
+                      />
+                    </button>
+                  )}
+                </span>
+              </div>
+
+              {selectedDocuments.length > 0 && isDocsExpanded ? (
+                <div className="cfg-doc-panel">
+                  <ul className="cfg-doc-list">
+                    {selectedDocuments.map((doc) => (
+                      <li key={doc.id} className="cfg-doc-item" title={doc.title}>
+                        {doc.title}
+                      </li>
+                    ))}
+                  </ul>
+                  <Link className="cfg-doc-change" to="/upload-content">
+                    Change selection
+                  </Link>
+                </div>
+              ) : null}
             </div>
 
             <div className="cfg-field">
@@ -539,7 +598,25 @@ function ConfigureQuizPage() {
                   value={Number(form.passingScore) || 0}
                   onChange={(event) => updateForm("passingScore", event.target.value)}
                 />
-                <span className="cfg-slider-val">{form.passingScore || 0}%</span>
+                <span className="cfg-score-box">
+                  <input
+                    type="number"
+                    className="cfg-score-input"
+                    min={0}
+                    max={100}
+                    value={form.passingScore}
+                    onChange={(event) => {
+                      const raw = event.target.value;
+                      if (raw === "") {
+                        updateForm("passingScore", "");
+                        return;
+                      }
+                      const clamped = Math.max(0, Math.min(100, Math.round(Number(raw))));
+                      updateForm("passingScore", String(clamped));
+                    }}
+                  />
+                  <span className="cfg-score-pct">%</span>
+                </span>
               </span>
             </div>
 
@@ -660,7 +737,19 @@ function ConfigureQuizPage() {
           </div>
 
           <div className="cfg-ai-col">
-            <img className="mgr-peek" src={mascot} alt="" aria-hidden />
+            <img
+              className={`mgr-peek ${justGenerated ? "mgr-peek-celebrate" : ""}`}
+              src={mascot}
+              alt=""
+              aria-hidden
+            />
+            {justGenerated && hasQuestions ? (
+              <div className="gen-complete-bubble gen-complete-bubble-peek" role="status">
+                All {quiz!.questionsPayload.length} question
+                {quiz!.questionsPayload.length === 1 ? "" : "s"}{" "}
+                {quiz!.questionsPayload.length === 1 ? "is" : "are"} ready!
+              </div>
+            ) : null}
             <div className="glass cfg-card">
             <div className="cfg-head">
               <span className="cfg-badge ai">
@@ -850,9 +939,30 @@ function ConfigureQuizPage() {
               {isGenerating ? (
                 <div className="qcard-generating">
                   <SparkleIcon style={{ width: 18, height: 18 }} />
-                  <span className="loading-line" />
+                  <div className="gen-progress-track">
+                    <div
+                      className="gen-progress-fill"
+                      style={{
+                        width: `${
+                          generationProgress
+                            ? Math.min(
+                                100,
+                                Math.round(
+                                  (generationProgress.questionsDetected /
+                                    Math.max(1, generationProgress.totalQuestions)) *
+                                    100
+                                )
+                              )
+                            : 4
+                        }%`,
+                      }}
+                    />
+                  </div>
                   <span style={{ whiteSpace: "nowrap" }}>
                     {generationStatus || "Generating questions…"}
+                    {generationProgress
+                      ? ` (${generationProgress.questionsDetected} of ${generationProgress.totalQuestions})`
+                      : ""}
                   </span>
                 </div>
               ) : null}
