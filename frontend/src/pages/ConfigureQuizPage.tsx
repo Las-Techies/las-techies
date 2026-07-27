@@ -87,6 +87,9 @@ function ConfigureQuizPage() {
   // page). Read once on mount; stored as "deselected" so new uploads default
   // to checked.
   const [deselectedDocumentIds] = useState<Set<number>>(() => loadDeselectedDocumentIds());
+  // The source-documents list collapses into an expandable row so the
+  // settings card stays compact when many documents are selected.
+  const [isDocsExpanded, setIsDocsExpanded] = useState(false);
   // Inline click-to-edit: at most one field (a question's prompt, or a
   // single option's text) is being edited at a time. Editing a field saves
   // automatically on blur/Enter — there's no separate edit form/Save button.
@@ -497,31 +500,59 @@ function ConfigureQuizPage() {
               </span>
             </div>
 
-            <div className="cfg-field">
-              <span className="cfg-field-ic">
-                <ListIcon />
-              </span>
-              <span className="cfg-field-label">Source documents</span>
-              <span className="cfg-field-control">
-                {isLoadingDocuments ? (
-                  <span className="cfg-doc-summary">Loading your team's documents…</span>
-                ) : documentsError ? (
-                  <span className="cfg-doc-summary error">{documentsError}</span>
-                ) : teamDocuments.length === 0 ? (
-                  <span className="cfg-doc-summary">
-                    No documents yet — <Link to="/upload-content">upload one first</Link>.
-                  </span>
-                ) : selectedDocuments.length === 0 ? (
-                  <span className="cfg-doc-summary error">
-                    Nothing checked — <Link to="/upload-content">check a document</Link>.
-                  </span>
-                ) : (
-                  <span className="cfg-doc-summary">
-                    Using {selectedDocuments.map((doc) => doc.title).join(", ")}.{" "}
-                    <Link to="/upload-content">Change selection</Link>
-                  </span>
-                )}
-              </span>
+            <div className="cfg-field cfg-field-docs">
+              <div className="cfg-docs-head">
+                <span className="cfg-field-ic">
+                  <ListIcon />
+                </span>
+                <span className="cfg-field-label">Source documents</span>
+                <span className="cfg-field-control">
+                  {isLoadingDocuments ? (
+                    <span className="cfg-doc-summary">Loading your team's documents…</span>
+                  ) : documentsError ? (
+                    <span className="cfg-doc-summary error">{documentsError}</span>
+                  ) : teamDocuments.length === 0 ? (
+                    <span className="cfg-doc-summary">
+                      No documents yet — <Link to="/upload-content">upload one first</Link>.
+                    </span>
+                  ) : selectedDocuments.length === 0 ? (
+                    <span className="cfg-doc-summary error">
+                      Nothing checked — <Link to="/upload-content">check a document</Link>.
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      className="cfg-doc-toggle"
+                      aria-expanded={isDocsExpanded}
+                      onClick={() => setIsDocsExpanded((open) => !open)}
+                    >
+                      <span className="cfg-doc-toggle-label">
+                        {selectedDocuments.length}{" "}
+                        {selectedDocuments.length === 1 ? "document" : "documents"}
+                      </span>
+                      <ChevronDown
+                        className={`cfg-doc-chevron${isDocsExpanded ? " open" : ""}`}
+                        aria-hidden
+                      />
+                    </button>
+                  )}
+                </span>
+              </div>
+
+              {selectedDocuments.length > 0 && isDocsExpanded ? (
+                <div className="cfg-doc-panel">
+                  <ul className="cfg-doc-list">
+                    {selectedDocuments.map((doc) => (
+                      <li key={doc.id} className="cfg-doc-item" title={doc.title}>
+                        {doc.title}
+                      </li>
+                    ))}
+                  </ul>
+                  <Link className="cfg-doc-change" to="/upload-content">
+                    Change selection
+                  </Link>
+                </div>
+              ) : null}
             </div>
 
             <div className="cfg-field">
@@ -539,7 +570,25 @@ function ConfigureQuizPage() {
                   value={Number(form.passingScore) || 0}
                   onChange={(event) => updateForm("passingScore", event.target.value)}
                 />
-                <span className="cfg-slider-val">{form.passingScore || 0}%</span>
+                <span className="cfg-score-box">
+                  <input
+                    type="number"
+                    className="cfg-score-input"
+                    min={0}
+                    max={100}
+                    value={form.passingScore}
+                    onChange={(event) => {
+                      const raw = event.target.value;
+                      if (raw === "") {
+                        updateForm("passingScore", "");
+                        return;
+                      }
+                      const clamped = Math.max(0, Math.min(100, Math.round(Number(raw))));
+                      updateForm("passingScore", String(clamped));
+                    }}
+                  />
+                  <span className="cfg-score-pct">%</span>
+                </span>
               </span>
             </div>
 
