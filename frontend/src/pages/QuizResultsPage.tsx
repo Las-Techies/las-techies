@@ -319,9 +319,13 @@ function QuizResultsPage() {
               ) : rows.length === 0 ? (
                 <p className="cfg-empty">No quiz results found yet.</p>
               ) : (
-                rows.map((row) => (
+                rows.map((row, index) => (
                   <div className="review-item" key={row.id}>
-                    <span className={`review-mark ${row.correct ? "ok" : "no"}`}>
+                    <span
+                      className={`review-mark t-success-check ${row.correct ? "ok" : "no"}`}
+                      data-state="in"
+                      style={{ "--stagger": `${Math.min(index, 10) * 45}ms` } as CSSProperties}
+                    >
                       {row.correct ? <CheckPlain /> : <XPlain />}
                     </span>
                     <span className="review-q">{row.text}</span>

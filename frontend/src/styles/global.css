@@ -40,6 +40,26 @@
   --avatar-falloff: 0.45;
   --avatar-ease-in: cubic-bezier(0.22, 1, 0.36, 1);
   --avatar-ease-out: cubic-bezier(0.34, 3.85, 0.64, 1);
+
+  /* Sliding pill tabs / segmented controls (e.g. difficulty selector) */
+  --tabs-dur: 250ms;
+  --tabs-ease: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* Success / fail check reveal (quiz results review list) */
+  --check-opacity-dur: 500ms;
+  --check-rotate-dur: 500ms;
+  --check-rotate-from: 80deg;
+  --check-bob-dur: 500ms;
+  --check-y-amount: 40px;
+  --check-blur-dur: 500ms;
+  --check-blur-from: 10px;
+  --check-path-dur: 500ms;
+  --check-path-delay: 80ms;
+  --check-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --check-ease-opacity: cubic-bezier(0.22, 1, 0.36, 1);
+  --check-ease-rotate: cubic-bezier(0.22, 1, 0.36, 1);
+  --check-ease-bob: cubic-bezier(0.34, 1.35, 0.64, 1);
+  --check-ease-path: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 /* transitions.dev "modal open / close" — layered onto each dialog's own
@@ -4109,6 +4129,73 @@ main.mgr-page > section.dropzone > input.sr-only {
   color: #fff;
 }
 
+/* transitions.dev "success check", adapted for both outcomes since the
+   correct/incorrect icons share the same stroke-based shape: each mark
+   fades in, rotates upright, settles with a Y-bob, and draws its stroke
+   path. `--stagger` (set inline per row in QuizResultsPage) cascades the
+   reveal down the review list instead of popping in all at once. */
+.t-success-check {
+  transform-origin: center;
+  opacity: 0;
+  will-change: transform, opacity, filter;
+}
+.t-success-check svg {
+  overflow: visible;
+}
+.t-success-check svg path {
+  stroke-dasharray: 20;
+  stroke-dashoffset: 20;
+}
+/* The X icon draws two line segments in one path (~34 total length vs. the
+   checkmark's ~20), so it needs its own dasharray to draw cleanly. */
+.review-mark.no.t-success-check svg path {
+  stroke-dasharray: 34;
+  stroke-dashoffset: 34;
+}
+
+.t-success-check[data-state="in"] {
+  animation:
+    t-check-fade   var(--check-opacity-dur) var(--check-ease-opacity) var(--stagger, 0ms) forwards,
+    t-check-rotate var(--check-rotate-dur)  var(--check-ease-rotate)  var(--stagger, 0ms) forwards,
+    t-check-blur   var(--check-blur-dur)    var(--check-ease-out)     var(--stagger, 0ms) forwards,
+    t-check-bob    var(--check-bob-dur)     var(--check-ease-bob)     var(--stagger, 0ms) forwards;
+}
+.t-success-check[data-state="in"] svg path {
+  animation: t-check-draw var(--check-path-dur) var(--check-ease-path)
+    calc(var(--check-path-delay, 0ms) + var(--stagger, 0ms)) forwards;
+}
+
+@keyframes t-check-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes t-check-rotate {
+  from { transform: rotate(var(--check-rotate-from)); }
+  to { transform: rotate(0deg); }
+}
+@keyframes t-check-blur {
+  from { filter: blur(var(--check-blur-from)); }
+  to { filter: blur(0); }
+}
+@keyframes t-check-bob {
+  from { translate: 0 var(--check-y-amount); }
+  to { translate: 0 0; }
+}
+@keyframes t-check-draw {
+  to { stroke-dashoffset: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .t-success-check {
+    animation: none !important;
+    opacity: 1;
+  }
+  .t-success-check svg path {
+    animation: none !important;
+    stroke-dashoffset: 0 !important;
+  }
+}
+
 .review-q {
   flex: 1;
   font-size: 14.5px;
@@ -4999,6 +5086,7 @@ main.mgr-page > section.dropzone > input.sr-only {
 }
 
 .diff-seg {
+  position: relative;
   display: inline-flex;
   gap: 6px;
   padding: 4px;
@@ -5006,7 +5094,31 @@ main.mgr-page > section.dropzone > input.sr-only {
   background: #eef1f6;
 }
 
+/* transitions.dev "tabs sliding" — a single pill slides + resizes behind
+   whichever difficulty is active (JS writes its position/width from
+   getBoundingClientRect via useSlidingPill) instead of each button
+   getting its own background flipped on instantly. */
+.diff-seg-pill {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  left: 0;
+  width: 0;
+  border-radius: 8px;
+  background: #1a7be0;
+  box-shadow: 0 4px 10px rgba(26, 123, 224, 0.3);
+  transform: translateX(0);
+  transition:
+    transform var(--tabs-dur) var(--tabs-ease),
+    width var(--tabs-dur) var(--tabs-ease);
+  will-change: transform, width;
+  pointer-events: none;
+  z-index: 0;
+}
+
 .diff-seg button {
+  position: relative;
+  z-index: 1;
   border: none;
   background: none;
   padding: 7px 14px;
@@ -5015,12 +5127,17 @@ main.mgr-page > section.dropzone > input.sr-only {
   font-weight: 700;
   color: #6b7d95;
   cursor: pointer;
+  transition: color var(--tabs-dur) var(--tabs-ease);
 }
 
 .diff-seg button.on {
-  background: #1a7be0;
   color: #fff;
-  box-shadow: 0 4px 10px rgba(26, 123, 224, 0.3);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .diff-seg-pill {
+    transition: none !important;
+  }
 }
 
 /* Difficulty option wrapper + animated hover tooltip */
