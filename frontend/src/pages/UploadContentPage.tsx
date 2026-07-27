@@ -12,8 +12,14 @@ import {
 } from "../features/quiz/storage";
 import {
   loadGoogleDriveAccessToken,
-  saveGoogleDriveAccessToken,
+  markPendingOAuthProvider,
 } from "../features/auth/googleDriveToken";
+import {
+  isGoogleDriveAuthConfigured,
+  preloadGoogleDriveAuth,
+  requestGoogleDriveAccessToken,
+} from "../features/auth/googleDriveAuth";
+import { useAuth } from "../context/AuthContext";
 import {
   ArrowRight,
   CheckPlain,
@@ -107,6 +113,12 @@ const formatAddedDate = (value: string | null) => {
   if (Number.isNaN(parsed.getTime())) return "";
   return parsed.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
 };
+// The backend surfaces Google's rejection verbatim, e.g. "Google Drive API
+// request failed (401). ..." from googleDriveRequest in documentProcessor.ts.
+const isGoogleAuthFailure = (message: string) =>
+  /Google Drive API request failed \((401|403)\)/i.test(message) ||
+  /Google access token is required/i.test(message);
+
 const detectLinkKind = (value: string): LinkKind => {
   const trimmed = value.trim();
   if (!trimmed) return "unsupported";
@@ -130,6 +142,7 @@ const detectLinkKind = (value: string): LinkKind => {
 };
 
 function UploadContentPage() {
+  const { user, signInWithGoogle } = useAuth();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [isDragActive, setIsDragActive] = useState(false);
   const [uploads, setUploads] = useState<UploadedItem[]>([]);
@@ -140,6 +153,10 @@ function UploadContentPage() {
   const [isImportingLink, setIsImportingLink] = useState(false);
   const [isGithubConnected, setIsGithubConnected] = useState(false);
   const [isConnectingGithub, setIsConnectingGithub] = useState(false);
+  // Set when Google's token is missing or Google itself rejected it, so the
+  // error can offer a one-click reconnect instead of telling the user to sign
+  // out and back in.
+  const [needsGoogleReconsent, setNeedsGoogleReconsent] = useState(false);
   // Which documents are unchecked for quiz generation. Stored as "deselected"
   // rather than "selected" so newly uploaded documents default to checked.
   const [deselectedDocumentIds, setDeselectedDocumentIds] = useState<Set<number>>(() =>
@@ -171,29 +188,36 @@ function UploadContentPage() {
     saveUploadedDocuments(readyDocs);
   };
 
+  // Google's access token is no longer snapshotted here — capturing it on the
+  // Upload page was always too late, since it's already gone from the session
+  // by the time the JWT has refreshed once. AuthContext now grabs it in
+  // onAuthStateChange, the one moment Supabase emits it.
   const refreshGithubConnectionStatus = async () => {
     const { data } = await supabase.auth.getSession();
     const identities = data.session?.user?.identities ?? [];
-    const hasGithubIdentity = identities.some(
-      (identity) => identity.provider === "github"
+    setIsGithubConnected(
+      identities.some((identity) => identity.provider === "github")
     );
-    setIsGithubConnected(hasGithubIdentity);
-
-    // Snapshot the Google Drive token now, while we can still be sure the
-    // session's provider_token is actually Google's — linking GitHub later
-    // in this session will overwrite it. If GitHub is already linked, the
-    // live token isn't trustworthy anymore, so don't stash it (that would
-    // just overwrite an earlier-captured, still-good Google token with a
-    // GitHub one).
-    if (!hasGithubIdentity && data.session?.provider_token) {
-      saveGoogleDriveAccessToken(data.session.provider_token);
-    }
   };
 
   useEffect(() => {
+    // Fetch Google's script now, not at click time, so the popup opens
+    // directly off the user's gesture instead of after a network round-trip.
+    preloadGoogleDriveAuth();
+  }, []);
+
+  useEffect(() => {
     const hydrateUploads = async () => {
+      // Deliberately not in the same try as the document fetch — a failure
+      // reading the session used to skip the document list entirely and drop
+      // silently to the local cache.
       try {
         await refreshGithubConnectionStatus();
+      } catch {
+        setIsGithubConnected(false);
+      }
+
+      try {
         const res = await apiFetch<MyDocumentsResponse>("/api/documents/mine");
         const serverUploads: UploadedItem[] = res.data.map((document) => ({
           key: `saved-${document.id}`,
@@ -237,6 +261,10 @@ function UploadContentPage() {
       // guaranteed to carry this account's custom user_metadata (like
       // team_id), which previously reset managers back to the default demo
       // team the moment they connected GitHub.
+      //
+      // Mark the provider so the token this redirect brings back isn't
+      // mistaken for a Google one and stashed as the Drive credential.
+      markPendingOAuthProvider("github");
       const { error: oauthError } = await supabase.auth.linkIdentity({
         provider: "github",
         options: {
@@ -249,6 +277,48 @@ function UploadContentPage() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to connect GitHub.");
       setIsConnectingGithub(false);
+    }
+  };
+
+  // Gets a Drive access token for the import about to run.
+  //
+  // Preferred path asks Google directly (see features/auth/googleDriveAuth) —
+  // fresh token per use, nothing stored, and the Supabase session is left
+  // alone. The Supabase provider_token path below is kept only so behaviour is
+  // unchanged until VITE_GOOGLE_CLIENT_ID is set, and can be deleted (along
+  // with googleDriveToken.ts) once the Google path is confirmed working.
+  const resolveGoogleDriveToken = async (): Promise<string> => {
+    if (isGoogleDriveAuthConfigured()) {
+      return requestGoogleDriveAccessToken();
+    }
+
+    const { data } = await supabase.auth.getSession();
+    const liveProviderToken = isGithubConnected
+      ? undefined
+      : data.session?.provider_token;
+    const token = loadGoogleDriveAccessToken(user?.id) ?? liveProviderToken;
+
+    if (!token) {
+      setNeedsGoogleReconsent(true);
+      throw new Error(
+        "Your Google Drive access has expired. Reconnect Google to import this folder."
+      );
+    }
+
+    return token;
+  };
+
+  // Re-runs the Google consent screen to mint a fresh Drive token. Reuses
+  // AuthContext's signInWithGoogle so the scopes and the redirect target stay
+  // in one place (redirectTo is always window.location.origin — never built
+  // from anything user-supplied). Must stay click-triggered: firing this from
+  // an effect would bounce the user through OAuth on every render.
+  const handleReconnectGoogle = async () => {
+    try {
+      setError("");
+      await signInWithGoogle();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to reconnect Google.");
     }
   };
 
@@ -321,9 +391,17 @@ function UploadContentPage() {
     ]);
 
     try {
+      // Authorize this request when we can. Previously it always went out
+      // unauthenticated, so a link the manager could open themselves would
+      // fail — or worse, Google would serve its HTML sign-in page with a 200
+      // and the backend would store that as the document's text.
+      const googleAccessToken = isGoogleDriveAuthConfigured()
+        ? await requestGoogleDriveAccessToken()
+        : undefined;
+
       const res = await apiFetch<UploadResponse>("/api/documents/import/google-drive", {
         method: "POST",
-        body: JSON.stringify({ url: trimmedUrl }),
+        body: JSON.stringify({ url: trimmedUrl, googleAccessToken }),
       });
 
       setUploads((prev) => {
@@ -363,22 +441,11 @@ function UploadContentPage() {
     }
 
     setError("");
+    setNeedsGoogleReconsent(false);
     setIsImportingLink(true);
 
     try {
-      // Prefer the token snapshotted right after Google sign-in over the
-      // live session's provider_token — if GitHub has been connected since
-      // then, the live one is a GitHub token now, not Google's (Supabase
-      // only keeps one provider_token slot). Falls back to the live session
-      // for anyone who hasn't connected GitHub yet, so nothing changes for
-      // the common case.
-      const { data } = await supabase.auth.getSession();
-      const googleAccessToken = loadGoogleDriveAccessToken() ?? data.session?.provider_token;
-      if (!googleAccessToken) {
-        throw new Error(
-          "Missing Google provider token. Please sign out and sign in with Google again."
-        );
-      }
+      const googleAccessToken = await resolveGoogleDriveToken();
 
       const res = await apiFetch<GoogleDriveFolderImportResponse>(
         "/api/documents/import/google-drive-folder",
@@ -409,7 +476,18 @@ function UploadContentPage() {
 
       setLinkInput("");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Google Drive folder import failed.");
+      const message =
+        err instanceof Error ? err.message : "Google Drive folder import failed.";
+      // A token can also be present but already rejected by Google — we can't
+      // know its real expiry, so treat Google's own 401/403 as the signal.
+      if (isGoogleAuthFailure(message)) {
+        setNeedsGoogleReconsent(true);
+        setError(
+          "Your Google Drive access has expired. Reconnect Google to import this folder."
+        );
+      } else {
+        setError(message);
+      }
     } finally {
       setIsImportingLink(false);
     }
@@ -721,7 +799,23 @@ function UploadContentPage() {
           )}
         </section>
 
-        {error ? <p className="form-error">{error}</p> : null}
+        {error ? (
+          <p className="form-error">
+            {error}
+            {needsGoogleReconsent ? (
+              <>
+                {" "}
+                <button
+                  type="button"
+                  className="link-button"
+                  onClick={() => void handleReconnectGoogle()}
+                >
+                  Reconnect Google
+                </button>
+              </>
+            ) : null}
+          </p>
+        ) : null}
         {hasReadyDocument && !hasSelectedDocument ? (
           <p className="form-error">Check at least one document above to continue.</p>
         ) : null}

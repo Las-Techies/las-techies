@@ -73,7 +73,14 @@ Open `frontend/.env` and fill in:
 | --- | --- |
 | `VITE_SUPABASE_URL` | Same Supabase Project URL as the backend |
 | `VITE_SUPABASE_PUBLISHABLE_KEY` | Supabase → Project Settings → API (anon/publishable key — **not** service_role) |
+| `VITE_GOOGLE_CLIENT_ID` | Needed for Google Drive import. Google Cloud Console → Credentials → the **Web application** OAuth client id (the one Supabase's Google provider uses works). Public value — not the client secret. |
 | `VITE_API_BASE_URL` | Optional. Leave blank to default to `http://localhost:4000` |
+
+For `VITE_GOOGLE_CLIENT_ID` to work, on that OAuth client add `http://localhost:5173`
+(and your deployed URL) under **Authorized JavaScript origins**, and enable the
+**Google Drive API** for the project. Leave the variable blank and Drive import
+falls back to the older Supabase `provider_token` flow, which stops working as
+soon as the login session refreshes.
 
 ## 5. Set up the database
 

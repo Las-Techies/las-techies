@@ -8,7 +8,11 @@ import {
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "../lib/supabaseClient";
 import { QUIZ_ATTEMPT_STORAGE_KEY } from "../features/quiz/types";
-import { clearGoogleDriveAccessToken } from "../features/auth/googleDriveToken";
+import {
+  captureGoogleProviderTokenFromSession,
+  clearGoogleDriveAccessToken,
+  markPendingOAuthProvider,
+} from "../features/auth/googleDriveToken";
 
 export type UserRole = "new_hire" | "manager";
 
@@ -43,8 +47,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     const { data: subscription } = supabase.auth.onAuthStateChange(
-      (_event, newSession) => {
+      (event, newSession) => {
         setSession(newSession);
+
+        // This callback is the only place Google's access token is ever
+        // observable — Supabase emits provider_token once, on the session
+        // created by the OAuth exchange, and drops it on the next JWT
+        // refresh. Snapshot it here or lose it.
+        captureGoogleProviderTokenFromSession(newSession);
+
+        // Covers sign-outs we didn't initiate (session expiry, or signOut in
+        // another tab) so a stale Drive token can't outlive its session.
+        if (event === "SIGNED_OUT") {
+          clearGoogleDriveAccessToken();
+        }
       }
     );
 
@@ -114,6 +130,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // session already established. Google doesn't know about "manager" vs
   // "new hire", so role starts unset — LoginPage prompts for it afterward.
   async function signInWithGoogle(): Promise<void> {
+    // Tell the post-redirect handler that the provider_token it's about to see
+    // is Google's, not a linked GitHub identity's.
+    markPendingOAuthProvider("google");
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
