@@ -15,6 +15,7 @@ CLAUDE.md
 backend/.cache/
 
 # Local-only tooling/scratch artifacts (never commit these)
+.claude/agent-memory/
 .cursor/
 .shots/
 .v2preview/

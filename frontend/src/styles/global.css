@@ -569,6 +569,22 @@ label {
   color: #ba0517;
 }
 
+/* Inline recovery action rendered inside .form-error (e.g. "Reconnect
+   Google" when a Drive token has expired). */
+.form-error .link-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: #0b4f94;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.form-error .link-button:hover {
+  color: #083a6e;
+}
+
 .form-info {
   margin: 10px 0 0;
   font-size: 13px;
