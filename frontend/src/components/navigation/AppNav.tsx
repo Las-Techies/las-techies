@@ -7,6 +7,7 @@ import { clearPreviewRole, getPreviewRole } from "../../features/auth/previewRol
 import { getUserDisplayFirstName, getUserInitials } from "../../features/auth/userDisplayName";
 import logoBadge from "../../assets/sageforce-logo-badge.png";
 import {
+  ChartBarIcon,
   ChevronDown,
   HomeIcon,
   ModulesIcon,
@@ -20,6 +21,7 @@ type NavItem = { label: string; type: "link"; to: string; icon: ReactNode };
 const managerNavItems: NavItem[] = [
   { label: "Upload + Generate", type: "link", to: "/upload-content", icon: <UploadIcon /> },
   { label: "Learner Module", type: "link", to: "/learner-module", icon: <ModulesIcon /> },
+  { label: "Dashboard", type: "link", to: "/manager-dashboard", icon: <ChartBarIcon /> },
 ];
 
 const newHireNavItems: NavItem[] = [

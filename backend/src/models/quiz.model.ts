@@ -156,6 +156,36 @@ export function markAssignmentComplete(
   });
 }
 
+// Powers the manager dashboard: every quiz on the team (any manager's, not
+// just the caller's — new hires are shared team-wide, so a manager should
+// see the full picture) joined with every assignment against it. No Prisma
+// relation between QuizAssignment and Quiz (same convention as the rest of
+// this schema), so the join happens here in application code, same as
+// findAssignedQuizzesForUser above.
+export async function findTeamQuizzesWithAssignments(teamId: number) {
+  const quizzes = await prisma.quiz.findMany({
+    where: { teamId },
+    orderBy: { createdAt: "desc" },
+  });
+  if (quizzes.length === 0) {
+    return { quizzes: [], joinedAssignments: [] };
+  }
+
+  const quizById = new Map(quizzes.map((quiz) => [quiz.id, quiz]));
+  const assignments = await prisma.quizAssignment.findMany({
+    where: { quizId: { in: quizzes.map((quiz) => quiz.id) } },
+  });
+
+  const joinedAssignments = assignments
+    .map((assignment) => ({ assignment, quiz: quizById.get(assignment.quizId) }))
+    .filter(
+      (entry): entry is { assignment: (typeof assignments)[number]; quiz: (typeof quizzes)[number] } =>
+        Boolean(entry.quiz)
+    );
+
+  return { quizzes, joinedAssignments };
+}
+
 // sourceDocumentIds is a plain JSON array, not a real foreign key, so this
 // checks in application code rather than relying on a DB-level JSON query
 // (keeps it correct regardless of the Postgres/Prisma JSON operator used).

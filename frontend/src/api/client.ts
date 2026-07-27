@@ -282,6 +282,50 @@ export function completeQuizAssignment(
   });
 }
 
+export type ManagerDashboardQuiz = {
+  id: number;
+  title: string;
+  status: "draft" | "published";
+  createdAt: string;
+  dueDate: string | null;
+  passingScore: number | null;
+  assignedCount: number;
+  completedCount: number;
+  averageScore: number | null;
+  averageTimeTakenSeconds: number | null;
+};
+
+export type ManagerDashboardLearnerAssignment = {
+  quizId: number;
+  quizTitle: string;
+  status: "pending" | "completed";
+  score: number | null;
+  timeTakenSeconds: number | null;
+  completedAt: string | null;
+  dueDate: string | null;
+};
+
+export type ManagerDashboardLearner = {
+  id: number;
+  name: string;
+  email: string;
+  assignments: ManagerDashboardLearnerAssignment[];
+};
+
+export type ManagerDashboardData = {
+  quizzes: ManagerDashboardQuiz[];
+  learners: ManagerDashboardLearner[];
+};
+
+// One-call payload for the manager dashboard: every quiz on the team with
+// aggregated assignment stats, plus every new hire on the team with their
+// own assignment history. Team-wide (not scoped to quizzes the caller
+// personally created), since new hires are shared across the team.
+export async function getManagerDashboard(): Promise<ManagerDashboardData> {
+  const res = await apiFetch<{ data: ManagerDashboardData }>("/api/quizzes/manager/dashboard");
+  return res.data;
+}
+
 export type MyTeam = {
   id: number;
   name: string;

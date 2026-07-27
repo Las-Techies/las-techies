@@ -6,6 +6,7 @@ import {
   generateQuiz,
   getAssignedQuizzes,
   getLatestQuiz,
+  getManagerDashboard,
   getQuiz,
   regenerateQuestion,
   updateQuestion,
@@ -17,6 +18,7 @@ const router = Router();
 router.post("/generate", requireRole("manager"), generateQuiz);
 router.get("/mine/latest", getLatestQuiz);
 router.get("/assigned/mine", getAssignedQuizzes);
+router.get("/manager/dashboard", requireRole("manager"), getManagerDashboard);
 router.get("/:quizId", getQuiz);
 router.patch("/:quizId", requireRole("manager"), updateQuiz);
 router.patch("/:quizId/questions/:questionId", requireRole("manager"), updateQuestion);
