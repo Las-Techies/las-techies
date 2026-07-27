@@ -5000,10 +5000,116 @@ label {
   font-weight: 600;
 }
 
-.qcard-generating .loading-line {
+/* Celebration when generation finishes: the panda that's already peeking
+   over the AI-Generated Questions card (.mgr-peek) gets a bounce, and a
+   speech bubble pointing at it announces the finished count — reuses the
+   one mascot already on this page instead of introducing a second one. */
+.mgr-peek-celebrate {
+  animation: mgrPeekCelebrate 3.2s ease;
+}
+
+@keyframes mgrPeekCelebrate {
+  0%,
+  100% {
+    transform: rotate(-8deg);
+  }
+  8% {
+    transform: rotate(-8deg) scale(0.85);
+  }
+  20% {
+    transform: rotate(6deg) scale(1.15);
+  }
+  32% {
+    transform: rotate(-4deg) scale(1.05);
+  }
+  44% {
+    transform: rotate(0deg) scale(1.1);
+  }
+  56% {
+    transform: rotate(-8deg) scale(1);
+  }
+}
+
+.gen-complete-bubble {
+  position: relative;
+  background: #fff;
+  border: 1px solid rgba(1, 118, 211, 0.18);
+  border-radius: 14px;
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--sf-navy);
+  box-shadow: 0 8px 20px rgba(9, 40, 82, 0.12);
+}
+
+.gen-complete-bubble-peek {
+  position: absolute;
+  top: -34px;
+  right: 176px;
+  z-index: 2;
+  max-width: 220px;
+  white-space: normal;
+  animation: genCompletePop 3.2s ease forwards;
+}
+
+.gen-complete-bubble-peek::after {
+  content: "";
+  position: absolute;
+  right: -6px;
+  top: 50%;
+  transform: translateY(-50%) rotate(45deg);
+  width: 12px;
+  height: 12px;
+  background: #fff;
+  border-right: 1px solid rgba(1, 118, 211, 0.18);
+  border-top: 1px solid rgba(1, 118, 211, 0.18);
+}
+
+@keyframes genCompletePop {
+  0% {
+    opacity: 0;
+    transform: translateY(6px) scale(0.7);
+  }
+  12% {
+    opacity: 1;
+    transform: translateY(-4px) scale(1.08);
+  }
+  22% {
+    transform: translateY(0) scale(1);
+  }
+  82% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+
+@media (max-width: 1000px) {
+  .gen-complete-bubble-peek {
+    display: none;
+  }
+}
+
+.gen-progress-track {
   flex: 1;
-  height: 14px;
-  margin: 0;
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(1, 118, 211, 0.12);
+  overflow: hidden;
+}
+
+.gen-progress-fill {
+  height: 100%;
+  min-width: 10px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #0176d3, #4fb0ff);
+  /* Real % from the backend's live "questions detected" count, so this
+     slides toward the true value on each SSE update rather than looping
+     indefinitely or faking a timed animation. */
+  transition: width 0.6s cubic-bezier(0.22, 0.9, 0.3, 1);
 }
 
 .cfg-empty {
