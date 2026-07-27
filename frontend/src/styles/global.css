@@ -5914,6 +5914,26 @@ main.mgr-page > section.dropzone > input.sr-only {
   }
 }
 
+/* transitions.dev "avatar group hover" — lifting one card gently lifts its
+   neighbors with a power-falloff (see the `.t-avatar` rule + the inline
+   --shift/--scale-active writes in MeetOurTeamPage.tsx), then everything
+   snaps back with a bouncy overshoot on mouse-leave. `.team-member` carries
+   the transform (not just `.team-avatar`) so the name label lifts with its
+   photo as one card. */
+.t-avatar {
+  transform-origin: center;
+  transform: translateY(var(--shift, 0px)) scale(var(--scale-active, 1));
+  transition: transform var(--avatar-dur) var(--avatar-ease-in);
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .t-avatar {
+    transition: none !important;
+    transform: none !important;
+  }
+}
+
 .team-avatar {
   width: 150px;
   height: 150px;

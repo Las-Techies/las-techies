@@ -15,6 +15,8 @@ import {
 } from "../models/quiz.model";
 import { findDocumentByIdForTeam } from "../models/document.model";
 import { findTeamMembersByRole, findUsersByIdsForTeam } from "../models/user.model";
+import { sendMail } from "../services/mailer";
+import { env } from "../config/env";
 import { generateQuiz as generateQuizQuestions } from "../services/quizGenerator";
 import type { GenerationConfig, QuizQuestion } from "../services/quizTypes";
 
@@ -443,8 +445,115 @@ export async function assignQuiz(req: Request, res: Response, next: NextFunction
     }
 
     await createQuizAssignments(quizId, validUserIds, user.id);
+
+    // Best-effort notification email for existing team members who were just
+    // assigned this quiz. Assignment itself should still succeed even if
+    // one or more emails fail to send.
+    const quizTitle = quiz.title || "New Quiz Assignment";
+    const escapedQuizTitle = quizTitle
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+    const pandaImageUrl =
+      "https://raw.githubusercontent.com/Las-Techies/las-techies/main/frontend/src/assets/panda-cheer-fullhat.png";
+    const learnerModuleLink = `${env.appUrl}/learner-module?quizId=${quiz.id}`;
+    const emailResults = await Promise.allSettled(
+      teamMembers.map((member) =>
+        sendMail({
+          to: member.email,
+          subject: `📚 New quiz assigned: ${quizTitle}`,
+          text: `Hi ${member.firstName},
+
+Great news — you've been assigned a new quiz in SageForce!
+
+Quiz: ${quizTitle}
+
+Log in to SageForce, then open your learner module to start:
+${learnerModuleLink}
+
+If the button doesn't work, click this link:
+${learnerModuleLink}
+
+You've got this 🚀
+`,
+          html: `
+            <div style="margin:0;padding:0;background:#eef4ff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#0e2a47;">
+              <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">
+                You have a new SageForce quiz assignment waiting.
+              </div>
+              <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background:#eef4ff;padding:32px 12px;">
+                <tr>
+                  <td align="center">
+                    <img
+                      src="${pandaImageUrl}"
+                      alt="Celebrating SageForce panda"
+                      width="180"
+                      style="display:block;margin:0 auto -44px;position:relative;z-index:2;border:0;outline:none;text-decoration:none;max-width:65%;height:auto;"
+                    />
+                    <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="max-width:680px;background:#ffffff;border-radius:22px;overflow:hidden;border:1px solid #d6e4ff;box-shadow:0 16px 40px rgba(26,123,224,0.14);">
+                      <tr>
+                        <td style="background:linear-gradient(135deg,#1657c0 0%,#2f8bff 55%,#7bc0ff 100%);padding:56px 28px 30px;color:#ffffff;text-align:center;">
+                          <div style="font-size:13px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;opacity:0.85;">✦ SageForce</div>
+                          <div style="margin-top:10px;font-size:34px;line-height:1.15;font-weight:800;">New Quiz Assigned 📚</div>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding:30px 34px 10px;text-align:center;">
+                          <p style="margin:0 0 10px;font-size:18px;line-height:1.6;color:#173b63;">
+                            Hi ${member.firstName}, you’ve been assigned a new quiz.
+                          </p>
+                          <p style="margin:0 0 20px;font-size:17px;line-height:1.55;color:#1e446a;">
+                            <strong>${escapedQuizTitle}</strong>
+                          </p>
+                          <p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#395f86;">
+                            Log in to SageForce to start your quiz.
+                          </p>
+                          <div style="text-align:center;margin:10px 0 18px;">
+                            <a href="${learnerModuleLink}" style="display:inline-block;background:#1a7be0;color:#ffffff;text-decoration:none;font-size:17px;font-weight:700;padding:14px 28px;border-radius:999px;box-shadow:0 6px 16px rgba(26,123,224,0.35);">
+                              Open Learner Module →
+                            </a>
+                          </div>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding:8px 34px 16px;">
+                          <div style="font-size:14px;line-height:1.6;color:#395f86;">
+                            Button not working? Click here:
+                          </div>
+                          <a href="${learnerModuleLink}" style="display:inline-block;color:#1a7be0;text-decoration:underline;font-size:14px;line-height:1.6;margin-top:4px;">
+                            Click here
+                          </a>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding:18px 34px 26px;border-top:1px solid #ebf2ff;font-size:13px;line-height:1.7;color:#6a86a5;">
+                          You can also find this quiz anytime in your Learner Module.<br />
+                          Sent with 🐼 by SageForce
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+            </div>
+          `,
+        })
+      )
+    );
+    const failedEmailCount = emailResults.filter((result) => result.status === "rejected").length;
+
     res.status(201).json({
-      data: { quizId, assignedTo: teamMembers },
+      data: {
+        quizId,
+        assignedTo: teamMembers,
+        notificationSummary: {
+          attempted: teamMembers.length,
+          sent: teamMembers.length - failedEmailCount,
+          failed: failedEmailCount,
+        },
+      },
     });
   } catch (err) {
     next(err);

@@ -5,12 +5,22 @@ import type { UserRole } from "../../context/AuthContext";
 
 const PREVIEW_ROLE_KEY = "sageforce_preview_role";
 
+function isLocalPreviewAllowed(): boolean {
+  if (typeof window === "undefined") return false;
+  return (
+    window.location.hostname === "localhost" ||
+    window.location.hostname === "127.0.0.1"
+  );
+}
+
 export function getPreviewRole(): UserRole | null {
+  if (!isLocalPreviewAllowed()) return null;
   const value = localStorage.getItem(PREVIEW_ROLE_KEY);
   return value === "manager" || value === "new_hire" ? value : null;
 }
 
 export function setPreviewRole(role: UserRole): void {
+  if (!isLocalPreviewAllowed()) return;
   localStorage.setItem(PREVIEW_ROLE_KEY, role);
 }
 
