@@ -70,11 +70,11 @@
 }
 
 /* transitions.dev "modal open / close" — layered onto each dialog's own
-   surface class (`.modal-card`, `.doc-modal`, `.confirm-modal`,
-   `.team-feature`) via the shared `.t-modal` behavior class, driven by the
-   `useModalTransition` hook. `.t-modal-backdrop` fades the dimmed overlay
-   in step with it. See `useModalTransition.ts` for the is-open/is-closing
-   orchestration (delayed unmount so the close animation gets to play). */
+   surface class (`.modal-card`, `.doc-modal`, `.confirm-modal`) via the
+   shared `.t-modal` behavior class, driven by the `useModalTransition`
+   hook. `.t-modal-backdrop` fades the dimmed overlay in step with it. See
+   `useModalTransition.ts` for the is-open/is-closing orchestration
+   (delayed unmount so the close animation gets to play). */
 .t-modal-backdrop {
   opacity: 0;
   transition: opacity var(--modal-open-dur) var(--modal-ease);
@@ -5879,11 +5879,39 @@ main.mgr-page > section.dropzone > input.sr-only {
   display: flex;
   flex-direction: column;
   align-items: center;
+  width: 190px;
+}
+
+.team-avatar-trigger {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   gap: 12px;
+  width: 100%;
+  padding: 0;
   background: none;
   border: none;
   cursor: pointer;
-  width: 190px;
+}
+
+/* transitions.dev "avatar group hover" — lifting one card gently lifts its
+   neighbors with a power-falloff (see the `.t-avatar` rule + the inline
+   --shift/--scale-active writes in MeetOurTeamPage.tsx), then everything
+   snaps back with a bouncy overshoot on mouse-leave. `.team-member` carries
+   the transform (not just `.team-avatar`) so the name label lifts with its
+   photo as one card. */
+.t-avatar {
+  transform-origin: center;
+  transform: translateY(var(--shift, 0px)) scale(var(--scale-active, 1));
+  transition: transform var(--avatar-dur) var(--avatar-ease-in);
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .t-avatar {
+    transition: none !important;
+    transform: none !important;
+  }
 }
 
 /* transitions.dev "avatar group hover" — lifting one card gently lifts its
@@ -5920,7 +5948,7 @@ main.mgr-page > section.dropzone > input.sr-only {
   box-shadow: 0 22px 40px rgba(3, 30, 70, 0.34);
 }
 
-.team-member.active .team-avatar {
+.team-member.open .team-avatar {
   border-color: #fff;
 }
 
@@ -5933,72 +5961,57 @@ main.mgr-page > section.dropzone > input.sr-only {
   text-shadow: 0 1px 0 rgba(255, 255, 255, 0.45);
 }
 
-/* Featured member modal (opens on avatar click). Fade/scale handled by the
-   `.t-modal-backdrop` / `.t-modal` classes (see the modal open/close block
-   near the top of this file) instead of the old one-shot `fadeInUp`
-   keyframe, so it gets a proper close animation too. */
-.team-modal-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 60;
+/* transitions.dev "accordion" — the bio panel grows vertically out of the
+   photo on hover/focus (instead of a modal popping over the page). Height
+   animates via grid-template-rows 0fr -> 1fr so it works for any amount of
+   bio text with no JS measuring; the inner element fades + un-blurs in
+   step so a half-open panel doesn't look like a content pop-in. */
+.team-bio-acc {
+  width: 100%;
   display: grid;
-  place-items: center;
-  padding: 24px;
-  background: rgba(9, 30, 62, 0.34);
-  backdrop-filter: blur(3px);
-  -webkit-backdrop-filter: blur(3px);
+  grid-template-rows: 0fr;
+  transition: grid-template-rows var(--duration-fast) var(--ease-smooth-out);
 }
 
-.team-feature {
-  position: relative;
-  width: min(640px, 100%);
-  padding: 30px 34px;
-  display: flex;
-  gap: 28px;
-  align-items: center;
-  background: rgba(244, 249, 255, 0.9);
-  box-shadow: 0 40px 90px rgba(6, 28, 62, 0.4);
+.team-bio-acc[data-open="true"] {
+  grid-template-rows: 1fr;
 }
 
-.team-feature-photo {
-  width: 150px;
-  height: 150px;
-  border-radius: 50%;
-  object-fit: cover;
-  border: 5px solid rgba(255, 255, 255, 0.9);
-  flex: none;
-  box-shadow: 0 12px 28px rgba(3, 30, 70, 0.22);
+.team-bio-acc-inner {
+  overflow: hidden;
+  opacity: 0;
+  filter: blur(2px);
+  text-align: center;
+  transition:
+    opacity var(--duration-fast) var(--ease-smooth-out),
+    filter var(--duration-fast) var(--ease-smooth-out);
 }
 
-.team-feature-body {
-  flex: 1;
+.team-bio-acc[data-open="true"] .team-bio-acc-inner {
+  opacity: 1;
+  filter: blur(0);
 }
 
-.team-feature-body h2 {
-  margin: 0;
-  font-family: "Playfair Display", Georgia, serif;
-  font-size: 30px;
-  font-weight: 800;
-  color: var(--sf-navy);
-}
-
-.team-feature-role {
-  margin: 2px 0 0;
-  font-size: 15px;
+.team-bio-role {
+  margin: 14px 0 0;
+  font-size: 13px;
   font-weight: 700;
   color: #1a7be0;
 }
 
-.team-feature-bio {
-  margin: 12px 0 16px;
-  font-size: 14.5px;
+.team-bio-text {
+  margin: 6px 0 14px;
+  font-size: 13px;
   line-height: 1.5;
   color: #46586f;
 }
 
-.team-feature-links {
+.team-bio-links {
   display: flex;
-  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  padding-bottom: 4px;
 }
 
 .team-social {
@@ -6012,7 +6025,14 @@ main.mgr-page > section.dropzone > input.sr-only {
   color: #263a54;
   font-size: 14px;
   font-weight: 600;
+  text-decoration: none;
   cursor: pointer;
+  transition: background var(--ui-hover-dur) var(--ui-hover-ease), border-color var(--ui-hover-dur) var(--ui-hover-ease);
+}
+
+.team-social:hover {
+  background: #fff;
+  border-color: #1a7be0;
 }
 
 .team-social svg {
@@ -6020,24 +6040,11 @@ main.mgr-page > section.dropzone > input.sr-only {
   height: 16px;
 }
 
-.team-feature-close {
-  position: absolute;
-  top: 16px;
-  right: 18px;
-  width: 30px;
-  height: 30px;
-  border-radius: 999px;
-  border: none;
-  background: rgba(11, 42, 84, 0.06);
-  color: #46586f;
-  cursor: pointer;
-  font-size: 16px;
-  display: grid;
-  place-items: center;
-}
-
-.team-feature-close:hover {
-  background: rgba(11, 42, 84, 0.12);
+@media (prefers-reduced-motion: reduce) {
+  .team-bio-acc,
+  .team-bio-acc-inner {
+    transition: none !important;
+  }
 }
 
 @media (max-width: 1000px) {
@@ -6059,11 +6066,6 @@ main.mgr-page > section.dropzone > input.sr-only {
   .team-row {
     flex-wrap: wrap;
     gap: 24px;
-  }
-
-  .team-feature {
-    flex-direction: column;
-    text-align: center;
   }
 
   .dropzone {
