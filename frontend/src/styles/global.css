@@ -4548,6 +4548,104 @@ label {
   text-decoration: underline;
 }
 
+/* Collapsible source-documents control: an expandable row whose header shows
+   the count + a rotating chevron, revealing the full list inline on click. */
+.cfg-field-docs {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+}
+
+.cfg-docs-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.cfg-doc-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 12px 0 16px;
+  margin: 0;
+  border-radius: 10px;
+  border: 1px solid rgba(11, 42, 84, 0.14);
+  background: rgba(255, 255, 255, 0.95);
+  color: var(--sf-navy);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.cfg-doc-toggle:hover {
+  border-color: rgba(26, 123, 224, 0.5);
+  background: #f6faff;
+}
+
+.cfg-doc-toggle[aria-expanded="true"] {
+  border-color: rgba(26, 123, 224, 0.6);
+  background: #f2f7fd;
+}
+
+.cfg-doc-chevron {
+  width: 18px;
+  height: 18px;
+  color: #2f6fb3;
+  transition: transform 0.2s ease;
+}
+
+.cfg-doc-chevron.open {
+  transform: rotate(180deg);
+}
+
+.cfg-doc-panel {
+  margin-top: 10px;
+  padding: 6px;
+  border-radius: 12px;
+  border: 1px solid rgba(11, 42, 84, 0.12);
+  background: #f8fbff;
+}
+
+.cfg-doc-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.cfg-doc-item {
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  color: rgba(11, 42, 84, 0.85);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cfg-doc-item + .cfg-doc-item {
+  border-top: 1px solid rgba(11, 42, 84, 0.06);
+}
+
+.cfg-doc-change {
+  display: block;
+  margin-top: 4px;
+  padding: 8px 10px;
+  border-top: 1px solid rgba(11, 42, 84, 0.1);
+  color: #1a7be0;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.cfg-doc-change:hover {
+  text-decoration: underline;
+}
+
 .cfg-field-control input[type="date"] {
   flex: none;
 }
@@ -4570,6 +4668,53 @@ label {
   font-family: inherit;
   font-size: 14px;
   font-weight: 600;
+}
+
+/* Editable passing-score box: a typable number input paired with the
+   slider, styled to match the read-only value chip it replaces. */
+.cfg-score-box {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  height: 34px;
+  padding: 0 8px;
+  border-radius: 9px;
+  background: #eef4fb;
+  color: var(--sf-navy);
+  font-weight: 600;
+}
+
+.cfg-field-control .cfg-score-box .cfg-score-input {
+  width: 30px;
+  height: 100%;
+  flex: none;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  text-align: right;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--sf-navy);
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+.cfg-field-control .cfg-score-box .cfg-score-input:focus {
+  outline: none;
+}
+
+.cfg-score-box .cfg-score-input::-webkit-outer-spin-button,
+.cfg-score-box .cfg-score-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.cfg-score-pct {
+  font-size: 14px;
+  padding-left: 1px;
 }
 
 .diff-seg {
@@ -4616,8 +4761,7 @@ label {
   transition: opacity 0.28s ease, transform 0.28s ease, visibility 0.28s ease;
 }
 
-.diff-opt:hover .diff-tip,
-.diff-opt:focus-within .diff-tip {
+.diff-opt:hover .diff-tip {
   opacity: 1;
   visibility: visible;
   transform: translate(-50%, 0);
