@@ -12,9 +12,13 @@ type RequireRoleProps = {
 // disagree about who counts as a manager. Managers land back on their
 // upload flow, new hires on their home page, matching LoginPage's redirect.
 function RequireRole({ role, children }: RequireRoleProps) {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
+
+  if (loading) return null;
+  if (!user) return <Navigate to="/" replace />;
+
   const effectiveRole =
-    (user?.user_metadata?.role as string | undefined) ?? getPreviewRole() ?? "new_hire";
+    (user.user_metadata?.role as string | undefined) ?? getPreviewRole() ?? "new_hire";
 
   if (effectiveRole !== role) {
     return <Navigate to={effectiveRole === "manager" ? "/upload-content" : "/home"} replace />;

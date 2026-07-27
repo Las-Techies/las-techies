@@ -28,8 +28,22 @@ function App() {
           </RequireRole>
         }
       />
-      <Route path="/learner-module" element={<LearnerModulePage />} />
-      <Route path="/quiz-taking" element={<QuizTakingPage />} />
+      <Route
+        path="/learner-module"
+        element={
+          <RequireRole role="new_hire">
+            <LearnerModulePage />
+          </RequireRole>
+        }
+      />
+      <Route
+        path="/quiz-taking"
+        element={
+          <RequireRole role="new_hire">
+            <QuizTakingPage />
+          </RequireRole>
+        }
+      />
       <Route
         path="/upload-content"
         element={
@@ -54,7 +68,14 @@ function App() {
           </RequireRole>
         }
       />
-      <Route path="/quiz-results" element={<QuizResultsPage />} />
+      <Route
+        path="/quiz-results"
+        element={
+          <RequireRole role="new_hire">
+            <QuizResultsPage />
+          </RequireRole>
+        }
+      />
       <Route
         path="/manager-dashboard"
         element={
