@@ -511,7 +511,7 @@ function ConfigureQuizPage() {
 
   return (
     <div className="app-shell">
-      <AppNav lockedNav={isGenerating} />
+      <AppNav lockedNav={isGenerating || regeneratingQuestionId !== null} />
       <main className="mgr-page">
         <div className="mgr-hero">
           <div>

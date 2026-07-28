@@ -96,10 +96,11 @@ function AppNav({ lockedNav = false }: { lockedNav?: boolean }) {
               className={`app-nav-link ${isActive ? "active" : ""} ${isLocked ? "disabled" : ""}`}
               to={item.to}
               onClick={(event) => {
+                event.preventDefault();
+                if (isLocked) return;
                 // Route through the quiz guard so navigating away mid-quiz
                 // prompts for confirmation instead of silently discarding the
                 // in-progress attempt. No-op guard when no quiz is active.
-                event.preventDefault();
                 requestNavigation(() => navigate(item.to));
               }}
             >
