@@ -26,6 +26,7 @@ import {
 import { saveModuleProgress } from "../features/quiz/storage";
 import type { GeneratedQuiz } from "../features/quiz/types";
 import { type SourceKind } from "../features/learner/data";
+import { useLastNonNull, useModalTransition } from "../hooks/useModalTransition";
 
 type Filter = "All" | "Files" | "Google Drive" | "GitHub";
 const FILTERS: Filter[] = ["All", "Files", "Google Drive", "GitHub"];
@@ -365,6 +366,12 @@ function LearnerModulePage() {
   const [hasNoTimeLimit, setHasNoTimeLimit] = useState(false);
   const [confirmStart, setConfirmStart] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
+  // Frozen copy so the doc-source modal keeps showing its last document
+  // while it plays its close animation, instead of the content vanishing
+  // the instant `openDoc` resets to null.
+  const frozenOpenDoc = useLastNonNull(openDoc);
+  const docModal = useModalTransition(Boolean(openDoc));
+  const confirmModal = useModalTransition(confirmStart);
 
   // Load the team's real uploaded documents — everyone's, not just this
   // user's own uploads, since the library is scoped to the whole team (and
@@ -404,27 +411,32 @@ function LearnerModulePage() {
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
-    // Prefer the specific quiz this page was opened for (from the new-hire's
-    // assigned-quiz list); fall back to "my latest" only when no quizId was
-    // passed in, so old links/bookmarks without one still work.
-    const quizRequest = quizIdParam
-      ? apiFetch<GeneratedQuiz | null>(`/api/quizzes/${quizIdParam}`)
-      : apiFetch<GeneratedQuiz | null>("/api/quizzes/mine/latest");
+    // Refresh behavior for new assignments:
+    // - If the URL carries quizId, still fetch that specific quiz.
+    // - Also fetch the user's latest assigned/published quiz and prefer it when
+    //   present, so a page refresh can pick up a newly assigned quiz.
+    const specificQuizPromise = quizIdParam
+      ? apiFetch<GeneratedQuiz | null>(`/api/quizzes/${quizIdParam}`).catch(() => null)
+      : Promise.resolve<GeneratedQuiz | null>(null);
+    const latestQuizPromise = apiFetch<GeneratedQuiz | null>("/api/quizzes/mine/latest").catch(
+      () => null
+    );
 
-    quizRequest
-      .then((quiz) => {
-        if (cancelled || !quiz) return;
-        if (quiz.title) setModuleTitle(quiz.title);
-        if (quiz.timeLimitMinutes) {
-          setTimeLimit(quiz.timeLimitMinutes);
-        } else {
-          setHasNoTimeLimit(true);
-        }
-        setQuizId(quiz.id);
-      })
-      .catch(() => {
-        /* keep default title */
-      });
+    Promise.all([specificQuizPromise, latestQuizPromise]).then(([specificQuiz, latestQuiz]) => {
+      if (cancelled) return;
+      const quiz = latestQuiz ?? specificQuiz;
+      if (!quiz) return;
+
+      if (quiz.title) setModuleTitle(quiz.title);
+      if (quiz.timeLimitMinutes) {
+        setTimeLimit(quiz.timeLimitMinutes);
+        setHasNoTimeLimit(false);
+      } else {
+        setTimeLimit(null);
+        setHasNoTimeLimit(true);
+      }
+      setQuizId(quiz.id);
+    });
 
     // Header shows the team's name rather than the quiz title, so a manager
     // previewing this page and a new hire completing it both see "their"
@@ -729,7 +741,7 @@ function LearnerModulePage() {
               </div>
             ) : docs.length === 0 ? (
               <p className="lib-empty">
-                No documents have been added to this module yet.
+                {isManager ? "No uploads yet." : "No documents have been added to this module yet."}
               </p>
             ) : (
               <>
@@ -807,7 +819,7 @@ function LearnerModulePage() {
         </section>
 
         <div className="page-actions">
-          <button className="secondary-btn" type="button" onClick={() => navigate("/home")}>
+          <button className="secondary-btn" type="button" onClick={() => navigate(isManager ? "/upload-content" : "/home")}>
             ← Back
           </button>
           {!isManager ? (
@@ -822,19 +834,24 @@ function LearnerModulePage() {
         </div>
       </main>
 
-      {!isChatOpen ? (
+      {/* Both the trigger and the panel stay mounted at all times — the
+          `.chat-morph` wrapper morphs its own box size between the two
+          (see global.css) instead of one unmounting while the other pops
+          in, so closing gets a real reverse animation instead of an
+          instant unmount. */}
+      <div className="chat-morph" data-open={isChatOpen}>
         <button
           type="button"
-          className="chat-fab"
+          className="chat-morph-plus"
           onClick={() => setIsChatOpen(true)}
           aria-label="Open Ask Sage chat"
+          aria-expanded={isChatOpen}
+          tabIndex={isChatOpen ? -1 : 0}
         >
           <ChatBubbleIcon />
         </button>
-      ) : null}
 
-      {isChatOpen ? (
-        <div className="card ai-card chat-widget-panel">
+        <div className="card ai-card chat-morph-menu" aria-hidden={!isChatOpen}>
           <div className="ai-head" ref={historyRef}>
             <Sparkle />
             <h2>Ask Sage</h2>
@@ -986,22 +1003,25 @@ function LearnerModulePage() {
             </button>
           </div>
         </div>
-      ) : null}
+      </div>
 
-      {openDoc ? (
+      {docModal.shouldRender && frozenOpenDoc ? (
         <div
-          className="doc-modal-backdrop"
+          className={`doc-modal-backdrop t-modal-backdrop ${docModal.phaseClassName}`}
           role="dialog"
           aria-modal="true"
-          aria-label={`Source: ${openDoc.title}`}
+          aria-label={`Source: ${frozenOpenDoc.title}`}
           onClick={() => setOpenDoc(null)}
         >
-          <div className="doc-modal" onClick={(event) => event.stopPropagation()}>
+          <div
+            className={`doc-modal t-modal ${docModal.phaseClassName}`}
+            onClick={(event) => event.stopPropagation()}
+          >
             <header className="doc-modal-head">
-              <DocIcon kind={openDoc.kind} />
+              <DocIcon kind={frozenOpenDoc.kind} />
               <div className="doc-modal-title">
-                <strong>{openDoc.title}</strong>
-                <span>{openDoc.typeLabel}</span>
+                <strong>{frozenOpenDoc.title}</strong>
+                <span>{frozenOpenDoc.typeLabel}</span>
               </div>
               <button
                 type="button"
@@ -1014,22 +1034,22 @@ function LearnerModulePage() {
             </header>
 
             <div className="doc-modal-body">
-              {fileUrlLoadingId === openDoc.remoteId ? (
+              {fileUrlLoadingId === frozenOpenDoc.remoteId ? (
                 <p className="subtle">Loading document…</p>
               ) : fileUrl?.url && isViewableInline(fileUrl.mimeType) ? (
                 <iframe
                   className="doc-modal-iframe"
                   src={embedSrcFor(fileUrl.url, fileUrl.mimeType)}
-                  title={openDoc.title}
+                  title={frozenOpenDoc.title}
                 />
-              ) : sourceLoadingId === openDoc.remoteId ? (
+              ) : sourceLoadingId === frozenOpenDoc.remoteId ? (
                 <p className="subtle">Loading source…</p>
-              ) : sourceError && !sourceText[openDoc.remoteId] ? (
+              ) : sourceError && !sourceText[frozenOpenDoc.remoteId] ? (
                 <p className="form-error">{sourceError}</p>
               ) : (
                 <article className="doc-page">
                   {renderDocParagraphs(
-                    sourceText[openDoc.remoteId] ??
+                    sourceText[frozenOpenDoc.remoteId] ??
                       "No extracted text available for this document."
                   )}
                 </article>
@@ -1055,15 +1075,18 @@ function LearnerModulePage() {
         </div>
       ) : null}
 
-      {confirmStart ? (
+      {confirmModal.shouldRender ? (
         <div
-          className="doc-modal-backdrop"
+          className={`doc-modal-backdrop t-modal-backdrop ${confirmModal.phaseClassName}`}
           role="dialog"
           aria-modal="true"
           aria-label="Start quiz"
           onClick={() => setConfirmStart(false)}
         >
-          <div className="confirm-modal" onClick={(event) => event.stopPropagation()}>
+          <div
+            className={`confirm-modal t-modal ${confirmModal.phaseClassName}`}
+            onClick={(event) => event.stopPropagation()}
+          >
             <div className="confirm-icon" aria-hidden>
               <svg viewBox="0 0 24 24" width="26" height="26">
                 <circle cx="12" cy="13" r="8" fill="none" stroke="#0176d3" strokeWidth="1.8" />

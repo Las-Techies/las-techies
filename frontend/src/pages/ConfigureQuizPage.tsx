@@ -11,6 +11,7 @@ import {
   type TeamDocument,
 } from "../api/client";
 import { loadDeselectedDocumentIds, saveQuizConfig } from "../features/quiz/storage";
+import { useSlidingPill } from "../hooks/useSlidingPill";
 import type { GeneratedQuiz, QuizDifficulty, QuizQuestion } from "../features/quiz/types";
 import { PencilIcon, RegenerateIcon } from "../components/icons/QuizIcons";
 import {
@@ -73,6 +74,7 @@ function ConfigureQuizPage() {
     dueDate: "",
     difficulty: "Medium",
   });
+  const difficultyPill = useSlidingPill<HTMLSpanElement, HTMLSpanElement>(form.difficulty);
   const [isGenerating, setIsGenerating] = useState(false);
   const [quiz, setQuiz] = useState<GeneratedQuiz | null>(null);
   // Questions revealed one-by-one as the model streams them, before the final
@@ -234,6 +236,10 @@ function ConfigureQuizPage() {
   );
 
   const handleGenerate = async () => {
+    // Double-click guard: once a generation starts, ignore additional clicks
+    // until the current streaming request finishes.
+    if (isGenerating) return;
+
     if (!isFormValid) {
       setError("Please fill all fields before generating AI questions.");
       return;
@@ -505,7 +511,7 @@ function ConfigureQuizPage() {
 
   return (
     <div className="app-shell">
-      <AppNav />
+      <AppNav lockedNav={isGenerating || regeneratingQuestionId !== null} />
       <main className="mgr-page">
         <div className="mgr-hero">
           <div>
@@ -536,6 +542,7 @@ function ConfigureQuizPage() {
                   style={{ flex: 1 }}
                   placeholder="Salesforce Security Best Practices"
                   value={form.moduleTitle}
+                  disabled={isGenerating}
                   onChange={(event) => updateForm("moduleTitle", event.target.value)}
                 />
               </span>
@@ -589,9 +596,11 @@ function ConfigureQuizPage() {
                       </li>
                     ))}
                   </ul>
-                  <Link className="cfg-doc-change" to="/upload-content">
-                    Change selection
-                  </Link>
+                  {!isGenerating && (
+                    <Link className="cfg-doc-change" to="/upload-content">
+                      Change selection
+                    </Link>
+                  )}
                 </div>
               ) : null}
             </div>
@@ -609,6 +618,7 @@ function ConfigureQuizPage() {
                   max={100}
                   step={5}
                   value={Number(form.passingScore) || 0}
+                  disabled={isGenerating}
                   onChange={(event) => updateForm("passingScore", event.target.value)}
                 />
                 <span className="cfg-score-box">
@@ -618,6 +628,7 @@ function ConfigureQuizPage() {
                     min={0}
                     max={100}
                     value={form.passingScore}
+                    disabled={isGenerating}
                     onChange={(event) => {
                       const raw = event.target.value;
                       if (raw === "") {
@@ -642,6 +653,7 @@ function ConfigureQuizPage() {
                 <select
                   style={{ flex: 1 }}
                   value={form.timeLimit}
+                  disabled={isGenerating}
                   onChange={(event) => updateForm("timeLimit", event.target.value)}
                 >
                   <option value="" disabled>
@@ -670,6 +682,7 @@ function ConfigureQuizPage() {
                   placeholder="e.g. 10"
                   style={{ width: 90 }}
                   value={form.questionCount}
+                  disabled={isGenerating}
                   onChange={(event) => updateForm("questionCount", event.target.value)}
                 />
               </span>
@@ -685,6 +698,7 @@ function ConfigureQuizPage() {
                   type="date"
                   value={form.dueDate}
                   min={todayIso}
+                  disabled={isGenerating}
                   onChange={(event) => updateForm("dueDate", event.target.value)}
                 />
               </span>
@@ -700,6 +714,7 @@ function ConfigureQuizPage() {
                   style={{ flex: 1 }}
                   placeholder="e.g. Salesforce Security"
                   value={form.topic}
+                  disabled={isGenerating}
                   onChange={(event) => updateForm("topic", event.target.value)}
                 />
               </span>
@@ -711,12 +726,15 @@ function ConfigureQuizPage() {
               </span>
               <span className="cfg-field-label">Difficulty</span>
               <span className="cfg-field-control">
-                <span className="diff-seg">
+                <span className="diff-seg" ref={difficultyPill.containerRef}>
+                  <span className="diff-seg-pill" ref={difficultyPill.pillRef} aria-hidden="true" />
                   {(["Easy", "Medium", "Hard"] as const).map((value) => (
                     <span className="diff-opt" key={value}>
                       <button
                         type="button"
+                        ref={difficultyPill.setItemRef(value)}
                         className={form.difficulty === value ? "on" : ""}
+                        disabled={isGenerating}
                         onClick={() => updateForm("difficulty", value)}
                       >
                         {value}
@@ -742,8 +760,14 @@ function ConfigureQuizPage() {
             </div>
 
             <div className="cfg-done-row">
-              <button type="button" className="sf-btn" onClick={handleGenerate}>
-                <CheckPlain /> {hasQuestions ? "Regenerate" : "Generate"}
+              <button
+                type="button"
+                className="sf-btn"
+                onClick={handleGenerate}
+                disabled={isGenerating}
+                aria-busy={isGenerating}
+              >
+                <CheckPlain /> {isGenerating ? "Generating…" : hasQuestions ? "Regenerate" : "Generate"}
               </button>
             </div>
             {error ? <p className="form-error">{error}</p> : null}
@@ -985,14 +1009,19 @@ function ConfigureQuizPage() {
         </section>
 
         <div className="mgr-foot" style={{ justifyContent: "center", gap: 18 } as CSSProperties}>
-          <Link className="ghost-btn btn-link" to="/upload-content">
+          <button
+            className="ghost-btn"
+            type="button"
+            disabled={isGenerating}
+            onClick={() => { if (!isGenerating) navigate("/upload-content"); }}
+          >
             <ArrowLeft /> Back
-          </Link>
+          </button>
           <button
             className="sf-btn"
             type="button"
-            disabled={isMutatingQuestion}
-            title={isMutatingQuestion ? "Waiting for your question edit to save…" : undefined}
+            disabled={isGenerating || isMutatingQuestion}
+            title={isGenerating ? "Please wait for generation to finish…" : isMutatingQuestion ? "Waiting for your question edit to save…" : undefined}
             onClick={handleNext}
           >
             {isMutatingQuestion ? "Saving…" : "Next: Review"} <ArrowRight />

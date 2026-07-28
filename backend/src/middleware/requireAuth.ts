@@ -88,13 +88,11 @@ export async function requireAuth(
       (supabaseUser.user_metadata?.role as string | undefined) ?? "new_hire";
     const { firstName, lastName } = deriveNameFromSupabaseUser(supabaseUser);
     // Team now rides along in the JWT like role/name do. `null` here means
-    // "this session's metadata doesn't say" rather than "reset to the demo
-    // team" — findOrCreateUserFromSupabase only falls back to the demo team
-    // when creating a brand-new user; for an existing user it leaves their
-    // already-assigned team alone instead of overwriting it. A JWT can end
-    // up without team_id for reasons unrelated to the user's real team
-    // (e.g. a fresh OAuth sign-in/link exchange), so it shouldn't be treated
-    // as authoritative proof they have no team.
+    // "this session's metadata doesn't say". We preserve that null for
+    // brand-new users so they are not auto-assigned to any default team;
+    // invite acceptance or manager team setup is what should assign team_id.
+    // For existing users, a missing claim still must not overwrite their
+    // already-assigned team.
     const teamIdRaw = supabaseUser.user_metadata?.team_id;
     const teamId = Number.isInteger(Number(teamIdRaw)) ? Number(teamIdRaw) : null;
 

@@ -10,6 +10,7 @@ import {
   type QuizConfig,
 } from "../features/quiz/types";
 import { ArrowLeft, ClipboardIcon, FileTextIcon } from "../components/icons";
+import { useLastNonNull, useModalTransition } from "../hooks/useModalTransition";
 
 const questionBankDefault = [
   {
@@ -326,6 +327,12 @@ function ReviewPublishPage() {
   const activeSourceItem = sourceModalPrompt
     ? questionDetails.find((item) => item.prompt === sourceModalPrompt) ?? null
     : null;
+  // Frozen copy so the modal keeps showing the last-viewed source while it
+  // plays its close animation, instead of the content vanishing the instant
+  // `sourceModalPrompt` resets to null.
+  const frozenSourceItem = useLastNonNull(activeSourceItem?.citation ? activeSourceItem : null);
+  const sourceModal = useModalTransition(Boolean(activeSourceItem?.citation));
+  const publishModal = useModalTransition(isPublishModalOpen);
 
   return (
     <div className="app-shell">
@@ -454,7 +461,7 @@ function ReviewPublishPage() {
             <div className="learner-email-input">
               <input
                 type="email"
-                placeholder="Enter learner's email"
+                placeholder="Enter learner's email or Google Group email" 
                 value={learnerEmail}
                 onChange={(event) => setLearnerEmail(event.target.value)}
                 onKeyDown={(event) => {
@@ -507,18 +514,21 @@ function ReviewPublishPage() {
           </div>
         </section>
 
-        {activeSourceItem?.citation ? (
+        {sourceModal.shouldRender && frozenSourceItem ? (
           <div
-            className="modal-backdrop"
+            className={`modal-backdrop t-modal-backdrop ${sourceModal.phaseClassName}`}
             role="dialog"
             aria-modal="true"
             onClick={() => setSourceModalPrompt(null)}
           >
-            <div className="modal-card rp-source-modal" onClick={(event) => event.stopPropagation()}>
+            <div
+              className={`modal-card rp-source-modal t-modal ${sourceModal.phaseClassName}`}
+              onClick={(event) => event.stopPropagation()}
+            >
               <div className="rp-source-head">
                 <div>
                   <span className="rp-source-eyebrow">Source document</span>
-                  <h3>{activeSourceItem.citation.sourceDocumentTitle}</h3>
+                  <h3>{frozenSourceItem.citation!.sourceDocumentTitle}</h3>
                 </div>
                 <button
                   type="button"
@@ -530,19 +540,19 @@ function ReviewPublishPage() {
                 </button>
               </div>
               <div className="rp-source-body">
-                {sourceLoadingByDocumentId[activeSourceItem.citation.sourceDocumentId] ? (
+                {sourceLoadingByDocumentId[frozenSourceItem.citation!.sourceDocumentId] ? (
                   <p className="cfg-empty">Loading source…</p>
-                ) : sourceErrorByDocumentId[activeSourceItem.citation.sourceDocumentId] ? (
+                ) : sourceErrorByDocumentId[frozenSourceItem.citation!.sourceDocumentId] ? (
                   <p className="form-error">
-                    {sourceErrorByDocumentId[activeSourceItem.citation.sourceDocumentId]}
+                    {sourceErrorByDocumentId[frozenSourceItem.citation!.sourceDocumentId]}
                   </p>
                 ) : (
                   <div className="rp-source-page">
                     {renderHighlightedSource(
-                      sourceTextByDocumentId[activeSourceItem.citation.sourceDocumentId] ??
+                      sourceTextByDocumentId[frozenSourceItem.citation!.sourceDocumentId] ??
                         "No extracted text available for this document.",
-                      activeSourceItem.citation.sourceSnippet,
-                      activeSourceItem.prompt
+                      frozenSourceItem.citation!.sourceSnippet,
+                      frozenSourceItem.prompt
                     )}
                   </div>
                 )}
@@ -551,9 +561,9 @@ function ReviewPublishPage() {
           </div>
         ) : null}
 
-        {isPublishModalOpen ? (
-          <div className="modal-backdrop" role="dialog" aria-modal="true">
-            <div className="modal-card">
+        {publishModal.shouldRender ? (
+          <div className={`modal-backdrop t-modal-backdrop ${publishModal.phaseClassName}`} role="dialog" aria-modal="true">
+            <div className={`modal-card t-modal ${publishModal.phaseClassName}`}>
               <h3>{displayTitle}</h3>
               <p>
                 Are you ready to publish this quiz to{" "}

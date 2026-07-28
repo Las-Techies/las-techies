@@ -6,6 +6,7 @@ import esmePhoto from "../assets/team-esme.png";
 import reynaPhoto from "../assets/team-reyna.png";
 import melaniePhoto from "../assets/team-melanie.png";
 import { ArrowLeft, GithubIcon, LinkedInIcon } from "../components/icons";
+import { useAvatarGroupHover } from "../hooks/useAvatarGroupHover";
 
 type Member = {
   id: string;
@@ -13,43 +14,59 @@ type Member = {
   role: string;
   photo: string;
   bio: string;
+  linkedin?: string;
+  github?: string;
 };
 
 const TEAM: Member[] = [
   {
     id: "frida",
     name: "Frida",
-    role: "Frontend Engineer",
+    role: "University of California, Berkeley",
     photo: fridaPhoto,
-    bio: "Frida shapes the SageForce experience end to end. She loves clean interfaces, delightful micro-interactions, and making complex flows feel effortless.",
+    bio: "Frida is a junior at the University of California, Berkeley studying Computer Science and Data Science.",
+    linkedin: "https://www.linkedin.com/in/frida-arriaga/",
+    github: "https://github.com/fridaarriaga",
   },
   {
     id: "esme",
     name: "Esme",
-    role: "Backend Engineer",
+    role: "University of California, Berkeley",
     photo: esmePhoto,
-    bio: "Esme builds the robust backend systems that power SageForce. She loves distributed systems, clean APIs, and turning complex problems into elegant solutions.",
+    bio: "Esme is a junior at the University of California, Berkeley studying Electrical Engineering and Computer Science.",
+    linkedin: "https://www.linkedin.com/in/esmebenitez/",
+    github: "https://github.com/EsmeBenitez",
   },
   {
     id: "reyna",
     name: "Reyna",
-    role: "AI Engineer",
+    role: "University of Houston",
     photo: reynaPhoto,
-    bio: "Reyna designs the AI that turns raw documents into sharp quiz questions. She's fascinated by LLMs, evaluation, and shipping models that actually help people.",
+    bio: "Reyna is a junior at the University of Houston studying Computer Science.",
+    linkedin: "https://www.linkedin.com/in/reyna-obreg%C3%B3n-8779322a8/",
+    github: "https://github.com/reyna1008",
   },
   {
     id: "melanie",
     name: "Melanie",
-    role: "Product Designer",
+    role: "University of Southern California",
     photo: melaniePhoto,
-    bio: "Melanie makes sure every screen feels intuitive and on-brand. She champions the user, sweats the details, and keeps the whole product feeling cohesive.",
+    bio: "Melanie is a junior at the University of Southern California studying Computer Science.",
+    linkedin: "https://www.linkedin.com/in/m3lanieperez/",
+    github: "https://github.com/melanienperez",
   },
 ];
 
 function MeetOurTeamPage() {
   const navigate = useNavigate();
-  const [featuredId, setFeaturedId] = useState<string | null>(null);
-  const featured = TEAM.find((member) => member.id === featuredId) ?? null;
+  // Which teammate's bio panel is expanded — driven by hover (and by
+  // keyboard focus / click as fallbacks for people who can't hover).
+  const [openId, setOpenId] = useState<string | null>(null);
+  const avatarGroup = useAvatarGroupHover<HTMLDivElement>();
+
+  const openAt = (id: string) => setOpenId(id);
+  const closeAt = (id: string) => setOpenId((current) => (current === id ? null : current));
+  const toggleAt = (id: string) => setOpenId((current) => (current === id ? null : id));
 
   return (
     <div className="app-shell">
@@ -68,55 +85,68 @@ function MeetOurTeamPage() {
           <img className="team-hero-mascot" src={mascot} alt="Waving panda" />
         </div>
 
-        <div className="team-row">
-          {TEAM.map((member) => (
-            <button
-              key={member.id}
-              type="button"
-              className={`team-member ${featuredId === member.id ? "active" : ""}`}
-              onClick={() => setFeaturedId(member.id)}
-            >
-              <img className="team-avatar" src={member.photo} alt={member.name} />
-              <span className="team-name">{member.name}</span>
-            </button>
-          ))}
-        </div>
-
-        {featured ? (
-          <div
-            className="team-modal-backdrop"
-            role="dialog"
-            aria-modal="true"
-            onClick={() => setFeaturedId(null)}
-          >
-            <section
-              className="glass team-feature"
-              onClick={(event) => event.stopPropagation()}
-            >
-              <button
-                type="button"
-                className="team-feature-close"
-                aria-label="Close"
-                onClick={() => setFeaturedId(null)}
+        <div className="team-row" ref={avatarGroup.rootRef} {...avatarGroup.rootProps}>
+          {TEAM.map((member, index) => {
+            const isOpen = openId === member.id;
+            return (
+              <div
+                key={member.id}
+                className={`team-member t-avatar ${isOpen ? "open" : ""}`}
+                onMouseEnter={() => {
+                  avatarGroup.getItemProps(index).onMouseEnter();
+                  openAt(member.id);
+                }}
+                onMouseLeave={() => closeAt(member.id)}
               >
-                ×
-              </button>
-              <img className="team-feature-photo" src={featured.photo} alt={featured.name} />
-              <div className="team-feature-body">
-                <h2>{featured.name}</h2>
-                <p className="team-feature-bio">{featured.bio}</p>
-                <div className="team-feature-links">
-                  <button type="button" className="team-social">
-                    <LinkedInIcon /> LinkedIn
-                  </button>
-                  <button type="button" className="team-social">
-                    <GithubIcon /> GitHub
-                  </button>
+                <button
+                  type="button"
+                  className="team-avatar-trigger"
+                  aria-expanded={isOpen}
+                  onClick={() => toggleAt(member.id)}
+                  onFocus={() => openAt(member.id)}
+                  onBlur={() => closeAt(member.id)}
+                >
+                  <img className="team-avatar" src={member.photo} alt={member.name} />
+                  <span className="team-name">{member.name}</span>
+                </button>
+
+                {/* transitions.dev "accordion" — grid-template-rows 0fr -> 1fr
+                    grows the bio panel vertically out of the photo on hover,
+                    instead of popping a modal over the whole page. */}
+                <div className="team-bio-acc" data-open={isOpen}>
+                  <div className="team-bio-acc-inner">
+                    <p className="team-bio-role">{member.role}</p>
+                    <p className="team-bio-text">{member.bio}</p>
+                    <div className="team-bio-links">
+                      {member.linkedin ? (
+                        <a
+                          href={member.linkedin}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="team-social"
+                          tabIndex={isOpen ? 0 : -1}
+                        >
+                          <LinkedInIcon /> LinkedIn
+                        </a>
+                      ) : null}
+                      {member.github ? (
+                        <a
+                          href={member.github}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="team-social"
+                          tabIndex={isOpen ? 0 : -1}
+                        >
+                          <GithubIcon /> GitHub
+                        </a>
+                      ) : null}
+                    </div>
+                  </div>
                 </div>
               </div>
-            </section>
-          </div>
-        ) : null}
+            );
+          })}
+        </div>
       </main>
     </div>
   );

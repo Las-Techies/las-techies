@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import AppNav from "../components/navigation/AppNav";
 import { getManagerDashboard, type ManagerDashboardData } from "../api/client";
+import { describeError, type FriendlyError } from "../api/errors";
+import ApiErrorCard from "../components/ApiErrorCard";
 import { CalendarIcon, ChartBarIcon, CheckCircleIcon, ClipboardIcon, PeopleIcon } from "../components/icons";
 
 function formatDate(iso: string | null): string {
@@ -25,16 +27,20 @@ function initialsOf(name: string): string {
 function ManagerDashboardPage() {
   const [data, setData] = useState<ManagerDashboardData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [loadError, setLoadError] = useState(false);
+  const [loadError, setLoadError] = useState<FriendlyError | null>(null);
+  // Bumped by the Try again button to re-run the loader effect.
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
+    setIsLoading(true);
+    setLoadError(null);
     getManagerDashboard()
       .then((result) => {
         if (!cancelled) setData(result);
       })
-      .catch(() => {
-        if (!cancelled) setLoadError(true);
+      .catch((err) => {
+        if (!cancelled) setLoadError(describeError(err));
       })
       .finally(() => {
         if (!cancelled) setIsLoading(false);
@@ -42,7 +48,7 @@ function ManagerDashboardPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [reloadKey]);
 
   const stats = useMemo(() => {
     if (!data) return null;
@@ -80,7 +86,11 @@ function ManagerDashboardPage() {
           <section className="glass dash-card">
             <p className="cfg-empty">Loading dashboard…</p>
           </section>
-        ) : loadError || !data ? (
+        ) : loadError ? (
+          <section className="glass dash-card">
+            <ApiErrorCard error={loadError} onRetry={() => setReloadKey((k) => k + 1)} />
+          </section>
+        ) : !data ? (
           <section className="glass dash-card">
             <p className="cfg-empty">Couldn't load your dashboard. Try refreshing the page.</p>
           </section>
@@ -172,6 +182,14 @@ function ManagerDashboardPage() {
                                   {assignment.status === "completed" && typeof assignment.score === "number"
                                     ? `${assignment.score}%`
                                     : "—"}
+                                  {assignment.attemptCount > 1 ? (
+                                    <span
+                                      className="dash-attempt-badge"
+                                      title={`Best of ${assignment.attemptCount} attempts`}
+                                    >
+                                      ×{assignment.attemptCount}
+                                    </span>
+                                  ) : null}
                                 </span>
                                 <span className="dash-assignment-meta">
                                   {formatDuration(assignment.timeTakenSeconds)}

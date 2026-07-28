@@ -9,4 +9,7 @@ export default defineConfig({
       interval: 300,
     },
   },
+  build: {
+    chunkSizeWarningLimit: 1000,
+  },
 });
