@@ -5879,7 +5879,7 @@ main.mgr-page > section.dropzone > input.sr-only {
   display: flex;
   flex-direction: column;
   align-items: center;
-  width: 190px;
+  width: 240px;
 }
 
 .team-avatar-trigger {
@@ -5935,13 +5935,17 @@ main.mgr-page > section.dropzone > input.sr-only {
 }
 
 .team-avatar {
-  width: 150px;
-  height: 150px;
+  width: 190px;
+  height: 190px;
   border-radius: 50%;
   object-fit: cover;
   border: 4px solid rgba(255, 255, 255, 0.85);
   box-shadow: 0 16px 34px rgba(3, 30, 70, 0.28);
   transition: box-shadow 0.18s ease;
+}
+
+.team-member:nth-child(4) .team-avatar {
+  object-position: 62% 38%;
 }
 
 .team-member:hover .team-avatar {
