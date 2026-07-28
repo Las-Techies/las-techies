@@ -7,7 +7,7 @@ import { apiFetch } from "../api/client";
 import { findHighlightSpan } from "../features/quiz/citationMatch";
 import { useLastNonNull, useModalTransition } from "../hooks/useModalTransition";
 import { loadQuizAttempt, loadQuizConfig } from "../features/quiz/storage";
-import type { GeneratedQuiz, QuizQuestion } from "../features/quiz/types";
+import type { QuizQuestion } from "../features/quiz/types";
 import {
   ArrowRight,
   CheckCircleIcon,
@@ -57,8 +57,6 @@ function QuizResultsPage() {
   const navigate = useNavigate();
   const attempt = useMemo(() => loadQuizAttempt(), []);
   const [passingScore, setPassingScore] = useState(70);
-  const [quiz, setQuiz] = useState<GeneratedQuiz | null>(null);
-  const [isLoadingLatestQuiz, setIsLoadingLatestQuiz] = useState(!attempt);
   // Which review row's source document is open in the source modal.
   const [sourceModalRowId, setSourceModalRowId] = useState<number | null>(null);
   const [sourceTextByDocumentId, setSourceTextByDocumentId] = useState<Record<number, string>>({});
@@ -72,22 +70,15 @@ function QuizResultsPage() {
 
   useEffect(() => {
     setPassingScore(loadQuizConfig().passingScore);
-    if (attempt) {
-      setIsLoadingLatestQuiz(false);
-      return;
-    }
-    setIsLoadingLatestQuiz(true);
-    apiFetch<GeneratedQuiz | null>("/api/quizzes/mine/latest")
-      .then((data) => setQuiz(data))
-      .catch(() => {
-        setQuiz(null);
-      })
-      .finally(() => setIsLoadingLatestQuiz(false));
-  }, [attempt]);
+  }, []);
 
-  const reviewQuestions: QuizQuestion[] = attempt?.questions ?? quiz?.questionsPayload ?? [];
+  // Results reflect a real, completed attempt only. Without one there is
+  // nothing to score — we must NOT fall back to the latest generated quiz's
+  // questions, or a new hire who never took the quiz would see a fabricated
+  // "100% — You passed!" (every question marked correct by its answer key).
+  const reviewQuestions: QuizQuestion[] = attempt?.questions ?? [];
   const userAnswers = attempt?.answers ?? {};
-  const hasRealData = reviewQuestions.length > 0;
+  const hasRealData = Boolean(attempt) && reviewQuestions.length > 0;
 
   const rows: ReviewRow[] = hasRealData
     ? reviewQuestions.map((question, index) => {
@@ -96,7 +87,7 @@ function QuizResultsPage() {
         return {
           id: question.id,
           text: `${index + 1}. ${question.prompt}`,
-          correct: attempt ? gotItRight : Boolean(correctOption),
+          correct: gotItRight,
           source: question.citation?.sourceDocumentTitle ?? "Course Docs",
           citation: question.citation
             ? {
@@ -125,9 +116,7 @@ function QuizResultsPage() {
             )
           )
         )
-      : attempt
-        ? "—" // older attempt saved before time tracking existed — nothing to compute
-        : "12m 34s"; // sample/demo state, no real attempt at all
+      : "—"; // attempt saved before time tracking existed — nothing to compute
 
   const activeSourceRow =
     sourceModalRowId != null ? rows.find((row) => row.id === sourceModalRowId) ?? null : null;
@@ -222,11 +211,7 @@ function QuizResultsPage() {
       <AppNav />
 
       <main className="results-stage">
-        {isLoadingLatestQuiz ? (
-          <section className="glass card results-empty">
-            <p className="cfg-empty">Loading your results…</p>
-          </section>
-        ) : !hasRealData ? (
+        {!hasRealData ? (
           <section className="glass card results-empty">
             <img className="results-empty-mascot" src={mascot} alt="" aria-hidden />
             <p className="results-eyebrow">YOUR PROGRESS</p>
@@ -317,12 +302,7 @@ function QuizResultsPage() {
               <ListIcon /> Review Your Answers
             </h2>
             <div className="review-scroll">
-              {isLoadingLatestQuiz ? (
-                <p className="cfg-empty">Loading quiz results...</p>
-              ) : rows.length === 0 ? (
-                <p className="cfg-empty">No quiz results found yet.</p>
-              ) : (
-                rows.map((row, index) => (
+              {rows.map((row, index) => (
                   <div className="review-item" key={row.id}>
                     <span
                       className={`review-mark t-success-check ${row.correct ? "ok" : "no"}`}
@@ -344,8 +324,7 @@ function QuizResultsPage() {
                       </button>
                     ) : null}
                   </div>
-                ))
-              )}
+                ))}
             </div>
           </section>
             </div>

@@ -4,7 +4,8 @@ import AppNav from "../components/navigation/AppNav";
 import { apiFetch, completeQuizAssignment } from "../api/client";
 import { saveQuizAttempt } from "../features/quiz/storage";
 import type { GeneratedQuiz, QuizQuestion } from "../features/quiz/types";
-import { ArrowLeft, ArrowRight, ClockIcon } from "../components/icons";
+import { useQuizGuard } from "../context/QuizGuardContext";
+import { ArrowLeft, ArrowRight, ClockIcon, ClipboardIcon, ShieldIcon } from "../components/icons";
 
 const LETTERS = ["A", "B", "C", "D", "E", "F"];
 
@@ -18,14 +19,20 @@ function QuizTakingPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const quizIdParam = searchParams.get("quizId");
+  const { setQuizInProgress } = useQuizGuard();
   const [isLoading, setIsLoading] = useState(true);
   const [title, setTitle] = useState("");
   const [quizId, setQuizId] = useState<number | null>(
     quizIdParam ? Number(quizIdParam) : null
   );
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
+  // Gate the questions behind an intro screen so a new hire explicitly starts
+  // the quiz (and sees the "finish in one sitting" warning) instead of being
+  // dropped straight into Question 1.
+  const [hasStarted, setHasStarted] = useState(false);
   const [current, setCurrent] = useState(0);
   const [answers, setAnswers] = useState<Record<number, number>>({});
+  const [timeLimitMinutes, setTimeLimitMinutes] = useState<number | null>(null);
   const [hasTimeLimit, setHasTimeLimit] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState(0);
   // Guards against the auto-submit-on-timeout effect firing more than once.
@@ -47,14 +54,12 @@ function QuizTakingPage() {
     quizRequest
       .then((quiz) => {
         if (cancelled || !quiz || quiz.questionsPayload.length === 0) return;
-        startedAtRef.current = Date.now();
         setQuestions(quiz.questionsPayload);
         setQuizId(quiz.id);
         setTitle(quiz.title);
-        if (quiz.timeLimitMinutes) {
-          setHasTimeLimit(true);
-          setSecondsLeft(quiz.timeLimitMinutes * 60);
-        }
+        // Remember the limit but don't start the clock — the countdown begins
+        // only once the learner starts the quiz from the intro screen.
+        if (quiz.timeLimitMinutes) setTimeLimitMinutes(quiz.timeLimitMinutes);
       })
       .catch(() => {
         /* leave questions empty — the empty state renders below */
@@ -71,9 +76,25 @@ function QuizTakingPage() {
   const question = questions[current];
   const isLast = current === total - 1;
 
+  // Begins the attempt: starts the timer (if any), stamps the start time for a
+  // real "time taken", and flips the quiz-in-progress guard on so leaving the
+  // page now prompts for confirmation.
+  const startQuiz = () => {
+    startedAtRef.current = Date.now();
+    if (timeLimitMinutes) {
+      setHasTimeLimit(true);
+      setSecondsLeft(timeLimitMinutes * 60);
+    }
+    setHasStarted(true);
+    setQuizInProgress(true);
+  };
+
   const submitQuiz = () => {
     if (hasSubmittedRef.current) return;
     hasSubmittedRef.current = true;
+    // Attempt is finishing — release the navigation guard before routing to
+    // results so the confirm modal doesn't fire on our own navigate().
+    setQuizInProgress(false);
 
     const submittedAt = Date.now();
     const startedAt = startedAtRef.current ?? submittedAt;
@@ -125,6 +146,27 @@ function QuizTakingPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasTimeLimit, secondsLeft, isLoading, questions.length]);
 
+  // Browser-level guardrail: warn on refresh / tab-close / browser-back while
+  // the quiz is in progress. This is the native confirm dialog — the in-app
+  // nav confirm modal (via QuizGuard) covers clicks on our own links.
+  useEffect(() => {
+    if (!hasStarted || hasSubmittedRef.current) return;
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      // Required for the prompt to show in some browsers; the text itself is
+      // ignored by modern browsers, which show their own generic message.
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [hasStarted]);
+
+  // Safety net: if this page unmounts for any reason while a quiz is live
+  // (it wasn't submitted), clear the global guard so it can't get stuck on.
+  useEffect(() => {
+    return () => setQuizInProgress(false);
+  }, [setQuizInProgress]);
+
   const selectOption = (optionId: number) => {
     setAnswers((prev) => ({ ...prev, [question.id]: optionId }));
   };
@@ -162,6 +204,48 @@ function QuizTakingPage() {
                 onClick={() => navigate("/learner-module")}
               >
                 <ArrowLeft /> Back to Learner Module
+              </button>
+            </div>
+          </section>
+        ) : !hasStarted ? (
+          <section className="glass quiz-panel quiz-intro">
+            <span className="quiz-intro-eyebrow">
+              <ClipboardIcon aria-hidden /> Onboarding Quiz
+            </span>
+            <h1 className="quiz-intro-title">{title || "Ready to start?"}</h1>
+
+            <ul className="quiz-intro-facts">
+              <li>
+                <strong>{total}</strong>
+                <span>{total === 1 ? "question" : "questions"}</span>
+              </li>
+              <li>
+                <strong>{timeLimitMinutes ? `${timeLimitMinutes} min` : "No limit"}</strong>
+                <span>time limit</span>
+              </li>
+            </ul>
+
+            <div className="quiz-intro-notice" role="note">
+              <span className="quiz-intro-notice-icon" aria-hidden>
+                <ShieldIcon />
+              </span>
+              <p>
+                Once you begin, complete the quiz in one sitting.{" "}
+                <strong>If you leave before submitting, your progress won't be saved</strong>{" "}
+                and you'll have to start over{timeLimitMinutes ? ", and the timer keeps running" : ""}.
+              </p>
+            </div>
+
+            <div className="quiz-panel-foot" style={{ justifyContent: "space-between" }}>
+              <button
+                className="ghost-btn"
+                type="button"
+                onClick={() => navigate("/learner-module")}
+              >
+                <ArrowLeft /> Back
+              </button>
+              <button className="sf-btn" type="button" onClick={startQuiz}>
+                Start Quiz <ArrowRight />
               </button>
             </div>
           </section>
