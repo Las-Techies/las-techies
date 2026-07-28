@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import AppNav from "../components/navigation/AppNav";
 import mascot from "../assets/panda-home.png";
 import { listAssignedQuizzes, type AssignedQuiz } from "../api/client";
+import { describeError, type FriendlyError } from "../api/errors";
+import ApiErrorCard from "../components/ApiErrorCard";
 import { useAuth } from "../context/AuthContext";
 import { getUserDisplayFirstName } from "../features/auth/userDisplayName";
 import { learnerModule } from "../features/learner/data";
@@ -39,20 +41,21 @@ function NewHireHomePage() {
 
   const [assignments, setAssignments] = useState<AssignedQuiz[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<FriendlyError | null>(null);
+  // Bumped by the Retry button to re-run the loader effect.
+  const [reloadKey, setReloadKey] = useState(0);
 
   // Show the new hire's real assigned quizzes (soonest-due-and-pending first).
   useEffect(() => {
     let cancelled = false;
     setIsLoading(true);
+    setError(null);
     listAssignedQuizzes()
       .then((data) => {
         if (!cancelled) setAssignments(data);
       })
       .catch((err) => {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : "Failed to load your assigned quizzes.");
-        }
+        if (!cancelled) setError(describeError(err));
       })
       .finally(() => {
         if (!cancelled) setIsLoading(false);
@@ -60,7 +63,7 @@ function NewHireHomePage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [reloadKey]);
 
   // The "current" quiz is the soonest still-pending one (list is pre-sorted).
   const current = useMemo(
@@ -153,7 +156,7 @@ function NewHireHomePage() {
             </span>
 
             {error ? (
-              <p className="form-error">{error}</p>
+              <ApiErrorCard error={error} onRetry={() => setReloadKey((k) => k + 1)} />
             ) : isLoading ? (
               <ul className="nh-timeline">
                 <li className="nh-step upcoming">

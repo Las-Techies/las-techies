@@ -1,5 +1,6 @@
 import { supabase } from "../lib/supabaseClient";
 import type { GeneratedQuiz, QuizQuestion } from "../features/quiz/types";
+import { ApiError, logApiError } from "./errors";
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:4000";
 
@@ -19,22 +20,41 @@ export async function apiFetch<T>(
   const token = data.session?.access_token;
 
   const isFormData = options.body instanceof FormData;
+  const method = options.method ?? "GET";
 
-  const res = await fetch(`${BASE_URL}${path}`, {
-    ...options,
-    headers: {
-      ...(isFormData ? {} : { "Content-Type": "application/json" }),
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...options.headers,
-    },
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${BASE_URL}${path}`, {
+      ...options,
+      headers: {
+        ...(isFormData ? {} : { "Content-Type": "application/json" }),
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...options.headers,
+      },
+    });
+  } catch (networkErr) {
+    // fetch only rejects when the request never got a response (offline,
+    // DNS/CORS, server down). Surface it as a status-0 ApiError so callers
+    // can tell "can't reach server" apart from a real HTTP error.
+    const error = new ApiError({
+      status: 0,
+      method,
+      path,
+      rawMessage:
+        networkErr instanceof Error ? networkErr.message : "Network request failed",
+    });
+    logApiError(error);
+    throw error;
+  }
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     const message =
       (body as { error?: { message?: string } })?.error?.message ??
       `Request failed with status ${res.status}`;
-    throw new Error(message);
+    const error = new ApiError({ status: res.status, method, path, rawMessage: message });
+    logApiError(error);
+    throw error;
   }
 
   if (res.status === 204) {
@@ -87,7 +107,14 @@ export async function streamQuizGeneration(
     const message =
       (parsedBody as { error?: { message?: string } })?.error?.message ??
       `Request failed with status ${res.status}`;
-    throw new Error(message);
+    const error = new ApiError({
+      status: res.status,
+      method: "POST",
+      path: "/api/quizzes/generate",
+      rawMessage: message,
+    });
+    logApiError(error);
+    throw error;
   }
 
   const reader = res.body.getReader();
