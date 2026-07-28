@@ -130,6 +130,13 @@ body::before {
   width: 100%;
 }
 
+.sf-btn-sm {
+  padding: 8px 14px;
+  font-size: 13px;
+  border-radius: 10px;
+  box-shadow: 0 6px 14px rgba(11, 92, 171, 0.32);
+}
+
 .sf-btn svg {
   width: 18px;
   height: 18px;
@@ -1988,6 +1995,62 @@ label {
   object-fit: contain;
   pointer-events: none;
   filter: drop-shadow(0 4px 5px rgba(3, 30, 70, 0.22));
+}
+
+/* Descriptive error card (e.g. "You're signed out") shown in place of the
+   quiz timeline when a request fails. Title + plain-language detail + the raw
+   technical message + a retry action. */
+.sf-error {
+  display: flex;
+  gap: 14px;
+  margin-top: 14px;
+  padding: 16px 18px;
+  border: 1px solid rgba(186, 5, 23, 0.25);
+  border-radius: 14px;
+  background: rgba(186, 5, 23, 0.06);
+}
+
+.sf-error-icon {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #ba0517;
+  color: #fff;
+  font-weight: 800;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.sf-error-body {
+  min-width: 0;
+}
+
+.sf-error-title {
+  display: block;
+  font-size: 15px;
+  color: #8a0412;
+}
+
+.sf-error-detail {
+  margin: 4px 0 0;
+  font-size: 13.5px;
+  color: #4a4a4a;
+}
+
+.sf-error-technical {
+  margin: 8px 0 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  color: #9a5560;
+  word-break: break-word;
+}
+
+.sf-error .sf-btn-sm {
+  margin-top: 12px;
 }
 
 .nh-grid {
