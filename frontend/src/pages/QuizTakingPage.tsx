@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import logoBadge from "../assets/sageforce-logo-badge.png";
+import AppNav from "../components/navigation/AppNav";
 import { apiFetch, completeQuizAssignment } from "../api/client";
 import { saveQuizAttempt } from "../features/quiz/storage";
 import type { GeneratedQuiz, QuizQuestion } from "../features/quiz/types";
@@ -143,12 +143,7 @@ function QuizTakingPage() {
 
   return (
     <div className="app-shell">
-      <header className="slim-topbar">
-        <div className="brand">
-          <img className="brand-logo" src={logoBadge} alt="SageForce" />
-          <span className="brand-name">SageForce</span>
-        </div>
-      </header>
+      <AppNav />
 
       <main className="quiz-stage">
         {isLoading ? (

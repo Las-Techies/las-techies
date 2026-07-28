@@ -1,7 +1,7 @@
 import type { CSSProperties } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import logoBadge from "../assets/sageforce-logo-badge.png";
+import AppNav from "../components/navigation/AppNav";
 import mascot from "../assets/panda-cheer-fullhat.png";
 import { apiFetch } from "../api/client";
 import { findHighlightSpan } from "../features/quiz/citationMatch";
@@ -39,16 +39,6 @@ function formatDuration(totalSeconds: number): string {
   const seconds = totalSeconds % 60;
   return `${minutes}m ${seconds.toString().padStart(2, "0")}s`;
 }
-
-// Sample content so the page is always demoable when opened without a real
-// submitted attempt. Mirrors the v3 wireframe.
-const SAMPLE_ROWS: ReviewRow[] = [
-  { id: 1, text: "What is Salesforce Customer 360?", correct: true, source: "Trailhead", citation: null },
-  { id: 2, text: "Which cloud allows you to automate service processes?", correct: true, source: "Help Docs", citation: null },
-  { id: 3, text: "What is the purpose of a Record Type?", correct: true, source: "Trailhead", citation: null },
-  { id: 4, text: "Which field type is used for long text and rich formatting?", correct: false, source: "Help Docs", citation: null },
-  { id: 5, text: "What is a validation rule used for?", correct: true, source: "Trailhead", citation: null },
-];
 
 const CONFETTI = [
   { left: "6%", top: "24%", bg: "#f6c445", rot: "18deg" },
@@ -229,38 +219,51 @@ function QuizResultsPage() {
 
   return (
     <div className="app-shell">
-      <header className="slim-topbar">
-        <div className="brand">
-          <img className="brand-logo" src={logoBadge} alt="SageForce" />
-          <span className="brand-name">SageForce</span>
-        </div>
-        <span className="done-pill">
-          <CheckCircleIcon /> Quiz Completed
-        </span>
-      </header>
+      <AppNav />
 
       <main className="results-stage">
-        {CONFETTI.map((bit, index) => (
-          <span
-            key={index}
-            className="confetti-bit"
-            style={{ left: bit.left, top: bit.top, background: bit.bg, transform: `rotate(${bit.rot})` }}
-          />
-        ))}
-
-        <div className="results-hero">
-          <div>
-            <p className="results-eyebrow">QUIZ RESULTS</p>
-            <h1>{didPass ? "You passed!" : "Almost there"}</h1>
-            <p>
-              {didPass
-                ? "Great job! You've demonstrated a solid understanding of this topic."
-                : "Review the questions you missed, then retake the quiz to pass."}
+        {isLoadingLatestQuiz ? (
+          <section className="glass card results-empty">
+            <p className="cfg-empty">Loading your results…</p>
+          </section>
+        ) : !hasRealData ? (
+          <section className="glass card results-empty">
+            <img className="results-empty-mascot" src={mascot} alt="" aria-hidden />
+            <p className="results-eyebrow">YOUR PROGRESS</p>
+            <h1>No quiz results yet</h1>
+            <p className="results-empty-sub">
+              Once you complete an assigned quiz, your score and a breakdown of your
+              answers will show up here.
             </p>
-          </div>
-        </div>
+            <div className="results-empty-actions">
+              <button className="sf-btn" type="button" onClick={() => navigate("/home")}>
+                Go to Home <ArrowRight />
+              </button>
+            </div>
+          </section>
+        ) : (
+          <>
+            {CONFETTI.map((bit, index) => (
+              <span
+                key={index}
+                className="confetti-bit"
+                style={{ left: bit.left, top: bit.top, background: bit.bg, transform: `rotate(${bit.rot})` }}
+              />
+            ))}
 
-        <div className="results-grid">
+            <div className="results-hero">
+              <div>
+                <p className="results-eyebrow">QUIZ RESULTS</p>
+                <h1>{didPass ? "You passed!" : "Almost there"}</h1>
+                <p>
+                  {didPass
+                    ? "Great job! You've demonstrated a solid understanding of this topic."
+                    : "Review the questions you missed, then retake the quiz to pass."}
+                </p>
+              </div>
+            </div>
+
+            <div className="results-grid">
           <section className="glass card">
             <h2 className="card-title">
               <ChartBarIcon /> Your Results
@@ -345,16 +348,16 @@ function QuizResultsPage() {
               )}
             </div>
           </section>
-        </div>
+            </div>
 
-        <div className="results-foot">
-          <button className="ghost-btn" type="button" onClick={() => navigate("/quiz-taking")}>
-            <RefreshIcon /> Retake
-          </button>
-          <button className="sf-btn" type="button" onClick={() => navigate("/learner-module")}>
-            Back to Module <ArrowRight />
-          </button>
-        </div>
+            <div className="results-foot">
+              <button className="ghost-btn" type="button" onClick={() => navigate("/quiz-taking")}>
+                <RefreshIcon /> Retake
+              </button>
+              <button className="sf-btn" type="button" onClick={() => navigate("/learner-module")}>
+                Back to Module <ArrowRight />
+              </button>
+            </div>
 
         {sourceModal.shouldRender && frozenSourceRow ? (
           <div
@@ -402,6 +405,8 @@ function QuizResultsPage() {
             </div>
           </div>
         ) : null}
+          </>
+        )}
       </main>
     </div>
   );
