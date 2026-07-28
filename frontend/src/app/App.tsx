@@ -11,6 +11,7 @@ import UploadContentPage from "../pages/UploadContentPage";
 import RequireRole from "../components/RequireRole";
 import MeetOurTeamPage from "../pages/MeetOurTeamPage";
 import ManagerDashboardPage from "../pages/ManagerDashboardPage";
+import AboutPage from "../pages/AboutPage";
 import CursorGlow from "../components/CursorGlow";
 
 function App() {
@@ -19,6 +20,7 @@ function App() {
       <CursorGlow />
       <Routes>
       <Route path="/" element={<LoginPage />} />
+      <Route path="/about" element={<AboutPage />} />
       <Route path="/signup" element={<InviteSignupPage />} />
       <Route
         path="/home"
