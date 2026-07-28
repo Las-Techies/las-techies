@@ -1,14 +1,5 @@
 import { prisma } from "../db/client";
 
-// Fallback for a genuinely brand-new user whose JWT doesn't carry a team_id
-// yet (GUS import comes later). Only used at creation time — see
-// findOrCreateUserFromSupabase, which deliberately does NOT fall back to
-// this for an existing user with a missing/invalid team_id claim, since that
-// previously caused a real team assignment to get silently overwritten
-// whenever a session's JWT happened to lack team_id (e.g. right after
-// linking a second OAuth identity).
-const DEFAULT_TEAM_ID = 1;
-
 export function findUserBySupabaseId(supabaseUserId: string) {
   return prisma.user.findUnique({ where: { supabaseUserId } });
 }
@@ -60,10 +51,9 @@ export async function findOrCreateUserFromSupabase(input: {
   lastName: string;
   role: string; // from JWT user_metadata; applied only on first creation
   // `null` means this session's JWT doesn't have a team_id claim (e.g. it
-  // predates a team being created, or came from an OAuth exchange that
-  // didn't carry custom metadata) — NOT "this user has no team". Only used
-  // as-is for a brand-new user (falls back to DEFAULT_TEAM_ID below); an
-  // existing user's already-assigned team is left alone instead.
+  // predates team assignment, or came from an OAuth exchange that didn't
+  // carry custom metadata). For brand-new users we persist null, so uninvited
+  // new hires are not auto-assigned to any team.
   teamId: number | null;
 }) {
   const existing = await findUserBySupabaseId(input.supabaseUserId);
@@ -111,7 +101,7 @@ export async function findOrCreateUserFromSupabase(input: {
       firstName: input.firstName,
       lastName: input.lastName,
       role: input.role,
-      teamId: input.teamId ?? DEFAULT_TEAM_ID,
+      teamId: input.teamId,
       authProvider: "supabase",
     },
   });
