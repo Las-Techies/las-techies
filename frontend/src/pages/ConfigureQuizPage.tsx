@@ -236,6 +236,10 @@ function ConfigureQuizPage() {
   );
 
   const handleGenerate = async () => {
+    // Double-click guard: once a generation starts, ignore additional clicks
+    // until the current streaming request finishes.
+    if (isGenerating) return;
+
     if (!isFormValid) {
       setError("Please fill all fields before generating AI questions.");
       return;
@@ -746,7 +750,13 @@ function ConfigureQuizPage() {
             </div>
 
             <div className="cfg-done-row">
-              <button type="button" className="sf-btn" onClick={handleGenerate}>
+              <button
+                type="button"
+                className="sf-btn"
+                onClick={handleGenerate}
+                disabled={isGenerating}
+                aria-busy={isGenerating}
+              >
                 <CheckPlain /> {hasQuestions ? "Regenerate" : "Generate"}
               </button>
             </div>
