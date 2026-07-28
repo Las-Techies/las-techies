@@ -288,6 +288,12 @@ export type AssignedQuiz = {
   description: string | null;
   dueDate: string | null;
   status: "pending" | "completed";
+  passingScore: number | null;
+  // Populated once the assignment is completed; the durable record of the
+  // result, independent of the browser-local attempt cache.
+  score: number | null;
+  timeTakenSeconds: number | null;
+  completedAt: string | null;
 };
 
 // Assigns a published quiz to a set of new hires on the manager's team.
