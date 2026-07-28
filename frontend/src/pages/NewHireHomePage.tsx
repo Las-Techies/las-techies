@@ -2,12 +2,11 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import AppNav from "../components/navigation/AppNav";
 import mascot from "../assets/panda-home.png";
-import { listAssignedQuizzes, type AssignedQuiz } from "../api/client";
+import { getMyTeam, listAssignedQuizzes, type AssignedQuiz } from "../api/client";
 import { describeError, type FriendlyError } from "../api/errors";
 import ApiErrorCard from "../components/ApiErrorCard";
 import { useAuth } from "../context/AuthContext";
 import { getUserDisplayFirstName } from "../features/auth/userDisplayName";
-import { learnerModule } from "../features/learner/data";
 import {
   ArrowRight,
   CalendarIcon,
@@ -40,6 +39,7 @@ function NewHireHomePage() {
   const firstName = getUserDisplayFirstName(user);
 
   const [assignments, setAssignments] = useState<AssignedQuiz[]>([]);
+  const [teamName, setTeamName] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<FriendlyError | null>(null);
   // Bumped by the Retry button to re-run the loader effect.
@@ -64,6 +64,22 @@ function NewHireHomePage() {
       cancelled = true;
     };
   }, [reloadKey]);
+
+  // Real team name for the hero subline. Fails quietly — the subline just
+  // omits the team rather than falling back to placeholder seed data.
+  useEffect(() => {
+    let cancelled = false;
+    getMyTeam()
+      .then((team) => {
+        if (!cancelled) setTeamName(team.name);
+      })
+      .catch(() => {
+        /* leave teamName null; the subline drops the team suffix */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // The "current" quiz is the soonest still-pending one (list is pre-sorted).
   const current = useMemo(
@@ -95,7 +111,7 @@ function NewHireHomePage() {
             <h1>Welcome back, {firstName}</h1>
             <p className="nh-hero-sub">
               {isLoading
-                ? `Your onboarding path · ${learnerModule.team}`
+                ? `Your onboarding path${teamName ? ` · ${teamName}` : ""}`
                 : pendingCount > 0
                   ? `You have ${pendingCount} onboarding quiz${pendingCount === 1 ? "" : "zes"} to complete`
                   : "You're all caught up on your onboarding"}

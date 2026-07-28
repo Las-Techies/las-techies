@@ -3938,6 +3938,49 @@ main.mgr-page > section.dropzone > input.sr-only {
   position: relative;
 }
 
+/* Empty/loading state shown on the Progress page before any quiz is
+   completed — replaces the old 0%/sample-data placeholder. */
+.results-empty {
+  max-width: 620px;
+  margin: 40px auto 0;
+  padding: 40px 36px;
+  text-align: center;
+}
+
+.results-empty-mascot {
+  width: 132px;
+  height: auto;
+  margin: 0 auto 8px;
+  display: block;
+}
+
+.results-empty .results-eyebrow {
+  color: var(--sf-navy);
+  opacity: 0.55;
+}
+
+.results-empty h1 {
+  margin: 6px 0 10px;
+  font-size: 34px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--sf-navy);
+}
+
+.results-empty-sub {
+  margin: 0 auto;
+  max-width: 440px;
+  font-size: 16px;
+  line-height: 1.5;
+  color: rgba(6, 32, 66, 0.7);
+}
+
+.results-empty-actions {
+  margin-top: 24px;
+  display: flex;
+  justify-content: center;
+}
+
 .results-hero {
   display: flex;
   align-items: center;
