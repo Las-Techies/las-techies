@@ -411,27 +411,32 @@ function LearnerModulePage() {
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
-    // Prefer the specific quiz this page was opened for (from the new-hire's
-    // assigned-quiz list); fall back to "my latest" only when no quizId was
-    // passed in, so old links/bookmarks without one still work.
-    const quizRequest = quizIdParam
-      ? apiFetch<GeneratedQuiz | null>(`/api/quizzes/${quizIdParam}`)
-      : apiFetch<GeneratedQuiz | null>("/api/quizzes/mine/latest");
+    // Refresh behavior for new assignments:
+    // - If the URL carries quizId, still fetch that specific quiz.
+    // - Also fetch the user's latest assigned/published quiz and prefer it when
+    //   present, so a page refresh can pick up a newly assigned quiz.
+    const specificQuizPromise = quizIdParam
+      ? apiFetch<GeneratedQuiz | null>(`/api/quizzes/${quizIdParam}`).catch(() => null)
+      : Promise.resolve<GeneratedQuiz | null>(null);
+    const latestQuizPromise = apiFetch<GeneratedQuiz | null>("/api/quizzes/mine/latest").catch(
+      () => null
+    );
 
-    quizRequest
-      .then((quiz) => {
-        if (cancelled || !quiz) return;
-        if (quiz.title) setModuleTitle(quiz.title);
-        if (quiz.timeLimitMinutes) {
-          setTimeLimit(quiz.timeLimitMinutes);
-        } else {
-          setHasNoTimeLimit(true);
-        }
-        setQuizId(quiz.id);
-      })
-      .catch(() => {
-        /* keep default title */
-      });
+    Promise.all([specificQuizPromise, latestQuizPromise]).then(([specificQuiz, latestQuiz]) => {
+      if (cancelled) return;
+      const quiz = latestQuiz ?? specificQuiz;
+      if (!quiz) return;
+
+      if (quiz.title) setModuleTitle(quiz.title);
+      if (quiz.timeLimitMinutes) {
+        setTimeLimit(quiz.timeLimitMinutes);
+        setHasNoTimeLimit(false);
+      } else {
+        setTimeLimit(null);
+        setHasNoTimeLimit(true);
+      }
+      setQuizId(quiz.id);
+    });
 
     // Header shows the team's name rather than the quiz title, so a manager
     // previewing this page and a new hire completing it both see "their"

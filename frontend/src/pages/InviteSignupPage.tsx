@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import mascotLogo from "../assets/panda-login.png";
 import { useAuth } from "../context/AuthContext";
 import { apiFetch } from "../api/client";
 import { supabase } from "../lib/supabaseClient";
+import { GoogleIcon } from "../components/icons";
 
 type InvitePreview = { email: string; teamName: string | null };
 type Mode = "signup" | "login";
@@ -23,7 +24,7 @@ function InviteSignupPage() {
   const [searchParams] = useSearchParams();
   const token = searchParams.get("invite") ?? "";
   const navigate = useNavigate();
-  const { signUp, signIn } = useAuth();
+  const { signUp, signIn, signInWithGoogle, session, loading } = useAuth();
 
   const [preview, setPreview] = useState<InvitePreview | null>(null);
   const [loadingPreview, setLoadingPreview] = useState(true);
@@ -35,6 +36,8 @@ function InviteSignupPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+  const hasAutoAcceptAttempted = useRef(false);
 
   useEffect(() => {
     if (!token) {
@@ -58,6 +61,57 @@ function InviteSignupPage() {
     await apiFetch(`/api/invites/${token}/accept`, { method: "POST" });
     await supabase.auth.refreshSession();
     navigate("/home", { replace: true });
+  };
+
+  // If someone is already signed in (including after returning from Google
+  // OAuth), finish invite acceptance automatically instead of requiring
+  // another manual login step.
+  useEffect(() => {
+    if (
+      loading ||
+      loadingPreview ||
+      !preview ||
+      !session ||
+      submitting ||
+      hasAutoAcceptAttempted.current
+    ) {
+      return;
+    }
+
+    const signedInEmail = session.user.email?.trim().toLowerCase() ?? "";
+    const invitedEmail = preview.email.trim().toLowerCase();
+    if (!signedInEmail) return;
+
+    if (signedInEmail !== invitedEmail) {
+      hasAutoAcceptAttempted.current = true;
+      setError(
+        `You're signed in as ${session.user.email}. This invite is for ${preview.email}. Please sign in with the invited email to continue.`
+      );
+      return;
+    }
+
+    hasAutoAcceptAttempted.current = true;
+    setError("");
+    setSubmitting(true);
+    void acceptAndEnter().catch((err) => {
+      setError(
+        err instanceof Error ? err.message : "Unable to accept the invite. Please try again."
+      );
+      setSubmitting(false);
+    });
+  }, [loading, loadingPreview, preview, session, submitting]);
+
+  const handleGoogleSignIn = async () => {
+    setError("");
+    setIsGoogleLoading(true);
+    try {
+      await signInWithGoogle();
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Unable to start Google sign-in. Please try again."
+      );
+      setIsGoogleLoading(false);
+    }
   };
 
   const handleSignup = async () => {
@@ -220,6 +274,18 @@ function InviteSignupPage() {
                     : "Log in & join"}
               </button>
             </div>
+            <div className="oauth-divider">
+              <span>or</span>
+            </div>
+            <button
+              type="button"
+              className="google-btn"
+              onClick={handleGoogleSignIn}
+              disabled={submitting || isGoogleLoading}
+            >
+              <GoogleIcon aria-hidden />
+              {isGoogleLoading ? "Continuing with Google…" : "Continue with Google"}
+            </button>
             {error ? <p className="form-error">{error}</p> : null}
           </>
         )}
