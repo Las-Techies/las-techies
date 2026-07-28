@@ -977,6 +977,11 @@ label {
   box-shadow: 0 3px 8px rgba(9, 40, 82, 0.25);
 }
 
+.user-avatar-photo {
+  object-fit: cover;
+  background: none;
+}
+
 .app-nav-user-menu {
   position: absolute;
   top: calc(100% + 6px);

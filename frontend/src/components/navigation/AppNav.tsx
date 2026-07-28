@@ -49,6 +49,7 @@ function AppNav({ lockedNav = false }: { lockedNav?: boolean }) {
   const isManager = effectiveRole === "manager";
   const role = isManager ? "Manager" : "New Hire";
   const initials = getUserInitials(user);
+  const avatarUrl = (user?.user_metadata?.avatar_url ?? user?.user_metadata?.picture) as string | undefined;
   const navItems = isManager ? managerNavItems : newHireNavItems;
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -117,7 +118,11 @@ function AppNav({ lockedNav = false }: { lockedNav?: boolean }) {
           aria-expanded={isMenuOpen}
           onClick={() => setIsMenuOpen((open) => !open)}
         >
-          <span className="user-avatar">{initials.toUpperCase() || "•"}</span>
+          {avatarUrl ? (
+            <img className="user-avatar user-avatar-photo" src={avatarUrl} alt={initials || "User"} referrerPolicy="no-referrer" />
+          ) : (
+            <span className="user-avatar">{initials.toUpperCase() || "•"}</span>
+          )}
           <span>
             {firstName} <span className="muted">· {role}</span>
           </span>
