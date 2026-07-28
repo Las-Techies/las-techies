@@ -31,7 +31,7 @@ const newHireNavItems: NavItem[] = [
   { label: "Progress", type: "link", to: "/quiz-results", icon: <ProgressIcon /> },
 ];
 
-function AppNav() {
+function AppNav({ lockedNav = false }: { lockedNav?: boolean }) {
   const location = useLocation();
   const navigate = useNavigate();
   const isWorkflowRoute = QUIZ_WORKFLOW_ROUTES.some((route) => route === location.pathname);
@@ -79,12 +79,16 @@ function AppNav() {
           const isActive =
             location.pathname === item.to ||
             (item.to === "/upload-content" && isWorkflowRoute);
+          const isLocked = lockedNav && !isActive;
 
           return (
             <Link
               key={item.label}
-              className={`app-nav-link ${isActive ? "active" : ""}`}
+              className={`app-nav-link ${isActive ? "active" : ""} ${isLocked ? "disabled" : ""}`}
               to={item.to}
+              onClick={isLocked ? (e) => e.preventDefault() : undefined}
+              aria-disabled={isLocked || undefined}
+              style={isLocked ? { pointerEvents: "none", opacity: 0.4 } : undefined}
             >
               {item.icon}
               {item.label}
