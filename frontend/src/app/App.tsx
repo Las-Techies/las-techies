@@ -30,11 +30,7 @@ function App() {
       />
       <Route
         path="/learner-module"
-        element={
-          <RequireRole role="new_hire">
-            <LearnerModulePage />
-          </RequireRole>
-        }
+        element={<LearnerModulePage />}
       />
       <Route
         path="/quiz-taking"
