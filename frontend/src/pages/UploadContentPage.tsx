@@ -646,7 +646,23 @@ function UploadContentPage() {
       // Must be the first await in this handler: with GIS this opens Google's
       // popup, and browsers only allow that while the click is still being
       // handled. Loading the Picker scripts first would get it blocked.
-      const googleAccessToken = await resolveGoogleDriveToken();
+      // Some browser/account chooser paths can fail to ever call Google's
+      // callback when the popup is dismissed, which leaves this promise hanging
+      // forever. Time it out so "Opening Drive…" always recovers.
+      const googleAccessToken = await Promise.race<string>([
+        resolveGoogleDriveToken(),
+        new Promise<string>((_, reject) =>
+          window.setTimeout(
+            () =>
+              reject(
+                new Error(
+                  "Google sign-in timed out. Please try again and complete the account chooser."
+                )
+              ),
+            3500
+          )
+        ),
+      ]);
 
       await ensureGooglePickerReady();
       const googlePicker = window.google?.picker;
@@ -655,6 +671,31 @@ function UploadContentPage() {
       }
 
       await new Promise<void>((resolve) => {
+        let settled = false;
+        let pickerVisible = false;
+        let timeoutId: number | null = null;
+        let focusTimeoutId: number | null = null;
+        const cleanup = () => {
+          if (timeoutId !== null) window.clearTimeout(timeoutId);
+          if (focusTimeoutId !== null) window.clearTimeout(focusTimeoutId);
+          window.removeEventListener("focus", handleWindowFocus);
+        };
+        const resolveOnce = () => {
+          if (settled) return;
+          settled = true;
+          cleanup();
+          resolve();
+        };
+        const handleWindowFocus = () => {
+          // Some browsers close the Picker without ever firing CANCEL/PICKED.
+          // When focus returns to this window and the picker was visible, treat
+          // that as a closed dialog and release the loading state quickly.
+          if (!pickerVisible || settled) return;
+          focusTimeoutId = window.setTimeout(() => {
+            if (!settled) resolveOnce();
+          }, 50);
+        };
+        window.addEventListener("focus", handleWindowFocus);
         const docsView = new googlePicker.DocsView(googlePicker.ViewId.DOCS)
           .setMimeTypes("application/vnd.google-apps.document")
           .setIncludeFolders(true);
@@ -673,10 +714,13 @@ function UploadContentPage() {
           .setCallback((pickerData: Record<string, unknown>) => {
             const action = pickerData[googlePicker.Response.ACTION] as string | undefined;
             if (action === googlePicker.Action.CANCEL) {
-              resolve();
+              resolveOnce();
               return;
             }
-            if (action !== googlePicker.Action.PICKED) return;
+            if (action !== googlePicker.Action.PICKED) {
+              resolveOnce();
+              return;
+            }
 
             const pickedDocs = ((pickerData[googlePicker.Response.DOCUMENTS] as
               | PickerDocumentPayload[]
@@ -706,7 +750,7 @@ function UploadContentPage() {
                 setError(
                   "No supported Google Docs or folders were selected. Please pick a Google Doc or Drive folder."
                 );
-                resolve();
+                resolveOnce();
                 return;
               }
               // Reuse the token we already got — see presetToken's comment.
@@ -719,17 +763,24 @@ function UploadContentPage() {
               for (const docUrl of pickedGoogleDocs) {
                 await handleGoogleDriveImport(docUrl, googleAccessToken);
               }
-              resolve();
+              resolveOnce();
             })().catch((err) => {
               setError(
                 err instanceof Error ? err.message : "Google Drive Picker import failed."
               );
-              resolve();
+              resolveOnce();
             });
           })
           .build();
 
         picker.setVisible(true);
+        pickerVisible = true;
+        timeoutId = window.setTimeout(() => {
+          if (!settled) {
+            setError("Google Drive Picker timed out. Please try again.");
+            resolveOnce();
+          }
+        }, 5000);
       });
     } catch (err) {
       const message =

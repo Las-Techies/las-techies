@@ -511,7 +511,7 @@ function ConfigureQuizPage() {
 
   return (
     <div className="app-shell">
-      <AppNav />
+      <AppNav lockedNav={isGenerating} />
       <main className="mgr-page">
         <div className="mgr-hero">
           <div>
@@ -542,6 +542,7 @@ function ConfigureQuizPage() {
                   style={{ flex: 1 }}
                   placeholder="Salesforce Security Best Practices"
                   value={form.moduleTitle}
+                  disabled={isGenerating}
                   onChange={(event) => updateForm("moduleTitle", event.target.value)}
                 />
               </span>
@@ -595,9 +596,11 @@ function ConfigureQuizPage() {
                       </li>
                     ))}
                   </ul>
-                  <Link className="cfg-doc-change" to="/upload-content">
-                    Change selection
-                  </Link>
+                  {!isGenerating && (
+                    <Link className="cfg-doc-change" to="/upload-content">
+                      Change selection
+                    </Link>
+                  )}
                 </div>
               ) : null}
             </div>
@@ -615,6 +618,7 @@ function ConfigureQuizPage() {
                   max={100}
                   step={5}
                   value={Number(form.passingScore) || 0}
+                  disabled={isGenerating}
                   onChange={(event) => updateForm("passingScore", event.target.value)}
                 />
                 <span className="cfg-score-box">
@@ -624,6 +628,7 @@ function ConfigureQuizPage() {
                     min={0}
                     max={100}
                     value={form.passingScore}
+                    disabled={isGenerating}
                     onChange={(event) => {
                       const raw = event.target.value;
                       if (raw === "") {
@@ -648,6 +653,7 @@ function ConfigureQuizPage() {
                 <select
                   style={{ flex: 1 }}
                   value={form.timeLimit}
+                  disabled={isGenerating}
                   onChange={(event) => updateForm("timeLimit", event.target.value)}
                 >
                   <option value="" disabled>
@@ -676,6 +682,7 @@ function ConfigureQuizPage() {
                   placeholder="e.g. 10"
                   style={{ width: 90 }}
                   value={form.questionCount}
+                  disabled={isGenerating}
                   onChange={(event) => updateForm("questionCount", event.target.value)}
                 />
               </span>
@@ -691,6 +698,7 @@ function ConfigureQuizPage() {
                   type="date"
                   value={form.dueDate}
                   min={todayIso}
+                  disabled={isGenerating}
                   onChange={(event) => updateForm("dueDate", event.target.value)}
                 />
               </span>
@@ -706,6 +714,7 @@ function ConfigureQuizPage() {
                   style={{ flex: 1 }}
                   placeholder="e.g. Salesforce Security"
                   value={form.topic}
+                  disabled={isGenerating}
                   onChange={(event) => updateForm("topic", event.target.value)}
                 />
               </span>
@@ -725,6 +734,7 @@ function ConfigureQuizPage() {
                         type="button"
                         ref={difficultyPill.setItemRef(value)}
                         className={form.difficulty === value ? "on" : ""}
+                        disabled={isGenerating}
                         onClick={() => updateForm("difficulty", value)}
                       >
                         {value}
@@ -757,7 +767,7 @@ function ConfigureQuizPage() {
                 disabled={isGenerating}
                 aria-busy={isGenerating}
               >
-                <CheckPlain /> {hasQuestions ? "Regenerate" : "Generate"}
+                <CheckPlain /> {isGenerating ? "Generating…" : hasQuestions ? "Regenerate" : "Generate"}
               </button>
             </div>
             {error ? <p className="form-error">{error}</p> : null}
@@ -999,14 +1009,19 @@ function ConfigureQuizPage() {
         </section>
 
         <div className="mgr-foot" style={{ justifyContent: "center", gap: 18 } as CSSProperties}>
-          <Link className="ghost-btn btn-link" to="/upload-content">
+          <button
+            className="ghost-btn"
+            type="button"
+            disabled={isGenerating}
+            onClick={() => { if (!isGenerating) navigate("/upload-content"); }}
+          >
             <ArrowLeft /> Back
-          </Link>
+          </button>
           <button
             className="sf-btn"
             type="button"
-            disabled={isMutatingQuestion}
-            title={isMutatingQuestion ? "Waiting for your question edit to save…" : undefined}
+            disabled={isGenerating || isMutatingQuestion}
+            title={isGenerating ? "Please wait for generation to finish…" : isMutatingQuestion ? "Waiting for your question edit to save…" : undefined}
             onClick={handleNext}
           >
             {isMutatingQuestion ? "Saving…" : "Next: Review"} <ArrowRight />
