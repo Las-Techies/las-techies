@@ -336,6 +336,11 @@ function QuizResultsPage() {
                   {didPass ? "Passed" : "Not yet"}
                 </span>
                 <p className="score-sub">Passing score: {effectivePassingScore}%</p>
+                {completedQuiz && completedQuiz.attemptCount > 1 ? (
+                  <p className="score-sub">
+                    Best of {completedQuiz.attemptCount} attempts
+                  </p>
+                ) : null}
                 <p className="score-breakdown-label">Performance Breakdown</p>
               </div>
             </div>
@@ -417,6 +422,11 @@ function QuizResultsPage() {
               <button
                 className="ghost-btn"
                 type="button"
+                title={
+                  didPass
+                    ? "You've already passed — practice runs never lower your recorded score."
+                    : "Retake to improve your score. We keep your best result."
+                }
                 onClick={() =>
                   navigate(
                     completedQuiz
@@ -425,7 +435,7 @@ function QuizResultsPage() {
                   )
                 }
               >
-                <RefreshIcon /> Retake
+                <RefreshIcon /> {didPass ? "Practice again" : "Retake"}
               </button>
               <button className="sf-btn" type="button" onClick={() => navigate("/learner-module")}>
                 Back to Module <ArrowRight />

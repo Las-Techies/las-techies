@@ -290,10 +290,13 @@ export type AssignedQuiz = {
   status: "pending" | "completed";
   passingScore: number | null;
   // Populated once the assignment is completed; the durable record of the
-  // result, independent of the browser-local attempt cache.
+  // result, independent of the browser-local attempt cache. `score` is the
+  // best (highest) score across all attempts; `attemptCount` is how many times
+  // the quiz has been submitted.
   score: number | null;
   timeTakenSeconds: number | null;
   completedAt: string | null;
+  attemptCount: number;
 };
 
 // Assigns a published quiz to a set of new hires on the manager's team.
@@ -345,6 +348,7 @@ export type ManagerDashboardLearnerAssignment = {
   score: number | null;
   timeTakenSeconds: number | null;
   completedAt: string | null;
+  attemptCount: number;
   dueDate: string | null;
 };
 
