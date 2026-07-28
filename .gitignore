@@ -20,3 +20,7 @@ backend/.cache/
 .shots/
 .v2preview/
 dist/
+
+# Root-level package.json was created by installing deps at the repo root by
+# mistake (the app deps live in frontend/). Keep it out of version control.
+/package.json
