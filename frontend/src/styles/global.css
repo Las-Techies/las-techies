@@ -3705,6 +3705,151 @@ main.mgr-page > section.dropzone > input.sr-only {
   padding: 30px 34px;
 }
 
+/* Pre-quiz intro / start screen (gates Question 1 behind an explicit start
+   plus the "finish in one sitting" warning). */
+.quiz-intro {
+  text-align: center;
+}
+
+.quiz-intro-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(6, 32, 66, 0.55);
+}
+
+.quiz-intro-eyebrow svg {
+  width: 16px;
+  height: 16px;
+}
+
+.quiz-intro-title {
+  margin: 10px 0 22px;
+  font-size: 34px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--sf-navy);
+}
+
+.quiz-intro-facts {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  margin: 0 0 22px;
+  padding: 0;
+  list-style: none;
+}
+
+.quiz-intro-facts li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 120px;
+  padding: 16px 20px;
+  border-radius: 14px;
+  background: rgba(11, 92, 171, 0.06);
+  border: 1px solid rgba(11, 92, 171, 0.12);
+}
+
+.quiz-intro-facts strong {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--sf-navy);
+}
+
+.quiz-intro-facts span {
+  font-size: 13px;
+  color: rgba(6, 32, 66, 0.6);
+}
+
+.quiz-intro-notice {
+  display: flex;
+  gap: 12px;
+  text-align: left;
+  max-width: 560px;
+  margin: 0 auto 26px;
+  padding: 16px 18px;
+  border-radius: 14px;
+  border: 1px solid rgba(214, 158, 4, 0.35);
+  background: rgba(245, 196, 69, 0.12);
+}
+
+.quiz-intro-notice-icon {
+  flex: none;
+  display: inline-flex;
+  color: #b7860b;
+}
+
+.quiz-intro-notice-icon svg {
+  width: 22px;
+  height: 22px;
+}
+
+.quiz-intro-notice p {
+  margin: 0;
+  font-size: 14.5px;
+  line-height: 1.5;
+  color: rgba(6, 32, 66, 0.8);
+}
+
+/* "Leave the quiz?" confirm modal fired from AppNav's guarded navigation. */
+.quiz-leave-modal {
+  max-width: 420px;
+  padding: 28px 28px 24px;
+  text-align: center;
+}
+
+.quiz-leave-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  margin-bottom: 12px;
+  border-radius: 50%;
+  background: rgba(245, 196, 69, 0.18);
+  color: #b7860b;
+}
+
+.quiz-leave-icon svg {
+  width: 26px;
+  height: 26px;
+}
+
+.quiz-leave-modal h3 {
+  margin: 0 0 8px;
+  font-size: 21px;
+  font-weight: 800;
+  color: var(--sf-navy);
+}
+
+.quiz-leave-modal p {
+  margin: 0 0 22px;
+  font-size: 15px;
+  line-height: 1.5;
+  color: rgba(6, 32, 66, 0.72);
+}
+
+.quiz-leave-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+/* Destructive action variant (e.g. confirming you'll abandon the quiz). */
+.sf-btn-danger {
+  background: linear-gradient(180deg, #e0453a 0%, #ba0517 100%);
+  box-shadow: 0 10px 22px rgba(186, 5, 23, 0.35);
+}
+
+.sf-btn-danger:hover:not(:disabled) {
+  box-shadow: 0 14px 28px rgba(186, 5, 23, 0.45);
+}
+
 .quiz-panel-head {
   display: flex;
   align-items: center;

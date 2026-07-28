@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { QUIZ_WORKFLOW_ROUTES } from "../../features/quiz/workflow";
 import { useAuth } from "../../context/AuthContext";
+import { useQuizGuard } from "../../context/QuizGuardContext";
+import { useModalTransition } from "../../hooks/useModalTransition";
 import { clearPreviewRole, getPreviewRole } from "../../features/auth/previewRole";
 import { getUserDisplayFirstName, getUserInitials } from "../../features/auth/userDisplayName";
 import logoBadge from "../../assets/sageforce-logo-badge.png";
@@ -13,6 +16,7 @@ import {
   ModulesIcon,
   ProgressIcon,
   QuizIcon,
+  ShieldIcon,
   UploadIcon,
 } from "../icons";
 
@@ -36,6 +40,8 @@ function AppNav() {
   const navigate = useNavigate();
   const isWorkflowRoute = QUIZ_WORKFLOW_ROUTES.some((route) => route === location.pathname);
   const { user, signOut } = useAuth();
+  const { isLeavePromptOpen, requestNavigation, confirmLeave, cancelLeave } = useQuizGuard();
+  const leaveModal = useModalTransition(isLeavePromptOpen);
   const email = user?.email ?? null;
   const firstName = getUserDisplayFirstName(user);
   const effectiveRole =
@@ -61,11 +67,14 @@ function AppNav() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [isMenuOpen]);
 
-  const handleLogout = async () => {
+  const handleLogout = () => {
     setIsMenuOpen(false);
-    clearPreviewRole();
-    await signOut();
-    navigate("/");
+    // Logging out mid-quiz would also discard the attempt — guard it too.
+    requestNavigation(async () => {
+      clearPreviewRole();
+      await signOut();
+      navigate("/");
+    });
   };
 
   return (
@@ -85,6 +94,13 @@ function AppNav() {
               key={item.label}
               className={`app-nav-link ${isActive ? "active" : ""}`}
               to={item.to}
+              onClick={(event) => {
+                // Route through the quiz guard so navigating away mid-quiz
+                // prompts for confirmation instead of silently discarding the
+                // in-progress attempt. No-op guard when no quiz is active.
+                event.preventDefault();
+                requestNavigation(() => navigate(item.to));
+              }}
             >
               {item.icon}
               {item.label}
@@ -126,6 +142,40 @@ function AppNav() {
           </div>
         ) : null}
       </div>
+      {leaveModal.shouldRender
+        ? createPortal(
+            <div
+              className={`modal-backdrop t-modal-backdrop ${leaveModal.phaseClassName}`}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="quiz-leave-title"
+              onClick={cancelLeave}
+            >
+              <div
+                className={`modal-card quiz-leave-modal t-modal ${leaveModal.phaseClassName}`}
+                onClick={(event) => event.stopPropagation()}
+              >
+                <span className="quiz-leave-icon" aria-hidden>
+                  <ShieldIcon />
+                </span>
+                <h3 id="quiz-leave-title">Leave the quiz?</h3>
+                <p>
+                  You're in the middle of a quiz. If you leave now your progress
+                  won't be saved and you'll have to start over.
+                </p>
+                <div className="quiz-leave-actions">
+                  <button type="button" className="ghost-btn" onClick={cancelLeave}>
+                    Keep going
+                  </button>
+                  <button type="button" className="sf-btn sf-btn-danger" onClick={confirmLeave}>
+                    Leave quiz
+                  </button>
+                </div>
+              </div>
+            </div>,
+            document.body
+          )
+        : null}
     </header>
   );
 }

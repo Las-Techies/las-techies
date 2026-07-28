@@ -199,12 +199,12 @@ function NewHireHomePage() {
                   <li
                     key={`${step.quizId}-${i}`}
                     className={`nh-step ${step.status}`}
-                    onClick={() => navigate(`/learner-module?quizId=${step.quizId}`)}
+                    onClick={() => navigate(`/quiz-taking?quizId=${step.quizId}`)}
                     role="button"
                     tabIndex={0}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" || e.key === " ") {
-                        navigate(`/learner-module?quizId=${step.quizId}`);
+                        navigate(`/quiz-taking?quizId=${step.quizId}`);
                       }
                     }}
                   >
