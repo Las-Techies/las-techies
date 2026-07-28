@@ -583,6 +583,7 @@ export async function getAssignedQuizzes(req: Request, res: Response, next: Next
         score: assignment.score,
         timeTakenSeconds: assignment.timeTakenSeconds,
         completedAt: assignment.completedAt,
+        attemptCount: assignment.attemptCount,
       }))
     );
   } catch (err) {
@@ -645,6 +646,7 @@ export async function getManagerDashboard(req: Request, res: Response, next: Nex
           score: assignment.score,
           timeTakenSeconds: assignment.timeTakenSeconds,
           completedAt: assignment.completedAt,
+          attemptCount: assignment.attemptCount,
           dueDate: quiz.dueDate,
         }))
         .sort((a, b) => {

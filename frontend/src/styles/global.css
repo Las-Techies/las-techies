@@ -6520,6 +6520,17 @@ main.mgr-page > section.dropzone > input.sr-only {
   color: #8a96a8;
 }
 
+/* Small "took N attempts" marker next to a learner's best score. */
+.dash-attempt-badge {
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 1;
+  padding: 2px 5px;
+  border-radius: 999px;
+  background: rgba(240, 173, 78, 0.16);
+  color: #b26a00;
+}
+
 .dash-status-pill {
   flex: none;
   font-size: 11.5px;

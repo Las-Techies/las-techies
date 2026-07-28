@@ -134,8 +134,13 @@ model QuizAssignment {
   assignedToUserId Int
   assignedByUserId Int
   status           String    @default("pending") // pending | completed
+  // Best (highest) score across all attempts, and the time taken on that best
+  // attempt — a retake never lowers a passing result. `attemptCount` tracks how
+  // many times the new hire has submitted, so a manager can still see who
+  // struggled even though only the best result is kept.
   score            Int?
   timeTakenSeconds Int?
+  attemptCount     Int       @default(0)
   completedAt      DateTime?
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt

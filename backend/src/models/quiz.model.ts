@@ -139,20 +139,49 @@ export async function findAssignedQuizzesForUser(userId: number) {
 
 // Scoped to the caller's own assignment row so a new hire can only mark
 // their own progress complete, never someone else's.
-export function markAssignmentComplete(
+//
+// Retake policy: every submission bumps `attemptCount`, but we keep the BEST
+// (highest) score rather than the latest — a retake can raise a result but
+// never lowers a previously passing one. `timeTakenSeconds` tracks the time of
+// that best attempt so the two stay consistent. `completedAt` is stamped on the
+// first completion and left untouched afterwards. Runs in a transaction because
+// "is this score higher than the current one?" needs the current row first.
+//
+// Returns `{ count }` (0 when no assignment row exists) so callers can stay
+// best-effort, same as before.
+export async function markAssignmentComplete(
   quizId: number,
   userId: number,
   score?: number,
   timeTakenSeconds?: number
-) {
-  return prisma.quizAssignment.updateMany({
-    where: { quizId, assignedToUserId: userId },
-    data: {
-      status: "completed",
-      completedAt: new Date(),
-      ...(typeof score === "number" ? { score } : {}),
-      ...(typeof timeTakenSeconds === "number" ? { timeTakenSeconds } : {}),
-    },
+): Promise<{ count: number }> {
+  return prisma.$transaction(async (tx) => {
+    const existing = await tx.quizAssignment.findUnique({
+      where: { quizId_assignedToUserId: { quizId, assignedToUserId: userId } },
+    });
+    if (!existing) return { count: 0 };
+
+    // Keep the best score. A new score wins only when it's strictly higher than
+    // what's on record (or nothing is on record yet). When it wins, the time
+    // taken follows it so the stored pair always describes the same attempt.
+    const newScoreWins =
+      typeof score === "number" &&
+      (existing.score == null || score > existing.score);
+
+    await tx.quizAssignment.update({
+      where: { id: existing.id },
+      data: {
+        status: "completed",
+        completedAt: existing.completedAt ?? new Date(),
+        attemptCount: existing.attemptCount + 1,
+        ...(newScoreWins ? { score } : {}),
+        ...(newScoreWins && typeof timeTakenSeconds === "number"
+          ? { timeTakenSeconds }
+          : {}),
+      },
+    });
+
+    return { count: 1 };
   });
 }
 

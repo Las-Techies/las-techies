@@ -182,6 +182,14 @@ function ManagerDashboardPage() {
                                   {assignment.status === "completed" && typeof assignment.score === "number"
                                     ? `${assignment.score}%`
                                     : "—"}
+                                  {assignment.attemptCount > 1 ? (
+                                    <span
+                                      className="dash-attempt-badge"
+                                      title={`Best of ${assignment.attemptCount} attempts`}
+                                    >
+                                      ×{assignment.attemptCount}
+                                    </span>
+                                  ) : null}
                                 </span>
                                 <span className="dash-assignment-meta">
                                   {formatDuration(assignment.timeTakenSeconds)}
