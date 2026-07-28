@@ -729,7 +729,7 @@ function LearnerModulePage() {
               </div>
             ) : docs.length === 0 ? (
               <p className="lib-empty">
-                No documents have been added to this module yet.
+                {isManager ? "No uploads yet." : "No documents have been added to this module yet."}
               </p>
             ) : (
               <>
@@ -807,7 +807,7 @@ function LearnerModulePage() {
         </section>
 
         <div className="page-actions">
-          <button className="secondary-btn" type="button" onClick={() => navigate("/home")}>
+          <button className="secondary-btn" type="button" onClick={() => navigate(isManager ? "/upload-content" : "/home")}>
             ← Back
           </button>
           {!isManager ? (
