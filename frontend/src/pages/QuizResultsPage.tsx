@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import AppNav from "../components/navigation/AppNav";
 import mascot from "../assets/panda-cheer-fullhat.png";
-import { apiFetch } from "../api/client";
+import { apiFetch, listAssignedQuizzes, type AssignedQuiz } from "../api/client";
 import { findHighlightSpan } from "../features/quiz/citationMatch";
 import { useLastNonNull, useModalTransition } from "../hooks/useModalTransition";
 import { loadQuizAttempt, loadQuizConfig } from "../features/quiz/storage";
@@ -57,6 +57,12 @@ function QuizResultsPage() {
   const navigate = useNavigate();
   const attempt = useMemo(() => loadQuizAttempt(), []);
   const [passingScore, setPassingScore] = useState(70);
+  // The most-recently-completed assignment from the backend — the durable
+  // source of truth for "did they finish, and how did they do". The local
+  // `attempt` above only enriches the per-question review (the backend
+  // doesn't store individual answers) and may be missing on another device.
+  const [completedQuiz, setCompletedQuiz] = useState<AssignedQuiz | null>(null);
+  const [isLoadingResult, setIsLoadingResult] = useState(true);
   // Which review row's source document is open in the source modal.
   const [sourceModalRowId, setSourceModalRowId] = useState<number | null>(null);
   const [sourceTextByDocumentId, setSourceTextByDocumentId] = useState<Record<number, string>>({});
@@ -72,13 +78,53 @@ function QuizResultsPage() {
     setPassingScore(loadQuizConfig().passingScore);
   }, []);
 
-  // Results reflect a real, completed attempt only. Without one there is
-  // nothing to score — we must NOT fall back to the latest generated quiz's
-  // questions, or a new hire who never took the quiz would see a fabricated
-  // "100% — You passed!" (every question marked correct by its answer key).
-  const reviewQuestions: QuizQuestion[] = attempt?.questions ?? [];
-  const userAnswers = attempt?.answers ?? {};
-  const hasRealData = Boolean(attempt) && reviewQuestions.length > 0;
+  // Pull the durable result from the backend so a completed quiz still shows
+  // its score/time after a refresh or on another device, even if the local
+  // attempt cache is gone. Picks the most recently completed assignment.
+  useEffect(() => {
+    let cancelled = false;
+    listAssignedQuizzes()
+      .then((assigned) => {
+        if (cancelled) return;
+        const completed = assigned
+          .filter((quiz) => quiz.status === "completed" && quiz.completedAt)
+          .sort(
+            (a, b) =>
+              new Date(b.completedAt!).getTime() - new Date(a.completedAt!).getTime()
+          );
+        setCompletedQuiz(completed[0] ?? null);
+      })
+      .catch(() => {
+        /* leave null — falls back to the local attempt if present */
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoadingResult(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Prefer the quiz's own passing score (from the backend) over the local
+  // manager config, which may not match the quiz actually taken.
+  const effectivePassingScore =
+    typeof completedQuiz?.passingScore === "number" ? completedQuiz.passingScore : passingScore;
+
+  // Only enrich the per-question review from the local attempt when it belongs
+  // to the completed quiz we're showing — otherwise a stale attempt from a
+  // different quiz would render the wrong questions.
+  const attemptMatchesCompleted =
+    Boolean(attempt) &&
+    (completedQuiz == null || attempt?.quizId == null || attempt?.quizId === completedQuiz.quizId);
+
+  // Results reflect a real, completed quiz. We treat the backend's completed
+  // assignment as the source of truth; a local attempt only adds the answer
+  // breakdown. We must NOT fabricate a "100% — You passed!" from an untaken
+  // quiz's answer key.
+  const reviewQuestions: QuizQuestion[] =
+    attemptMatchesCompleted && attempt ? attempt.questions : [];
+  const userAnswers = attemptMatchesCompleted && attempt ? attempt.answers : {};
+  const hasRealData = Boolean(completedQuiz) || (Boolean(attempt) && reviewQuestions.length > 0);
 
   const rows: ReviewRow[] = hasRealData
     ? reviewQuestions.map((question, index) => {
@@ -100,23 +146,41 @@ function QuizResultsPage() {
       })
     : [];
 
+  // Score comes from the backend when available (survives refresh / other
+  // devices); otherwise fall back to recomputing from the local attempt rows.
+  const hasReviewRows = rows.length > 0;
+  const score =
+    typeof completedQuiz?.score === "number"
+      ? completedQuiz.score
+      : hasReviewRows
+        ? Math.round((rows.filter((row) => row.correct).length / rows.length) * 100)
+        : 0;
+  const didPass = score >= effectivePassingScore;
+
+  // The per-question correct/incorrect chips only make sense with the local
+  // answer breakdown; without it we show the review as unavailable rather than
+  // implying every question was right/wrong.
   const totalQuestions = rows.length;
   const correctCount = rows.filter((row) => row.correct).length;
   const incorrectCount = Math.max(totalQuestions - correctCount, 0);
-  const score =
-    totalQuestions > 0 ? Math.round((correctCount / totalQuestions) * 100) : 0;
-  const didPass = score >= passingScore;
+
+  // Time taken: prefer the backend record, fall back to the local attempt's
+  // start/submit stamps.
   const timeTaken =
-    attempt?.startedAt && attempt?.submittedAt
-      ? formatDuration(
-          Math.max(
-            0,
-            Math.round(
-              (new Date(attempt.submittedAt).getTime() - new Date(attempt.startedAt).getTime()) / 1000
+    typeof completedQuiz?.timeTakenSeconds === "number"
+      ? formatDuration(completedQuiz.timeTakenSeconds)
+      : attempt?.startedAt && attempt?.submittedAt
+        ? formatDuration(
+            Math.max(
+              0,
+              Math.round(
+                (new Date(attempt.submittedAt).getTime() -
+                  new Date(attempt.startedAt).getTime()) /
+                  1000
+              )
             )
           )
-        )
-      : "—"; // attempt saved before time tracking existed — nothing to compute
+        : "—"; // no backend time and attempt predates time tracking
 
   const activeSourceRow =
     sourceModalRowId != null ? rows.find((row) => row.id === sourceModalRowId) ?? null : null;
@@ -211,7 +275,12 @@ function QuizResultsPage() {
       <AppNav />
 
       <main className="results-stage">
-        {!hasRealData ? (
+        {isLoadingResult && !hasRealData ? (
+          <section className="glass card results-empty">
+            <p className="results-eyebrow">YOUR PROGRESS</p>
+            <h1>Loading your results…</h1>
+          </section>
+        ) : !hasRealData ? (
           <section className="glass card results-empty">
             <img className="results-empty-mascot" src={mascot} alt="" aria-hidden />
             <p className="results-eyebrow">YOUR PROGRESS</p>
@@ -266,26 +335,33 @@ function QuizResultsPage() {
                   {didPass ? <CheckCircleIcon /> : <XPlain />}
                   {didPass ? "Passed" : "Not yet"}
                 </span>
-                <p className="score-sub">Passing score: {passingScore}%</p>
+                <p className="score-sub">Passing score: {effectivePassingScore}%</p>
                 <p className="score-breakdown-label">Performance Breakdown</p>
               </div>
             </div>
 
             <div className="stat-chips">
-              <div className="stat-chip">
-                <span className="stat-ic good">
-                  <CheckPlain />
-                </span>
-                <strong>{correctCount}</strong>
-                <span>Correct</span>
-              </div>
-              <div className="stat-chip">
-                <span className="stat-ic bad">
-                  <XPlain />
-                </span>
-                <strong>{incorrectCount}</strong>
-                <span>Incorrect</span>
-              </div>
+              {/* Per-question correct/incorrect counts require the local answer
+                  breakdown; hide them when we only have the backend score so we
+                  don't show a misleading "0 correct". */}
+              {hasReviewRows ? (
+                <>
+                  <div className="stat-chip">
+                    <span className="stat-ic good">
+                      <CheckPlain />
+                    </span>
+                    <strong>{correctCount}</strong>
+                    <span>Correct</span>
+                  </div>
+                  <div className="stat-chip">
+                    <span className="stat-ic bad">
+                      <XPlain />
+                    </span>
+                    <strong>{incorrectCount}</strong>
+                    <span>Incorrect</span>
+                  </div>
+                </>
+              ) : null}
               <div className="stat-chip">
                 <span className="stat-ic time">
                   <ClockIcon />
@@ -302,7 +378,8 @@ function QuizResultsPage() {
               <ListIcon /> Review Your Answers
             </h2>
             <div className="review-scroll">
-              {rows.map((row, index) => (
+              {hasReviewRows ? (
+                rows.map((row, index) => (
                   <div className="review-item" key={row.id}>
                     <span
                       className={`review-mark t-success-check ${row.correct ? "ok" : "no"}`}
@@ -324,13 +401,30 @@ function QuizResultsPage() {
                       </button>
                     ) : null}
                   </div>
-                ))}
+                ))
+              ) : (
+                <p className="cfg-empty">
+                  A per-question breakdown isn't available for this attempt
+                  {" "}— it was completed on another device or browser. Your score
+                  above is still saved.
+                </p>
+              )}
             </div>
           </section>
             </div>
 
             <div className="results-foot">
-              <button className="ghost-btn" type="button" onClick={() => navigate("/quiz-taking")}>
+              <button
+                className="ghost-btn"
+                type="button"
+                onClick={() =>
+                  navigate(
+                    completedQuiz
+                      ? `/quiz-taking?quizId=${completedQuiz.quizId}`
+                      : "/quiz-taking"
+                  )
+                }
+              >
                 <RefreshIcon /> Retake
               </button>
               <button className="sf-btn" type="button" onClick={() => navigate("/learner-module")}>

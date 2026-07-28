@@ -576,6 +576,13 @@ export async function getAssignedQuizzes(req: Request, res: Response, next: Next
         description: quiz.description,
         dueDate: quiz.dueDate,
         status: assignment.status,
+        passingScore: quiz.passingScore,
+        // Durable result fields so the new hire's Progress page can render a
+        // completed quiz's score/time even without the local attempt cache
+        // (different browser/device, cleared storage, etc.).
+        score: assignment.score,
+        timeTakenSeconds: assignment.timeTakenSeconds,
+        completedAt: assignment.completedAt,
       }))
     );
   } catch (err) {
