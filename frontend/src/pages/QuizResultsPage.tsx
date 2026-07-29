@@ -67,6 +67,9 @@ const CONFETTI = [
 type QuizResultsNavState = {
   quizId?: number;
   completion?: CompleteQuizAssignmentResult;
+  // The taken quiz's passing score, so the pass/fail hero + badge are correct
+  // on first paint instead of flipping once listAssignedQuizzes() resolves.
+  passingScore?: number | null;
 };
 
 function seedCompletedQuizFromNav(state: unknown): AssignedQuiz | null {
@@ -82,7 +85,7 @@ function seedCompletedQuizFromNav(state: unknown): AssignedQuiz | null {
     description: null,
     dueDate: null,
     status: "completed",
-    passingScore: null,
+    passingScore: navState?.passingScore ?? null,
     score: completion.score,
     timeTakenSeconds: completion.timeTakenSeconds,
     completedAt: completion.completedAt,

@@ -32,6 +32,10 @@ function QuizTakingPage() {
   const [hasStarted, setHasStarted] = useState(false);
   const [current, setCurrent] = useState(0);
   const [answers, setAnswers] = useState<Record<number, number>>({});
+  // The quiz's own passing score, remembered so we can hand it to the results
+  // page on submit. Without it the results page falls back to the local manager
+  // config until its fetch resolves, which can briefly flip pass/fail.
+  const [passingScore, setPassingScore] = useState<number | null>(null);
   const [timeLimitMinutes, setTimeLimitMinutes] = useState<number | null>(null);
   const [hasTimeLimit, setHasTimeLimit] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState(0);
@@ -61,6 +65,7 @@ function QuizTakingPage() {
         setQuestions(quiz.questionsPayload);
         setQuizId(quiz.id);
         setTitle(quiz.title);
+        setPassingScore(quiz.passingScore);
         // Remember the limit but don't start the clock — the countdown begins
         // only once the learner starts the quiz from the intro screen.
         if (quiz.timeLimitMinutes) setTimeLimitMinutes(quiz.timeLimitMinutes);
@@ -141,7 +146,7 @@ function QuizTakingPage() {
     }
 
     navigate("/quiz-results", {
-      state: completion ? { quizId, completion } : undefined,
+      state: completion ? { quizId, completion, passingScore } : undefined,
     });
   };
 
