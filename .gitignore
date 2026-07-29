@@ -21,6 +21,10 @@ backend/.cache/
 .v2preview/
 dist/
 
+# Root-level package.json was created by installing deps at the repo root by
+# mistake (the app deps live in frontend/). Keep it out of version control.
+/package.json
+
 # transitions-refine (npx transitions-refine live) local relay state —
 # points at localhost, never meant to be committed. `frontend/index.html`'s
 # injected <script> tag is stripped automatically by `transitions-refine
