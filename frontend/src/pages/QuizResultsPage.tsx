@@ -123,9 +123,17 @@ function QuizResultsPage() {
     setPassingScore(loadQuizConfig().passingScore);
   }, []);
 
+  // The specific quiz these results are for: the one just submitted (nav state)
+  // or, failing that, the local attempt. We fetch this exact quiz's record
+  // rather than "whatever was completed most recently" — retakes don't bump
+  // `completedAt`, so the most-recent sort can surface a DIFFERENT quiz, which
+  // then mismatches the local attempt and wrongly hides the per-question review.
+  const navState = location.state as { quizId?: number } | null;
+  const targetQuizId = navState?.quizId ?? attempt?.quizId ?? null;
+
   // Pull the durable result from the backend so a completed quiz still shows
   // its score/time after a refresh or on another device, even if the local
-  // attempt cache is gone. Picks the most recently completed assignment.
+  // attempt cache is gone.
   useEffect(() => {
     let cancelled = false;
     listAssignedQuizzes()
@@ -137,10 +145,17 @@ function QuizResultsPage() {
             (a, b) =>
               new Date(b.completedAt!).getTime() - new Date(a.completedAt!).getTime()
           );
+        // Prefer the record for the quiz we're actually showing; fall back to
+        // the most recently completed only when we don't know which quiz (e.g.
+        // opened directly, no nav state and no local attempt).
+        const match =
+          (targetQuizId != null
+            ? completed.find((quiz) => quiz.quizId === targetQuizId)
+            : undefined) ?? completed[0];
         // Don't let an empty/slow fetch clobber the record we seeded from the
         // just-submitted quiz — only replace it when the fetch actually found
         // a completed assignment (the durable, fully-populated version).
-        setCompletedQuiz((seeded) => completed[0] ?? seeded);
+        setCompletedQuiz((seeded) => match ?? seeded);
       })
       .catch(() => {
         /* leave null — falls back to the local attempt if present */
@@ -151,7 +166,7 @@ function QuizResultsPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [targetQuizId]);
 
   // Prefer the quiz's own passing score (from the backend) over the local
   // manager config, which may not match the quiz actually taken.
