@@ -1,6 +1,6 @@
 # Project Plan
 
-Pod Members: **Esme, Frida, Melanie, Reyna**
+Pod Members: **Frida, Esme, Reyna, Melanie**
 
 ## Problem Statement and Description
 
