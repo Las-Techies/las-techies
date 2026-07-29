@@ -29,7 +29,10 @@ import {
   ModulesIcon,
   XPlain,
   CheckPlain,
+  GithubIcon,
+  LinkedInIcon,
 } from "../components/icons";
+import { useAvatarGroupHover } from "../hooks/useAvatarGroupHover";
 
 import "../styles/about.css";
 
@@ -262,10 +265,42 @@ const FEATURES = [
 ];
 
 const TEAM = [
-  { name: "Frida", role: "Frontend Engineer", photo: teamFrida },
-  { name: "Esme", role: "Backend Engineer", photo: teamEsme },
-  { name: "Reyna", role: "AI Engineer", photo: teamReyna },
-  { name: "Melanie", role: "Product Designer", photo: teamMelanie },
+  {
+    id: "frida",
+    name: "Frida",
+    role: "University of California, Berkeley",
+    photo: teamFrida,
+    bio: "Frida is a junior at the University of California, Berkeley studying Computer Science and Data Science.",
+    linkedin: "https://www.linkedin.com/in/frida-arriaga/",
+    github: "https://github.com/fridaarriaga",
+  },
+  {
+    id: "esme",
+    name: "Esme",
+    role: "University of California, Berkeley",
+    photo: teamEsme,
+    bio: "Esme is a junior at the University of California, Berkeley studying Electrical Engineering and Computer Science.",
+    linkedin: "https://www.linkedin.com/in/esmebenitez/",
+    github: "https://github.com/EsmeBenitez",
+  },
+  {
+    id: "reyna",
+    name: "Reyna",
+    role: "University of Houston",
+    photo: teamReyna,
+    bio: "Reyna is a junior at the University of Houston studying Computer Science.",
+    linkedin: "https://www.linkedin.com/in/reyna-obreg%C3%B3n-8779322a8/",
+    github: "https://github.com/reyna1008",
+  },
+  {
+    id: "melanie",
+    name: "Melanie",
+    role: "University of Southern California",
+    photo: teamMelanie,
+    bio: "Melanie is a junior at the University of Southern California studying Computer Science.",
+    linkedin: "https://www.linkedin.com/in/m3lanieperez/",
+    github: "https://github.com/melanienperez",
+  },
 ];
 
 function AboutPage() {
@@ -274,6 +309,12 @@ function AboutPage() {
   const lenisRef = useRef<Lenis | null>(null);
   const jumpingRef = useRef(false); // true while a nav jump is animating (suppresses the demo lock)
   const [scrolled, setScrolled] = useState(false);
+
+  // Team hover reveal: hovering a member grows a bio panel (role, bio, socials)
+  // out of their photo, mirroring the standalone Meet Our Team page. Driven by
+  // hover, with keyboard focus / click as fallbacks for people who can't hover.
+  const [openMemberId, setOpenMemberId] = useState<string | null>(null);
+  const teamHover = useAvatarGroupHover<HTMLDivElement>();
 
   /* ---- hero scroll-linked parallax ---- */
   const heroRef = useRef<HTMLElement>(null);
@@ -343,7 +384,7 @@ function AboutPage() {
           <button onClick={() => scrollTo("#lp-features")}>Features</button>
           <button onClick={() => scrollTo("#lp-team")}>Team</button>
         </div>
-        <button className="lp-btn lp-btn-primary" onClick={() => navigate("/")}>
+        <button className="lp-btn lp-btn-primary" onClick={() => navigate("/login")}>
           Get Started
         </button>
       </nav>
@@ -366,7 +407,7 @@ function AboutPage() {
               they're ready.
             </p>
             <div className="lp-hero-cta">
-              <button className="lp-btn lp-btn-primary" onClick={() => navigate("/")}>
+              <button className="lp-btn lp-btn-primary" onClick={() => navigate("/login")}>
                 Get Started <ArrowRight />
               </button>
               <button className="lp-btn lp-btn-ghost" onClick={() => scrollTo("#lp-how")}>
@@ -510,19 +551,71 @@ function AboutPage() {
           initial="hidden"
           whileInView="show"
           viewport={viewport}
+          ref={teamHover.rootRef}
+          {...teamHover.rootProps}
         >
-          {TEAM.map((m) => (
-            <motion.div
-              key={m.name}
-              className="lp-member"
-              variants={staggerChild}
-              whileHover={reduce ? undefined : { y: -6, scale: 1.04 }}
-              transition={{ type: "spring", stiffness: 300, damping: 20 }}
-            >
-              <img className="lp-avatar" src={m.photo} alt={m.name} />
-              <h3>{m.name}</h3>
-            </motion.div>
-          ))}
+          {TEAM.map((m, index) => {
+            const isOpen = openMemberId === m.id;
+            return (
+              <motion.div
+                key={m.id}
+                className={`lp-member t-avatar ${isOpen ? "open" : ""}`}
+                variants={staggerChild}
+                onMouseEnter={() => {
+                  teamHover.getItemProps(index).onMouseEnter();
+                  setOpenMemberId(m.id);
+                }}
+                onMouseLeave={() =>
+                  setOpenMemberId((current) => (current === m.id ? null : current))
+                }
+              >
+                <button
+                  type="button"
+                  className="lp-member-trigger"
+                  aria-expanded={isOpen}
+                  onClick={() =>
+                    setOpenMemberId((current) => (current === m.id ? null : m.id))
+                  }
+                  onFocus={() => setOpenMemberId(m.id)}
+                  onBlur={() =>
+                    setOpenMemberId((current) => (current === m.id ? null : current))
+                  }
+                >
+                  <img className="lp-avatar" src={m.photo} alt={m.name} />
+                  <h3>{m.name}</h3>
+                </button>
+
+                {/* grid-template-rows 0fr -> 1fr accordion: the bio panel grows
+                    out of the photo on hover instead of popping a modal. */}
+                <div className="lp-member-bio" data-open={isOpen}>
+                  <div className="lp-member-bio-inner">
+                    <p className="lp-member-role">{m.role}</p>
+                    <p className="lp-member-text">{m.bio}</p>
+                    <div className="lp-member-links">
+                      <a
+                        href={m.linkedin}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="lp-member-social"
+                        tabIndex={isOpen ? 0 : -1}
+                      >
+                        <LinkedInIcon /> LinkedIn
+                      </a>
+                      <a
+                        href={m.github}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="lp-member-social"
+                        tabIndex={isOpen ? 0 : -1}
+                      >
+                        <GithubIcon /> GitHub
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            );
+          })}
         </motion.div>
       </section>
 
@@ -539,7 +632,7 @@ function AboutPage() {
           <img className="lp-cta-panda" src={pandaLogin} alt="" aria-hidden="true" />
           <h2>Ready to transform onboarding?</h2>
           <p>Turn your first doc into a quiz today — no setup, no rebuild.</p>
-          <button className="lp-btn lp-btn-primary" onClick={() => navigate("/")}>
+          <button className="lp-btn lp-btn-primary" onClick={() => navigate("/login")}>
             Get Started free <ArrowRight />
           </button>
         </motion.div>
@@ -562,12 +655,11 @@ function AboutPage() {
             <h4>Product</h4>
             <a onClick={() => scrollTo("#lp-features")}>Features</a>
             <a onClick={() => scrollTo("#lp-how")}>How it works</a>
-            <a onClick={() => navigate("/")}>Log in</a>
+            <a onClick={() => navigate("/login")}>Log in</a>
           </div>
           <div className="lp-footer-col">
             <h4>Company</h4>
             <a onClick={() => scrollTo("#lp-team")}>Team</a>
-            <a onClick={() => navigate("/meet-our-team")}>Meet our team</a>
           </div>
           <div className="lp-footer-col">
             <h4>Resources</h4>
