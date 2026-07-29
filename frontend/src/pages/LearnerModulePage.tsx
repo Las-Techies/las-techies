@@ -15,6 +15,7 @@ import {
   deleteChatConversation,
   getChatConversation,
   getDocumentFileUrl,
+  getDocumentDetail,
   getMyTeam,
   listChatConversations,
   listTeamDocuments,
@@ -23,6 +24,7 @@ import {
   type ChatSource,
   type DocumentFileUrl,
 } from "../api/client";
+import { isMarkdownSource, openSourceUrl } from "../features/documents/source";
 import { saveModuleProgress } from "../features/quiz/storage";
 import type { GeneratedQuiz } from "../features/quiz/types";
 import { type SourceKind } from "../features/learner/data";
@@ -564,12 +566,55 @@ function LearnerModulePage() {
   };
 
   const openSource = (doc: DisplayDoc) => {
-    setOpenDoc(doc);
+    // Mark read regardless of how the source opens.
     setReadIds((prev) => {
       const next = new Set(prev);
       next.add(doc.id);
       return next;
     });
+
+    // Markdown reads far better on its original page — if this doc is markdown
+    // and has a source URL, link out in a new tab instead of the in-app viewer.
+    // We fetch detail to get the URL (the doc list doesn't carry it); only for
+    // markdown, so the common PDF/DOCX path keeps its single file-URL fetch.
+    if (isMarkdownSource(doc.title)) {
+      getDocumentDetail(doc.remoteId)
+        .then((detail) => {
+          if (detail.sourceUrl) {
+            openSourceUrl(detail.sourceUrl);
+          } else {
+            openSourceModal(doc); // bare .md upload with no link — show text
+          }
+        })
+        .catch(() => openSourceModal(doc));
+      return;
+    }
+
+    openSourceModal(doc);
+  };
+
+  // A chat "Sources:" chip: markdown ones link out to the original file (fetch
+  // the URL on click, since chat sources don't carry it); non-markdown just
+  // opens the matching library doc's source modal when we can find it.
+  const openChatSource = (source: ChatSource) => {
+    if (isMarkdownSource(source.documentTitle)) {
+      getDocumentDetail(source.documentId)
+        .then((detail) => {
+          if (detail.sourceUrl) openSourceUrl(detail.sourceUrl);
+        })
+        .catch(() => {
+          /* no-op: leave the chat as-is if the source can't be resolved */
+        });
+      return;
+    }
+    const doc = docs.find((d) => d.remoteId === source.documentId);
+    if (doc) openSourceModal(doc);
+  };
+
+  // Opens the in-app source modal (embedded original file, or extracted-text
+  // fallback for legacy docs / non-embeddable types).
+  const openSourceModal = (doc: DisplayDoc) => {
+    setOpenDoc(doc);
     setFileUrl(null);
     setFileUrlLoadingId(doc.remoteId);
     getDocumentFileUrl(doc.remoteId)
@@ -947,8 +992,12 @@ function LearnerModulePage() {
             ) : (
               <>
                 {messages.map((message, index) => {
-                  const sourceTitles = message.sources
-                    ? Array.from(new Set(message.sources.map((s) => s.documentTitle)))
+                  // Dedupe by documentId (keeping the source object so markdown
+                  // ones can link out) rather than by title string.
+                  const uniqueSources = message.sources
+                    ? Array.from(
+                        new Map(message.sources.map((s) => [s.documentId, s])).values()
+                      )
                     : [];
                   return (
                     <div key={index} className={`bubble-row ${message.role}`}>
@@ -961,8 +1010,22 @@ function LearnerModulePage() {
                         <div className={`bubble ${message.role}`}>
                           {message.role === "assistant" ? renderMessageText(message.text) : message.text}
                         </div>
-                        {sourceTitles.length > 0 ? (
-                          <p className="bubble-sources">Sources: {sourceTitles.join(", ")}</p>
+                        {uniqueSources.length > 0 ? (
+                          <p className="bubble-sources">
+                            Sources:{" "}
+                            {uniqueSources.map((source, i) => (
+                              <span key={source.documentId}>
+                                {i > 0 ? ", " : ""}
+                                <button
+                                  type="button"
+                                  className="bubble-source-link"
+                                  onClick={() => openChatSource(source)}
+                                >
+                                  {source.documentTitle}
+                                </button>
+                              </span>
+                            ))}
+                          </p>
                         ) : null}
                       </div>
                     </div>

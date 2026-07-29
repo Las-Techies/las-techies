@@ -4,11 +4,12 @@ import { useLocation, useNavigate } from "react-router-dom";
 import AppNav from "../components/navigation/AppNav";
 import mascot from "../assets/panda-cheer-fullhat.png";
 import {
-  apiFetch,
+  getDocumentDetail,
   listAssignedQuizzes,
   type AssignedQuiz,
   type CompleteQuizAssignmentResult,
 } from "../api/client";
+import { isMarkdownSource, openSourceUrl } from "../features/documents/source";
 import { findHighlightSpan } from "../features/quiz/citationMatch";
 import { useLastNonNull, useModalTransition } from "../hooks/useModalTransition";
 import { loadQuizAttempt, loadQuizConfig } from "../features/quiz/storage";
@@ -265,7 +266,30 @@ function QuizResultsPage() {
   const frozenSourceRow = useLastNonNull(activeSourceRow?.citation ? activeSourceRow : null);
   const sourceModal = useModalTransition(Boolean(activeSourceRow?.citation));
 
+  // Opening a source: markdown docs read far better on their original page, so
+  // if the cited doc is markdown we fetch its URL and link out to the real file
+  // in a new tab. Markdown is detected synchronously from the citation title so
+  // the common (non-markdown) case still opens the text modal instantly, with
+  // no extra round-trip. Markdown with no URL (e.g. a bare .md upload) falls
+  // back to the same text modal.
   const openSourceModal = (row: ReviewRow) => {
+    if (!row.citation) return;
+    const documentId = row.citation.sourceDocumentId;
+
+    if (isMarkdownSource(row.citation.sourceDocumentTitle)) {
+      getDocumentDetail(documentId)
+        .then((detail) => {
+          if (detail.sourceUrl) openSourceUrl(detail.sourceUrl);
+          else openTextModal(row);
+        })
+        .catch(() => openTextModal(row));
+      return;
+    }
+
+    openTextModal(row);
+  };
+
+  const openTextModal = (row: ReviewRow) => {
     if (!row.citation) return;
     setSourceModalRowId(row.id);
     void loadSourceText(row.citation.sourceDocumentId);
@@ -282,12 +306,10 @@ function QuizResultsPage() {
     });
 
     try {
-      const response = await apiFetch<{ data: { rawText: string | null } }>(
-        `/api/documents/${documentId}`
-      );
+      const detail = await getDocumentDetail(documentId);
       setSourceTextByDocumentId((prev) => ({
         ...prev,
-        [documentId]: response.data.rawText ?? "No extracted text available for this document.",
+        [documentId]: detail.rawText ?? "No extracted text available for this document.",
       }));
     } catch (err) {
       setSourceErrorByDocumentId((prev) => ({

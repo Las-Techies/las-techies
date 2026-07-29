@@ -251,6 +251,38 @@ export async function listMyDocuments(): Promise<MyDocument[]> {
   return res.data;
 }
 
+export type DocumentDetail = {
+  id: number;
+  title: string;
+  sourceType: string;
+  // The document's original location (GitHub blob URL, Google Drive link, …).
+  // Backed by the DB's snake_case `source_url` column. Null for plain uploads.
+  sourceUrl: string | null;
+  rawText: string | null;
+};
+
+// Full detail for a single document, including the extracted text (for the
+// in-app source viewer) and its original source URL (so markdown sources can
+// link out to the real file instead of showing flattened text).
+export async function getDocumentDetail(documentId: number): Promise<DocumentDetail> {
+  const res = await apiFetch<{
+    data: {
+      id: number;
+      title: string;
+      sourceType: string;
+      source_url: string | null;
+      rawText: string | null;
+    };
+  }>(`/api/documents/${documentId}`);
+  return {
+    id: res.data.id,
+    title: res.data.title,
+    sourceType: res.data.sourceType,
+    sourceUrl: res.data.source_url,
+    rawText: res.data.rawText,
+  };
+}
+
 export type DocumentFileUrl = {
   url: string | null;
   mimeType: string | null;
