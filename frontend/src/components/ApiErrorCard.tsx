@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 import type { FriendlyError } from "../api/errors";
 
 type ApiErrorCardProps = {
@@ -19,6 +20,20 @@ type ApiErrorCardProps = {
  */
 function ApiErrorCard({ error, onRetry }: ApiErrorCardProps) {
   const navigate = useNavigate();
+  const { signOut } = useAuth();
+
+  // An auth error means the token the backend saw was expired/invalid, but the
+  // browser's Supabase session often still looks valid — so a bare navigate to
+  // /login would be bounced straight back by LoginPage's "already signed in"
+  // redirect (the page flashes, then returns you here). Clear the stale session
+  // first so the login form actually stays put.
+  const handleSignIn = async () => {
+    try {
+      await signOut();
+    } finally {
+      navigate("/login", { replace: true });
+    }
+  };
 
   return (
     <div className="sf-error" role="alert">
@@ -30,7 +45,7 @@ function ApiErrorCard({ error, onRetry }: ApiErrorCardProps) {
         <p className="sf-error-detail">{error.detail}</p>
         <p className="sf-error-technical">{error.technical}</p>
         {error.action === "signin" ? (
-          <button type="button" className="sf-btn sf-btn-sm" onClick={() => navigate("/login")}>
+          <button type="button" className="sf-btn sf-btn-sm" onClick={handleSignIn}>
             Sign in
           </button>
         ) : (
