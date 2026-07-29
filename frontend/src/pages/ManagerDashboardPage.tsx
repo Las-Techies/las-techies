@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import AppNav from "../components/navigation/AppNav";
-import { getManagerDashboard, type ManagerDashboardData } from "../api/client";
+import { apiFetch, getManagerDashboard, type ManagerDashboardData } from "../api/client";
 import { describeError, type FriendlyError } from "../api/errors";
 import ApiErrorCard from "../components/ApiErrorCard";
 import { CalendarIcon, ChartBarIcon, CheckCircleIcon, ClipboardIcon, PeopleIcon } from "../components/icons";
+import type { GeneratedQuiz } from "../features/quiz/types";
+import { useLastNonNull, useModalTransition } from "../hooks/useModalTransition";
 
 function formatDate(iso: string | null): string {
   if (!iso) return "No due date";
@@ -28,6 +30,10 @@ function ManagerDashboardPage() {
   const [data, setData] = useState<ManagerDashboardData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<FriendlyError | null>(null);
+  const [selectedQuiz, setSelectedQuiz] = useState<GeneratedQuiz | null>(null);
+  const [isQuizModalOpen, setIsQuizModalOpen] = useState(false);
+  const [isQuizModalLoading, setIsQuizModalLoading] = useState(false);
+  const [quizModalError, setQuizModalError] = useState("");
   // Bumped by the Try again button to re-run the loader effect.
   const [reloadKey, setReloadKey] = useState(0);
 
@@ -70,6 +76,26 @@ function ManagerDashboardPage() {
       averageScore,
     };
   }, [data]);
+
+  const quizModal = useModalTransition(isQuizModalOpen);
+  const frozenSelectedQuiz = useLastNonNull(selectedQuiz);
+
+  async function openQuizModal(quizId: number) {
+    setIsQuizModalOpen(true);
+    setIsQuizModalLoading(true);
+    setQuizModalError("");
+    setSelectedQuiz(null);
+    try {
+      const quiz = await apiFetch<GeneratedQuiz>(`/api/quizzes/${quizId}`);
+      setSelectedQuiz(quiz);
+    } catch (err) {
+      setQuizModalError(err instanceof Error ? err.message : "Failed to load quiz details.");
+    } finally {
+      setIsQuizModalLoading(false);
+    }
+  }
+
+  const quizToShow = selectedQuiz ?? frozenSelectedQuiz;
 
   return (
     <div className="app-shell">
@@ -233,7 +259,15 @@ function ManagerDashboardPage() {
                     <tbody>
                       {data.quizzes.map((quiz) => (
                         <tr key={quiz.id}>
-                          <td>{quiz.title}</td>
+                          <td>
+                            <button
+                              type="button"
+                              className="dash-quiz-link"
+                              onClick={() => void openQuizModal(quiz.id)}
+                            >
+                              {quiz.title}
+                            </button>
+                          </td>
                           <td>
                             <span className={`dash-status-pill ${quiz.status}`}>{quiz.status}</span>
                           </td>
@@ -251,6 +285,71 @@ function ManagerDashboardPage() {
             </section>
           </>
         )}
+
+        {quizModal.shouldRender ? (
+          <div
+            className={`modal-backdrop t-modal-backdrop ${quizModal.phaseClassName}`}
+            role="dialog"
+            aria-modal="true"
+            onClick={() => setIsQuizModalOpen(false)}
+          >
+            <div
+              className={`modal-card dash-quiz-modal t-modal ${quizModal.phaseClassName}`}
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="dash-quiz-modal-head">
+                <div>
+                  <span className="dash-quiz-modal-eyebrow">Past quiz details</span>
+                  <h3>{quizToShow?.title ?? "Quiz details"}</h3>
+                </div>
+                <button
+                  type="button"
+                  className="rp-source-close"
+                  aria-label="Close quiz details"
+                  onClick={() => setIsQuizModalOpen(false)}
+                >
+                  ×
+                </button>
+              </div>
+              <div className="dash-quiz-modal-body">
+                {isQuizModalLoading ? (
+                  <p className="cfg-empty">Loading quiz…</p>
+                ) : quizModalError ? (
+                  <p className="form-error">{quizModalError}</p>
+                ) : !quizToShow ? (
+                  <p className="cfg-empty">Quiz details unavailable.</p>
+                ) : (
+                  <div className="qcards rp-qcards">
+                    {quizToShow.questionsPayload.map((item, index) => (
+                      <article className="qcard" key={`${item.id}-${index}`}>
+                        <div className="qcard-head">
+                          <span className="qcard-num">{index + 1}</span>
+                          <h3 className="qcard-prompt">{item.prompt}</h3>
+                        </div>
+                        <ul className="qopts">
+                          {item.options.map((option, optIndex) => (
+                            <li key={option.id} className={`qopt ${option.isCorrect ? "is-correct" : ""}`}>
+                              <span className="qopt-radio" aria-hidden />
+                              <span className="qopt-text">
+                                {String.fromCharCode(65 + optIndex)}. {option.text}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                        <div className="rp-answer">
+                          <span className="rp-answer-label">Correct Answer:</span>
+                          <span className="rp-answer-value">
+                            {item.options.find((option) => option.isCorrect)?.text ?? "N/A"}
+                          </span>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        ) : null}
       </main>
     </div>
   );
