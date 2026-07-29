@@ -282,7 +282,10 @@ function UploadContentPage() {
       const { error: oauthError } = await supabase.auth.linkIdentity({
         provider: "github",
         options: {
-          redirectTo: window.location.origin,
+          // Come back to /login (which forwards a signed-in user on to their
+          // dashboard), not "/", the marketing landing page that has no
+          // session redirect and would strand the manager after linking.
+          redirectTo: `${window.location.origin}/login`,
         },
       });
       if (oauthError) {
@@ -324,9 +327,10 @@ function UploadContentPage() {
 
   // Re-runs the Google consent screen to mint a fresh Drive token. Reuses
   // AuthContext's signInWithGoogle so the scopes and the redirect target stay
-  // in one place (redirectTo is always window.location.origin — never built
-  // from anything user-supplied). Must stay click-triggered: firing this from
-  // an effect would bounce the user through OAuth on every render.
+  // in one place (redirectTo is always `${window.location.origin}/login` —
+  // never built from anything user-supplied). Must stay click-triggered:
+  // firing this from an effect would bounce the user through OAuth on every
+  // render.
   const handleReconnectGoogle = async () => {
     try {
       setError("");

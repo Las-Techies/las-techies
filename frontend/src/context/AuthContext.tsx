@@ -120,8 +120,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Sends a password-reset email. Supabase redirects the user back here
   // with a recovery token after they click the link in that email.
   async function resetPassword(email: string): Promise<void> {
+    // Return to /login, not "/". The site root is the marketing landing page,
+    // which has no session-detection redirect — landing there would strand the
+    // user instead of continuing them into the app.
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: window.location.origin,
+      redirectTo: `${window.location.origin}/login`,
     });
     if (error) throw error;
   }
@@ -136,7 +139,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: window.location.origin,
+        // Bounce back to /login (which forwards a signed-in user on to their
+        // dashboard) rather than "/", the marketing landing page that has no
+        // such redirect and would otherwise strand the user after auth.
+        redirectTo: `${window.location.origin}/login`,
         scopes: "openid email profile",
       },
     });
