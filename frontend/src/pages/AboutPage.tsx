@@ -569,21 +569,10 @@ function AboutPage() {
                   setOpenMemberId((current) => (current === m.id ? null : current))
                 }
               >
-                <button
-                  type="button"
-                  className="lp-member-trigger"
-                  aria-expanded={isOpen}
-                  onClick={() =>
-                    setOpenMemberId((current) => (current === m.id ? null : m.id))
-                  }
-                  onFocus={() => setOpenMemberId(m.id)}
-                  onBlur={() =>
-                    setOpenMemberId((current) => (current === m.id ? null : current))
-                  }
-                >
+                <div className="lp-member-trigger">
                   <img className="lp-avatar" src={m.photo} alt={m.name} />
                   <h3>{m.name}</h3>
-                </button>
+                </div>
 
                 {/* grid-template-rows 0fr -> 1fr accordion: the bio panel grows
                     out of the photo on hover instead of popping a modal. */}
