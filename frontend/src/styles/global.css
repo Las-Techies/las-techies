@@ -6557,6 +6557,16 @@ main.mgr-page > section.dropzone > input.sr-only {
   background: #e3f8ec;
 }
 
+.dash-status-pill.completed-passed {
+  color: #036b3a;
+  background: #e3f8ec;
+}
+
+.dash-status-pill.completed-not-passed {
+  color: #8a1226;
+  background: #ffe3e8;
+}
+
 .dash-status-pill.pending {
   color: #8a6d00;
   background: #fff3d6;

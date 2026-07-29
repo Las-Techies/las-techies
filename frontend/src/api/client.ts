@@ -362,6 +362,7 @@ export type ManagerDashboardLearnerAssignment = {
   timeTakenSeconds: number | null;
   completedAt: string | null;
   attemptCount: number;
+  passingScore: number | null;
   dueDate: string | null;
 };
 

@@ -653,6 +653,7 @@ export async function getManagerDashboard(req: Request, res: Response, next: Nex
           timeTakenSeconds: assignment.timeTakenSeconds,
           completedAt: assignment.completedAt,
           attemptCount: assignment.attemptCount,
+          passingScore: quiz.passingScore,
           dueDate: quiz.dueDate,
         }))
         .sort((a, b) => {

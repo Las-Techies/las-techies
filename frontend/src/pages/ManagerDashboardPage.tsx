@@ -12,6 +12,15 @@ function formatDate(iso: string | null): string {
   return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 }
 
+function formatTakenDate(iso: string | null): string {
+  if (!iso) return "Not taken yet";
+  return new Date(iso).toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
 function formatDuration(totalSeconds: number | null): string {
   if (totalSeconds === null) return "—";
   const minutes = Math.floor(totalSeconds / 60);
@@ -24,6 +33,22 @@ function initialsOf(name: string): string {
   const first = parts[0]?.[0] ?? "";
   const last = parts.length > 1 ? parts[parts.length - 1]?.[0] ?? "" : "";
   return (first + last).toUpperCase() || "•";
+}
+
+function getAssignmentStatusDisplay(assignment: {
+  status: "pending" | "completed";
+  score: number | null;
+  passingScore: number | null;
+}): { label: string; className: string } {
+  if (assignment.status !== "completed") {
+    return { label: "Pending", className: "pending" };
+  }
+  if (typeof assignment.score === "number" && typeof assignment.passingScore === "number") {
+    return assignment.score >= assignment.passingScore
+      ? { label: "Completed - Passed", className: "completed-passed" }
+      : { label: "Completed - Not passed", className: "completed-not-passed" };
+  }
+  return { label: "Completed", className: "completed" };
 }
 
 function ManagerDashboardPage() {
@@ -198,11 +223,13 @@ function ManagerDashboardPage() {
                           <p className="dash-empty-hint">No quizzes assigned yet.</p>
                         ) : (
                           <div className="dash-assignment-list">
-                            {learner.assignments.map((assignment) => (
+                            {learner.assignments.map((assignment) => {
+                              const statusDisplay = getAssignmentStatusDisplay(assignment);
+                              return (
                               <div className="dash-assignment-row" key={assignment.quizId}>
                                 <span className="dash-assignment-title">{assignment.quizTitle}</span>
-                                <span className={`dash-status-pill ${assignment.status}`}>
-                                  {assignment.status === "completed" ? "Completed" : "Pending"}
+                                <span className={`dash-status-pill ${statusDisplay.className}`}>
+                                  {statusDisplay.label}
                                 </span>
                                 <span className="dash-assignment-meta">
                                   {assignment.status === "completed" && typeof assignment.score === "number"
@@ -221,10 +248,14 @@ function ManagerDashboardPage() {
                                   {formatDuration(assignment.timeTakenSeconds)}
                                 </span>
                                 <span className="dash-assignment-meta muted">
-                                  <CalendarIcon /> {formatDate(assignment.dueDate)}
+                                  <CalendarIcon /> Due {formatDate(assignment.dueDate)}
+                                </span>
+                                <span className="dash-assignment-meta muted">
+                                  <CalendarIcon /> Taken {formatTakenDate(assignment.completedAt)}
                                 </span>
                               </div>
-                            ))}
+                            );
+                            })}
                           </div>
                         )}
                       </div>
@@ -252,7 +283,8 @@ function ManagerDashboardPage() {
                         <th>Assigned</th>
                         <th>Completed</th>
                         <th>Avg. score</th>
-                        <th>Avg. time</th>
+                        <th>Avg. time taken</th>
+                        <th>Due date</th>
                         <th>Created</th>
                       </tr>
                     </thead>
@@ -275,6 +307,7 @@ function ManagerDashboardPage() {
                           <td>{quiz.completedCount}</td>
                           <td>{quiz.averageScore !== null ? `${quiz.averageScore}%` : "—"}</td>
                           <td>{formatDuration(quiz.averageTimeTakenSeconds)}</td>
+                          <td>{formatDate(quiz.dueDate)}</td>
                           <td>{formatDate(quiz.createdAt)}</td>
                         </tr>
                       ))}
