@@ -694,7 +694,16 @@ export async function completeAssignment(req: Request, res: Response, next: Next
         ? Math.round(req.body.timeTakenSeconds)
         : undefined;
     const result = await markAssignmentComplete(quizId, user.id, score, timeTakenSeconds);
-    res.json({ updated: result.count > 0 });
+    // Relay the durable record back so the client can render it immediately
+    // (chiefly attemptCount, which has no browser-local equivalent and would
+    // otherwise only appear a beat later once the results page refetches).
+    res.json({
+      updated: result.count > 0,
+      attemptCount: result.attemptCount,
+      score: result.score,
+      timeTakenSeconds: result.timeTakenSeconds,
+      completedAt: result.completedAt,
+    });
   } catch (err) {
     next(err);
   }

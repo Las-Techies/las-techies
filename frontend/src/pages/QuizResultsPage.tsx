@@ -1,9 +1,14 @@
 import type { CSSProperties } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import AppNav from "../components/navigation/AppNav";
 import mascot from "../assets/panda-cheer-fullhat.png";
-import { apiFetch, listAssignedQuizzes, type AssignedQuiz } from "../api/client";
+import {
+  apiFetch,
+  listAssignedQuizzes,
+  type AssignedQuiz,
+  type CompleteQuizAssignmentResult,
+} from "../api/client";
 import { findHighlightSpan } from "../features/quiz/citationMatch";
 import { useLastNonNull, useModalTransition } from "../hooks/useModalTransition";
 import { loadQuizAttempt, loadQuizConfig } from "../features/quiz/storage";
@@ -53,15 +58,55 @@ const CONFETTI = [
   { left: "94%", top: "62%", bg: "#2f8fe6", rot: "-8deg" },
 ];
 
+// The quiz page navigates here with the completion record it just wrote (see
+// QuizTakingPage.submitQuiz). Turn that into a partial AssignedQuiz so the
+// results page can render its score/time/"Best of N attempts" immediately,
+// before the listAssignedQuizzes() fetch confirms it. Fields this page doesn't
+// read (title/description/dueDate/assignmentId) get harmless placeholders.
+type QuizResultsNavState = {
+  quizId?: number;
+  completion?: CompleteQuizAssignmentResult;
+};
+
+function seedCompletedQuizFromNav(state: unknown): AssignedQuiz | null {
+  const navState = (state ?? null) as QuizResultsNavState | null;
+  const completion = navState?.completion;
+  const quizId = navState?.quizId;
+  if (!completion || !completion.updated || typeof quizId !== "number") return null;
+
+  return {
+    assignmentId: -1,
+    quizId,
+    title: "",
+    description: null,
+    dueDate: null,
+    status: "completed",
+    passingScore: null,
+    score: completion.score,
+    timeTakenSeconds: completion.timeTakenSeconds,
+    completedAt: completion.completedAt,
+    attemptCount: completion.attemptCount ?? 0,
+  };
+}
+
 function QuizResultsPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const attempt = useMemo(() => loadQuizAttempt(), []);
   const [passingScore, setPassingScore] = useState(70);
   // The most-recently-completed assignment from the backend — the durable
   // source of truth for "did they finish, and how did they do". The local
   // `attempt` above only enriches the per-question review (the backend
   // doesn't store individual answers) and may be missing on another device.
-  const [completedQuiz, setCompletedQuiz] = useState<AssignedQuiz | null>(null);
+  //
+  // Seed it from the router state the quiz page hands us on submit (the record
+  // it just wrote), so score/time and especially "Best of N attempts" render on
+  // the FIRST paint instead of popping in a beat later once the fetch below
+  // resolves. Only the fields this page reads are known here; the rest are
+  // placeholders the listAssignedQuizzes() fetch fills in moments later.
+  const [completedQuiz, setCompletedQuiz] = useState<AssignedQuiz | null>(() =>
+    seedCompletedQuizFromNav(location.state)
+  );
   const [isLoadingResult, setIsLoadingResult] = useState(true);
   // Which review row's source document is open in the source modal.
   const [sourceModalRowId, setSourceModalRowId] = useState<number | null>(null);
@@ -92,7 +137,10 @@ function QuizResultsPage() {
             (a, b) =>
               new Date(b.completedAt!).getTime() - new Date(a.completedAt!).getTime()
           );
-        setCompletedQuiz(completed[0] ?? null);
+        // Don't let an empty/slow fetch clobber the record we seeded from the
+        // just-submitted quiz — only replace it when the fetch actually found
+        // a completed assignment (the durable, fully-populated version).
+        setCompletedQuiz((seeded) => completed[0] ?? seeded);
       })
       .catch(() => {
         /* leave null — falls back to the local attempt if present */
@@ -146,16 +194,28 @@ function QuizResultsPage() {
       })
     : [];
 
-  // Score comes from the backend when available (survives refresh / other
-  // devices); otherwise fall back to recomputing from the local attempt rows.
   const hasReviewRows = rows.length > 0;
-  const score =
-    typeof completedQuiz?.score === "number"
-      ? completedQuiz.score
-      : hasReviewRows
-        ? Math.round((rows.filter((row) => row.correct).length / rows.length) * 100)
-        : 0;
+  // The score of the attempt just taken, from the local answer breakdown. This
+  // drives the headline so the ring never contradicts the questions on screen
+  // (e.g. showing 100% after a 2/5 retake).
+  const thisAttemptScore = hasReviewRows
+    ? Math.round((rows.filter((row) => row.correct).length / rows.length) * 100)
+    : null;
+  // The best score on record (backend, "best-of-N" policy). Kept as a separate
+  // stat so a worse retake doesn't erase that they'd already aced it.
+  const bestScore =
+    typeof completedQuiz?.score === "number" ? completedQuiz.score : null;
+  // Headline reflects this attempt; fall back to the best score only when there
+  // is no local breakdown (e.g. viewing on another device / after cache clear).
+  const score = thisAttemptScore ?? bestScore ?? 0;
   const didPass = score >= effectivePassingScore;
+  // Whether they've cleared this quiz on any attempt — used so we don't nag
+  // someone to "retake to pass" when they've already passed on a better run.
+  const hasEverPassed = bestScore != null && bestScore >= effectivePassingScore;
+  // Show the best-of stat only when it actually beats this attempt (otherwise
+  // it's just a redundant restatement of the headline).
+  const showBestScore =
+    bestScore != null && thisAttemptScore != null && bestScore > thisAttemptScore;
 
   // The per-question correct/incorrect chips only make sense with the local
   // answer breakdown; without it we show the review as unavailable rather than
@@ -312,7 +372,9 @@ function QuizResultsPage() {
                 <p>
                   {didPass
                     ? "Great job! You've demonstrated a solid understanding of this topic."
-                    : "Review the questions you missed, then retake the quiz to pass."}
+                    : hasEverPassed
+                      ? "This attempt came in lower, but your best passing score is still on record."
+                      : "Review the questions you missed, then retake the quiz to pass."}
                 </p>
               </div>
             </div>
@@ -327,7 +389,7 @@ function QuizResultsPage() {
               <div className="score-ring" style={{ "--pct": `${score}%` } as CSSProperties}>
                 <div className="score-ring-center">
                   <strong>{score}%</strong>
-                  <span>Your Score</span>
+                  <span>{showBestScore ? "This Attempt" : "Your Score"}</span>
                 </div>
               </div>
               <div className="score-meta">
@@ -336,6 +398,9 @@ function QuizResultsPage() {
                   {didPass ? "Passed" : "Not yet"}
                 </span>
                 <p className="score-sub">Passing score: {effectivePassingScore}%</p>
+                {showBestScore ? (
+                  <p className="score-sub">Best score: {bestScore}%</p>
+                ) : null}
                 {completedQuiz && completedQuiz.attemptCount > 1 ? (
                   <p className="score-sub">
                     Best of {completedQuiz.attemptCount} attempts

@@ -127,16 +127,22 @@ function QuizTakingPage() {
     // Failure is still non-fatal — we navigate regardless so a network hiccup
     // never strands the learner away from their results (the local attempt
     // above still drives the immediate on-screen breakdown).
+    // Carries the just-saved backend record to the results page so it renders
+    // immediately (esp. attemptCount / "Best of N attempts", which has no local
+    // equivalent), instead of popping in a beat later after the page refetches.
+    let completion: Awaited<ReturnType<typeof completeQuizAssignment>> | null = null;
     if (quizId) {
       setIsSubmitting(true);
       try {
-        await completeQuizAssignment(quizId, score, timeTakenSeconds);
+        completion = await completeQuizAssignment(quizId, score, timeTakenSeconds);
       } catch {
         /* non-fatal — proceed to results anyway */
       }
     }
 
-    navigate("/quiz-results");
+    navigate("/quiz-results", {
+      state: completion ? { quizId, completion } : undefined,
+    });
   };
 
   // Countdown ticks only while there's a time limit and time remaining.

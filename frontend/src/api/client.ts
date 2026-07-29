@@ -313,19 +313,32 @@ export function listAssignedQuizzes(): Promise<AssignedQuiz[]> {
 }
 
 // Best-effort: marks the caller's own assignment for this quiz complete.
+export type CompleteQuizAssignmentResult = {
+  updated: boolean;
+  // The durable record after this completion, echoed back so the results page
+  // can show it on first paint instead of waiting for a follow-up refetch.
+  attemptCount: number | null;
+  score: number | null;
+  timeTakenSeconds: number | null;
+  completedAt: string | null;
+};
+
 export function completeQuizAssignment(
   quizId: number,
   score?: number,
   timeTakenSeconds?: number
-): Promise<{ updated: boolean }> {
+): Promise<CompleteQuizAssignmentResult> {
   const body: Record<string, number> = {};
   if (typeof score === "number") body.score = score;
   if (typeof timeTakenSeconds === "number") body.timeTakenSeconds = timeTakenSeconds;
 
-  return apiFetch<{ updated: boolean }>(`/api/quizzes/${quizId}/assignments/me/complete`, {
-    method: "POST",
-    body: JSON.stringify(body),
-  });
+  return apiFetch<CompleteQuizAssignmentResult>(
+    `/api/quizzes/${quizId}/assignments/me/complete`,
+    {
+      method: "POST",
+      body: JSON.stringify(body),
+    }
+  );
 }
 
 export type ManagerDashboardQuiz = {
