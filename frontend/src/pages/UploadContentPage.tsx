@@ -282,10 +282,9 @@ function UploadContentPage() {
       const { error: oauthError } = await supabase.auth.linkIdentity({
         provider: "github",
         options: {
-          // Come back to /login (which forwards a signed-in user on to their
-          // dashboard), not "/", the marketing landing page that has no
-          // session redirect and would strand the manager after linking.
-          redirectTo: `${window.location.origin}/login`,
+          // Return to Upload + Generate after linking so managers can continue
+          // importing from GitHub without being bounced to the dashboard.
+          redirectTo: `${window.location.origin}/upload-content`,
         },
       });
       if (oauthError) {
