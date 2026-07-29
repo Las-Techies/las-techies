@@ -19,8 +19,8 @@ function App() {
     <>
       <CursorGlow />
       <Routes>
-      <Route path="/" element={<LoginPage />} />
-      <Route path="/about" element={<AboutPage />} />
+      <Route path="/" element={<AboutPage />} />
+      <Route path="/login" element={<LoginPage />} />
       <Route path="/signup" element={<InviteSignupPage />} />
       <Route
         path="/home"

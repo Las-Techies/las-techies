@@ -74,7 +74,7 @@ function AppNav({ lockedNav = false }: { lockedNav?: boolean }) {
     requestNavigation(async () => {
       clearPreviewRole();
       await signOut();
-      navigate("/");
+      navigate("/login");
     });
   };
 

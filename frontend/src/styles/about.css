@@ -9,7 +9,7 @@
   --lp-navy: var(--sf-navy, #032d60);
   --lp-blue: var(--sf-blue, #0b5cab);
   --lp-ink: #26364f;
-  --lp-muted: #5c6b84;
+  --lp-muted: #3a4560;
   --lp-line: rgba(9, 40, 82, 0.12);
   --lp-card: rgba(255, 255, 255, 0.72);
   --lp-card-border: rgba(255, 255, 255, 0.85);
@@ -32,7 +32,7 @@
 
 /* ---------- shared bits ---------- */
 .lp-eyebrow {
-  font-size: 12px;
+  font-size: 13.5px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
   font-weight: 800;
@@ -48,7 +48,7 @@
   font-weight: 800;
 }
 .lp-lead {
-  font-size: clamp(15px, 1.6vw, 18px);
+  font-size: clamp(16.5px, 1.7vw, 19px);
   color: var(--lp-muted);
   max-width: 620px;
   line-height: 1.6;
@@ -127,7 +127,7 @@
 .lp-nav-links {
   display: flex;
   gap: 26px;
-  font-size: 14px;
+  font-size: 15.5px;
   font-weight: 600;
   color: var(--lp-muted);
 }
@@ -140,7 +140,7 @@
   padding: 4px 2px;
 }
 .lp-nav-links button:hover { color: var(--lp-blue); }
-.lp-nav .lp-btn { padding: 9px 18px; font-size: 14px; }
+.lp-nav .lp-btn { padding: 9px 18px; font-size: 15px; }
 
 @media (max-width: 780px) {
   .lp-nav-links { display: none; }
@@ -222,7 +222,7 @@
   flex-wrap: wrap;
 }
 .lp-trust-label {
-  font-size: 12px;
+  font-size: 13.5px;
   font-weight: 700;
   letter-spacing: 0.12em;
   color: var(--lp-muted);
@@ -233,7 +233,7 @@
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.6);
   border: 1px solid var(--lp-line);
-  font-size: 13px;
+  font-size: 14.5px;
   font-weight: 700;
   color: var(--lp-heading);
 }
@@ -265,7 +265,7 @@
   gap: 10px;
   align-items: flex-start;
   margin: 12px 0;
-  font-size: 15px;
+  font-size: 16.5px;
   color: var(--lp-ink);
   line-height: 1.5;
 }
@@ -297,9 +297,9 @@
 }
 .lp-step-num svg { width: 22px; height: 22px; }
 .lp-step h3 { margin: 0 0 8px; font-size: 18px; color: var(--lp-heading); }
-.lp-step p { margin: 0; color: var(--lp-muted); font-size: 14.5px; line-height: 1.55; }
+.lp-step p { margin: 0; color: var(--lp-muted); font-size: 16px; line-height: 1.55; }
 .lp-step-badge {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 800;
   color: var(--lp-blue);
   letter-spacing: 0.08em;
@@ -341,7 +341,7 @@
 }
 .lp-feat-ic svg { width: 24px; height: 24px; }
 .lp-feat h3 { margin: 0 0 8px; font-size: 17px; color: var(--lp-heading); }
-.lp-feat p { margin: 0; color: var(--lp-muted); font-size: 14px; line-height: 1.55; }
+.lp-feat p { margin: 0; color: var(--lp-muted); font-size: 15.5px; line-height: 1.55; }
 
 /* ===========================================================================
    STATS
@@ -361,7 +361,7 @@
   line-height: 1;
   font-variant-numeric: tabular-nums;
 }
-.lp-stat-lbl { margin-top: 8px; color: var(--lp-muted); font-size: 14px; font-weight: 600; }
+.lp-stat-lbl { margin-top: 8px; color: var(--lp-muted); font-size: 15.5px; font-weight: 600; }
 
 /* ===========================================================================
    PRODUCT PREVIEW
@@ -489,7 +489,7 @@
   margin-left: 2px;
 }
 .lp-flip-hint {
-  font-size: 13.5px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--lp-muted);
   margin: 0;
@@ -519,7 +519,23 @@
   gap: 28px;
   margin-top: 56px;
 }
-.lp-member { text-align: center; }
+.lp-member {
+  text-align: center;
+  /* lifted/scaled by the avatar-group hover via --shift / --scale-active */
+  transform: translateY(var(--shift, 0px)) scale(var(--scale-active, 1));
+  transition: transform var(--ui-hover-dur, 0.15s) var(--ui-hover-ease, ease);
+  align-self: start;
+}
+.lp-member-trigger {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+}
 .lp-avatar {
   width: 156px;
   height: 156px;
@@ -529,9 +545,62 @@
   box-shadow: 0 12px 30px rgba(9, 40, 82, 0.2);
   margin: 0 auto 16px;
   background: #eaf1fb;
+  transition: border-color var(--ui-hover-dur, 0.15s) var(--ui-hover-ease, ease),
+    box-shadow var(--ui-hover-dur, 0.15s) var(--ui-hover-ease, ease);
+}
+.lp-member.open .lp-avatar {
+  border-color: var(--lp-accent, #3b6fe0);
+  box-shadow: 0 16px 38px rgba(9, 40, 82, 0.28);
 }
 .lp-member h3 { margin: 0; font-size: 18px; color: var(--lp-heading); }
-.lp-member p { margin: 2px 0 0; font-size: 13px; color: var(--lp-muted); }
+
+/* bio accordion — grid-template-rows 0fr -> 1fr grows the panel open */
+.lp-member-bio {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition: grid-template-rows 0.36s cubic-bezier(0.2, 0.7, 0.2, 1),
+    opacity 0.28s ease;
+}
+.lp-member-bio[data-open="true"] {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+.lp-member-bio-inner {
+  overflow: hidden;
+  min-height: 0;
+}
+.lp-member-role {
+  margin: 12px 0 0;
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--lp-muted);
+}
+.lp-member-text {
+  margin: 8px 0 0;
+  font-size: 15.5px;
+  line-height: 1.5;
+  color: var(--lp-heading);
+}
+.lp-member-links {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  margin-top: 14px;
+}
+.lp-member-social {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--lp-accent, #3b6fe0);
+  text-decoration: none;
+  cursor: pointer;
+  transition: opacity var(--ui-hover-dur, 0.15s) var(--ui-hover-ease, ease);
+}
+.lp-member-social:hover { opacity: 0.72; }
+.lp-member-social svg { width: 16px; height: 16px; }
 
 /* ===========================================================================
    CTA
@@ -580,9 +649,9 @@
 }
 .lp-footer-brand { display: flex; align-items: center; gap: 10px; font-weight: 800; color: var(--lp-heading); font-size: 16px; }
 .lp-footer-brand img { width: 28px; height: 28px; }
-.lp-footer p { color: var(--lp-muted); font-size: 13.5px; line-height: 1.6; max-width: 260px; margin: 12px 0 0; }
-.lp-footer-col h4 { margin: 0 0 12px; font-size: 13px; color: var(--lp-heading); letter-spacing: 0.04em; }
-.lp-footer-col a { display: block; color: var(--lp-muted); font-size: 13.5px; text-decoration: none; margin: 8px 0; cursor: pointer; }
+.lp-footer p { color: var(--lp-muted); font-size: 15px; line-height: 1.6; max-width: 280px; margin: 12px 0 0; }
+.lp-footer-col h4 { margin: 0 0 12px; font-size: 14.5px; color: var(--lp-heading); letter-spacing: 0.04em; }
+.lp-footer-col a { display: block; color: var(--lp-muted); font-size: 15px; text-decoration: none; margin: 8px 0; cursor: pointer; }
 .lp-footer-col a:hover { color: var(--lp-blue); }
 
 /* ===========================================================================

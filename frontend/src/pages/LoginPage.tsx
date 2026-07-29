@@ -5,6 +5,7 @@ import { useAuth } from "../context/AuthContext";
 import { apiFetch } from "../api/client";
 import { supabase } from "../lib/supabaseClient";
 import {
+  ArrowLeft,
   ChevronRight,
   EyeIcon,
   EyeOffIcon,
@@ -466,10 +467,10 @@ function LoginPage() {
 
       <button
         type="button"
-        className="creators-fab"
-        onClick={() => navigate("/meet-our-team")}
+        className="home-fab"
+        onClick={() => navigate("/")}
       >
-        <PeopleIcon aria-hidden /> Meet our creators
+        <ArrowLeft aria-hidden /> Back to home
       </button>
     </main>
   );

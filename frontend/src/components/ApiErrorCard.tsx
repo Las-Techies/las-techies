@@ -30,7 +30,7 @@ function ApiErrorCard({ error, onRetry }: ApiErrorCardProps) {
         <p className="sf-error-detail">{error.detail}</p>
         <p className="sf-error-technical">{error.technical}</p>
         {error.action === "signin" ? (
-          <button type="button" className="sf-btn sf-btn-sm" onClick={() => navigate("/")}>
+          <button type="button" className="sf-btn sf-btn-sm" onClick={() => navigate("/login")}>
             Sign in
           </button>
         ) : (

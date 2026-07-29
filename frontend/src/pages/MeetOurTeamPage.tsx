@@ -71,7 +71,7 @@ function MeetOurTeamPage() {
   return (
     <div className="app-shell">
       <div className="team-topbar">
-        <button type="button" className="back-btn" onClick={() => navigate("/")}>
+        <button type="button" className="back-btn" onClick={() => navigate("/login")}>
           <ArrowLeft /> Back to login
         </button>
       </div>
