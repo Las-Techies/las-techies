@@ -562,8 +562,8 @@ label {
   text-decoration: underline;
 }
 
-/* Floating "Meet our creators" button (bottom-left of the login page) */
-.creators-fab {
+/* Floating "Back to home" button (bottom-left of the login page) */
+.home-fab {
   position: fixed;
   left: 20px;
   bottom: 18px;
@@ -587,12 +587,12 @@ label {
   transition: background var(--ui-hover-dur) var(--ui-hover-ease), transform var(--ui-hover-dur) var(--ui-hover-ease);
 }
 
-.creators-fab:hover {
+.home-fab:hover {
   background: rgba(255, 255, 255, 0.36);
   transform: translateY(-2px);
 }
 
-.creators-fab svg {
+.home-fab svg {
   width: 20px;
   height: 20px;
 }

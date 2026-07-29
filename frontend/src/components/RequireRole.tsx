@@ -15,7 +15,7 @@ function RequireRole({ role, children }: RequireRoleProps) {
   const { user, loading } = useAuth();
 
   if (loading) return null;
-  if (!user) return <Navigate to="/" replace />;
+  if (!user) return <Navigate to="/login" replace />;
 
   const effectiveRole =
     (user.user_metadata?.role as string | undefined) ?? getPreviewRole() ?? "new_hire";
