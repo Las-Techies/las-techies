@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import AppNav from "../components/navigation/AppNav";
 import WizardSteps from "../components/navigation/WizardSteps";
 import { apiFetch, assignQuiz, listTeamMembers, type TeamMember } from "../api/client";
+import { findHighlightSpan } from "../features/quiz/citationMatch";
 import { loadQuizConfig } from "../features/quiz/storage";
 import {
   DEFAULT_QUIZ_CONFIG,
@@ -275,10 +276,14 @@ function ReviewPublishPage() {
     const normalizedSnippet = snippet?.trim() ?? "";
     if (!normalizedSnippet) return normalizedSource;
 
-    const start = normalizedSource.indexOf(normalizedSnippet);
-    if (start === -1) return normalizedSource;
+    // Fuzzy match (shared with the quiz-results review): tolerates whitespace,
+    // smart-quote, and paraphrase drift so a snippet that isn't a verbatim
+    // substring still highlights its closest passage instead of nothing.
+    const span = findHighlightSpan(normalizedSource, normalizedSnippet);
+    if (!span) return normalizedSource;
 
-    const end = start + normalizedSnippet.length;
+    const start = span.start;
+    const end = span.end;
     const before = normalizedSource.slice(0, start);
     const match = normalizedSource.slice(start, end);
     const after = normalizedSource.slice(end);
