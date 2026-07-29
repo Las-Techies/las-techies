@@ -5848,21 +5848,21 @@ main.mgr-page > section.dropzone > input.sr-only {
 .rp-cite-btn {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 10px;
   margin-left: auto;
-  padding: 5px 12px;
+  padding: 11px 22px;
   border-radius: 999px;
   border: 1px solid #bfdcfa;
   background: #eaf3ff;
   color: #0b5cab;
-  font-size: 12px;
+  font-size: 16px;
   font-weight: 700;
   cursor: pointer;
 }
 
 .rp-cite-btn svg {
-  width: 13px;
-  height: 13px;
+  width: 18px;
+  height: 18px;
 }
 
 .rp-cite-btn:hover {
