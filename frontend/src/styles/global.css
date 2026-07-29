@@ -857,6 +857,13 @@ label {
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
+  /* Lift the nav (and its user dropdown) above later-in-DOM page content.
+     The backdrop-filter above makes .app-nav its own stacking context; without
+     a z-index it sits at level 0, so positioned page content like the results
+     page's confetti/hero overlay paints on top and swallows clicks on the
+     "Log out" menu. */
+  position: relative;
+  z-index: 50;
 }
 
 .brand {
