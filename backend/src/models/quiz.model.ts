@@ -149,17 +149,30 @@ export async function findAssignedQuizzesForUser(userId: number) {
 //
 // Returns `{ count }` (0 when no assignment row exists) so callers can stay
 // best-effort, same as before.
+export type MarkAssignmentCompleteResult = {
+  count: number;
+  // The assignment's durable record after this completion, so the caller can
+  // relay it straight back to the client (chiefly attemptCount, which has no
+  // browser-local equivalent and would otherwise only appear after a refetch).
+  attemptCount: number | null;
+  score: number | null;
+  timeTakenSeconds: number | null;
+  completedAt: Date | null;
+};
+
 export async function markAssignmentComplete(
   quizId: number,
   userId: number,
   score?: number,
   timeTakenSeconds?: number
-): Promise<{ count: number }> {
+): Promise<MarkAssignmentCompleteResult> {
   return prisma.$transaction(async (tx) => {
     const existing = await tx.quizAssignment.findUnique({
       where: { quizId_assignedToUserId: { quizId, assignedToUserId: userId } },
     });
-    if (!existing) return { count: 0 };
+    if (!existing) {
+      return { count: 0, attemptCount: null, score: null, timeTakenSeconds: null, completedAt: null };
+    }
 
     // Keep the best score. A new score wins only when it's strictly higher than
     // what's on record (or nothing is on record yet). When it wins, the time
@@ -168,7 +181,7 @@ export async function markAssignmentComplete(
       typeof score === "number" &&
       (existing.score == null || score > existing.score);
 
-    await tx.quizAssignment.update({
+    const updated = await tx.quizAssignment.update({
       where: { id: existing.id },
       data: {
         status: "completed",
@@ -181,7 +194,13 @@ export async function markAssignmentComplete(
       },
     });
 
-    return { count: 1 };
+    return {
+      count: 1,
+      attemptCount: updated.attemptCount,
+      score: updated.score,
+      timeTakenSeconds: updated.timeTakenSeconds,
+      completedAt: updated.completedAt,
+    };
   });
 }
 

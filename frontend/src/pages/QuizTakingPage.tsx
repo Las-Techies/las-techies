@@ -35,6 +35,10 @@ function QuizTakingPage() {
   const [timeLimitMinutes, setTimeLimitMinutes] = useState<number | null>(null);
   const [hasTimeLimit, setHasTimeLimit] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState(0);
+  // True while the final submit is saving to the backend before we navigate to
+  // results — drives the "Submitting…" button state so the short await doesn't
+  // look like a dead click.
+  const [isSubmitting, setIsSubmitting] = useState(false);
   // Guards against the auto-submit-on-timeout effect firing more than once.
   const hasSubmittedRef = useRef(false);
   // Set once the quiz's real questions are actually on screen (not on mount —
@@ -89,7 +93,7 @@ function QuizTakingPage() {
     setQuizInProgress(true);
   };
 
-  const submitQuiz = () => {
+  const submitQuiz = async () => {
     if (hasSubmittedRef.current) return;
     hasSubmittedRef.current = true;
     // Attempt is finishing — release the navigation guard before routing to
@@ -115,18 +119,30 @@ function QuizTakingPage() {
       answers,
     });
 
-    // Best-effort: marks this new hire's assignment complete (and records
-    // their score/time) so it drops off their "to do" list and a manager can
-    // see real results instead of a blank/null row. Never blocks navigating
-    // to results — a failure here shouldn't stop the learner from seeing how
-    // they did.
+    // Mark this new hire's assignment complete (recording their score/time)
+    // BEFORE navigating. The results page reads the backend's completed-quiz
+    // list as its source of truth, so if we navigated first (fire-and-forget)
+    // that fetch could race ahead of this write and briefly show the PREVIOUS
+    // quiz's result until a manual refresh. Awaiting closes that race.
+    // Failure is still non-fatal — we navigate regardless so a network hiccup
+    // never strands the learner away from their results (the local attempt
+    // above still drives the immediate on-screen breakdown).
+    // Carries the just-saved backend record to the results page so it renders
+    // immediately (esp. attemptCount / "Best of N attempts", which has no local
+    // equivalent), instead of popping in a beat later after the page refetches.
+    let completion: Awaited<ReturnType<typeof completeQuizAssignment>> | null = null;
     if (quizId) {
-      void completeQuizAssignment(quizId, score, timeTakenSeconds).catch(() => {
-        /* non-fatal */
-      });
+      setIsSubmitting(true);
+      try {
+        completion = await completeQuizAssignment(quizId, score, timeTakenSeconds);
+      } catch {
+        /* non-fatal — proceed to results anyway */
+      }
     }
 
-    navigate("/quiz-results");
+    navigate("/quiz-results", {
+      state: completion ? { quizId, completion } : undefined,
+    });
   };
 
   // Countdown ticks only while there's a time limit and time remaining.
@@ -141,7 +157,7 @@ function QuizTakingPage() {
   // When the clock hits zero, the quiz auto-submits.
   useEffect(() => {
     if (hasTimeLimit && secondsLeft === 0 && !isLoading && questions.length > 0) {
-      submitQuiz();
+      void submitQuiz();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasTimeLimit, secondsLeft, isLoading, questions.length]);
@@ -173,7 +189,7 @@ function QuizTakingPage() {
 
   const goNext = () => {
     if (isLast) {
-      submitQuiz();
+      void submitQuiz();
       return;
     }
     setCurrent((index) => Math.min(index + 1, total - 1));
@@ -309,8 +325,13 @@ function QuizTakingPage() {
                 ))}
               </div>
 
-              <button className="sf-btn" type="button" onClick={goNext}>
-                {isLast ? "Submit" : "Next"} <ArrowRight />
+              <button
+                className="sf-btn"
+                type="button"
+                onClick={goNext}
+                disabled={isSubmitting}
+              >
+                {isLast ? (isSubmitting ? "Submitting…" : "Submit") : "Next"} <ArrowRight />
               </button>
             </div>
           </section>
