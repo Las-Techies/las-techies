@@ -230,12 +230,9 @@ function ReviewPublishPage() {
         return;
       }
 
-      // Published cleanly — reset the workflow and head back to the start so
-      // the manager can build a brand-new quiz. The just-published quiz stays
-      // saved server-side; the resume-latest logic simply skips published
-      // quizzes, so Upload/Configure begin fresh.
+      // Published cleanly — close the modal and head to the manager dashboard.
       setIsPublishModalOpen(false);
-      navigate("/upload-content");
+      navigate("/manager-dashboard");
     } catch (err) {
       setPublishError(
         err instanceof Error ? err.message : "Failed to publish quiz. Please try again."

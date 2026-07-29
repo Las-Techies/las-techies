@@ -605,10 +605,16 @@ function average(values: number[]): number | null {
 export async function getManagerDashboard(req: Request, res: Response, next: NextFunction) {
   try {
     const user = (req as any).user;
-    const [{ quizzes, joinedAssignments }, learners] = await Promise.all([
+    if (!user?.teamId) {
+      return res.status(401).json({ error: { message: "Unauthorized" } });
+    }
+
+    const [teamQuizData, learners] = await Promise.all([
       findTeamQuizzesWithAssignments(user.teamId),
       findTeamMembersByRole(user.teamId, "new_hire"),
     ]);
+    const quizzes = teamQuizData?.quizzes ?? [];
+    const joinedAssignments = teamQuizData?.joinedAssignments ?? [];
 
     const quizSummaries = quizzes.map((quiz) => {
       const forThisQuiz = joinedAssignments

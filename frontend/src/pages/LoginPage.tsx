@@ -19,7 +19,7 @@ import {
 type Mode = "login" | "signup";
 
 function routeForRole(role: string | undefined): string {
-  return role === "manager" ? "/upload-content" : "/home";
+  return role === "manager" ? "/manager-dashboard" : "/home";
 }
 
 function LoginPage() {

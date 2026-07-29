@@ -9,8 +9,8 @@ type RequireRoleProps = {
 };
 
 // Mirrors AppNav's effective-role logic so the guard and the nav never
-// disagree about who counts as a manager. Managers land back on their
-// upload flow, new hires on their home page, matching LoginPage's redirect.
+// disagree about who counts as a manager. Managers land on their dashboard,
+// new hires on their home page, matching LoginPage's redirect.
 function RequireRole({ role, children }: RequireRoleProps) {
   const { user, loading } = useAuth();
 
@@ -21,7 +21,7 @@ function RequireRole({ role, children }: RequireRoleProps) {
     (user.user_metadata?.role as string | undefined) ?? getPreviewRole() ?? "new_hire";
 
   if (effectiveRole !== role) {
-    return <Navigate to={effectiveRole === "manager" ? "/upload-content" : "/home"} replace />;
+    return <Navigate to={effectiveRole === "manager" ? "/manager-dashboard" : "/home"} replace />;
   }
 
   return <>{children}</>;
