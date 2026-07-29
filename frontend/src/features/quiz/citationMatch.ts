@@ -78,11 +78,22 @@ function sentenceSpans(sourceText: string): Array<{ text: string; start: number;
 // sentence lines up. Kept small so the highlight stays tight and readable.
 const MAX_WINDOW_SENTENCES = 4;
 
-// Absolute floor for the "always highlight" behavior: below this the two texts
-// share almost nothing, so any highlight would point at an unrelated passage.
-// We still return null in that case rather than mislead the learner.
-const MIN_HIGHLIGHT_SCORE = 0.12;
+// Returns the span of the first run of real (non-whitespace) text, used as a
+// last-resort highlight so we still point *somewhere* sensible when there are
+// no parseable sentences to score against (e.g. source is one long blob).
+function firstContentSpan(sourceText: string): HighlightSpan | null {
+  const match = /\S[\s\S]*?(?=\n|$)/.exec(sourceText);
+  if (!match) return null;
+  const start = match.index;
+  const end = Math.min(start + match[0].trimEnd().length, sourceText.length);
+  if (end <= start) return null;
+  return { start, end, matchType: "fuzzy" };
+}
 
+// Always resolves to a highlight span whenever there's any source text and a
+// snippet to place — the goal is to always show *where* an answer came from,
+// so a weak-but-best match is preferable to no highlight at all. Only returns
+// null when there's genuinely nothing to highlight (empty source or snippet).
 export function findHighlightSpan(sourceText: string, snippet: string | undefined | null): HighlightSpan | null {
   const trimmedSnippet = snippet?.trim() ?? "";
   if (!trimmedSnippet || !sourceText) return null;
@@ -94,7 +105,9 @@ export function findHighlightSpan(sourceText: string, snippet: string | undefine
   }
 
   const normalizedSnippet = normalize(trimmedSnippet);
-  if (!normalizedSnippet) return null;
+  // Snippet is all punctuation/whitespace — nothing meaningful to score, but we
+  // still highlight the first real passage so the reader isn't left with nothing.
+  if (!normalizedSnippet) return firstContentSpan(sourceText);
 
   // Score every window of 1..MAX_WINDOW_SENTENCES consecutive sentences and
   // keep the best one. Windowing is what lets a paraphrase that draws from a
@@ -114,9 +127,9 @@ export function findHighlightSpan(sourceText: string, snippet: string | undefine
     }
   }
 
-  // Since the goal is to always show where the answer came from, return the
-  // best passage found rather than giving up — unless overlap is negligible,
-  // where a highlight would be misleading.
-  if (!best || best.score < MIN_HIGHLIGHT_SCORE) return null;
+  // Always return the best passage found — showing the closest match is more
+  // useful than showing nothing. If the source had no parseable sentences to
+  // score (best is null), fall back to the first real content run.
+  if (!best) return firstContentSpan(sourceText);
   return { start: best.start, end: best.end, matchType: "fuzzy" };
 }
