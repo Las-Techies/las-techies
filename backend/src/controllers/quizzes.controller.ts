@@ -613,6 +613,8 @@ export async function getManagerDashboard(req: Request, res: Response, next: Nex
       findTeamQuizzesWithAssignments(user.teamId),
       findTeamMembersByRole(user.teamId, "new_hire"),
     ]);
+    const quizzes = teamQuizData?.quizzes ?? [];
+    const joinedAssignments = teamQuizData?.joinedAssignments ?? [];
 
     const quizSummaries = quizzes.map((quiz) => {
       const forThisQuiz = joinedAssignments
