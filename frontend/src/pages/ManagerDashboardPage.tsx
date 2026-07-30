@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import AppNav from "../components/navigation/AppNav";
 import {
   apiFetch,
@@ -9,7 +10,7 @@ import {
   type ManagerDashboardQuiz,
   type TeamMember,
 } from "../api/client";
-import { describeError, type FriendlyError } from "../api/errors";
+import { describeError } from "../api/errors";
 import ApiErrorCard from "../components/ApiErrorCard";
 import {
   CalendarIcon,
@@ -67,15 +68,10 @@ function getAssignmentStatusDisplay(assignment: {
 }
 
 function ManagerDashboardPage() {
-  const [data, setData] = useState<ManagerDashboardData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [loadError, setLoadError] = useState<FriendlyError | null>(null);
   const [selectedQuiz, setSelectedQuiz] = useState<GeneratedQuiz | null>(null);
   const [isQuizModalOpen, setIsQuizModalOpen] = useState(false);
   const [isQuizModalLoading, setIsQuizModalLoading] = useState(false);
   const [quizModalError, setQuizModalError] = useState("");
-  // Bumped by the Try again button to re-run the loader effect.
-  const [reloadKey, setReloadKey] = useState(0);
 
   // "Add users" modal: assign an already-published quiz to more learners (or
   // invite brand-new ones by email). `assignTarget` is the quiz being assigned.
@@ -95,24 +91,13 @@ function ManagerDashboardPage() {
   const [isAssigning, setIsAssigning] = useState(false);
   const [assignError, setAssignError] = useState("");
 
-  useEffect(() => {
-    let cancelled = false;
-    setIsLoading(true);
-    setLoadError(null);
-    getManagerDashboard()
-      .then((result) => {
-        if (!cancelled) setData(result);
-      })
-      .catch((err) => {
-        if (!cancelled) setLoadError(describeError(err));
-      })
-      .finally(() => {
-        if (!cancelled) setIsLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [reloadKey]);
+  const dashboardQuery = useQuery<ManagerDashboardData>({
+    queryKey: ["manager-dashboard"],
+    queryFn: getManagerDashboard,
+  });
+  const data = dashboardQuery.data ?? null;
+  const isLoading = dashboardQuery.isLoading;
+  const loadError = dashboardQuery.error ? describeError(dashboardQuery.error) : null;
 
   const stats = useMemo(() => {
     if (!data) return null;
@@ -254,13 +239,13 @@ function ManagerDashboardPage() {
         }
         setAssignError(`${parts.join(" and ")}. Please try again.`);
         // Refresh so any assignments that DID succeed are reflected.
-        setReloadKey((k) => k + 1);
+        void dashboardQuery.refetch();
         return;
       }
 
       // Clean success — close and refresh the dashboard counts.
       setIsAssignModalOpen(false);
-      setReloadKey((k) => k + 1);
+      void dashboardQuery.refetch();
     } finally {
       setIsAssigning(false);
     }
@@ -285,7 +270,7 @@ function ManagerDashboardPage() {
           </section>
         ) : loadError ? (
           <section className="glass dash-card">
-            <ApiErrorCard error={loadError} onRetry={() => setReloadKey((k) => k + 1)} />
+            <ApiErrorCard error={loadError} onRetry={() => void dashboardQuery.refetch()} />
           </section>
         ) : !data ? (
           <section className="glass dash-card">
