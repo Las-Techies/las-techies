@@ -6578,11 +6578,12 @@ main.mgr-page > section.dropzone > input.sr-only {
 
 .dash-assignment-meta {
   flex: none;
-  width: 70px;
+  width: auto;
   color: #5c6b82;
   display: flex;
   align-items: center;
   gap: 4px;
+  white-space: nowrap;
 }
 
 .dash-assignment-meta svg {
