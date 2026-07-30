@@ -659,7 +659,7 @@ function UploadContentPage() {
             () =>
               reject(
                 new Error(
-                  "Google sign-in timed out. Please try again and complete the account chooser."
+                  "Google sign-in timed out. Please click again and finish choosing your Google account in the window that opens."
                 )
               ),
             90000
