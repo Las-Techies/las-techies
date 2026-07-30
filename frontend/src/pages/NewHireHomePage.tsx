@@ -15,6 +15,8 @@ import {
   ClipboardIcon,
   PersonIcon,
   QuizIcon,
+  RefreshIcon,
+  XCircleIcon,
 } from "../components/icons";
 
 const formatDue = (iso: string | null): string => {
@@ -24,7 +26,7 @@ const formatDue = (iso: string | null): string => {
   return date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 };
 
-type StepStatus = "done" | "current" | "upcoming";
+type StepStatus = "done" | "current" | "upcoming" | "failed";
 type QuizStep = {
   quizId: number;
   title: string;
@@ -32,6 +34,16 @@ type QuizStep = {
   statusLabel: string;
   date: string;
 };
+
+const hasPassed = (a: AssignedQuiz) =>
+  a.status === "completed" &&
+  (a.passingScore == null || a.score == null || a.score >= a.passingScore);
+
+const hasFailed = (a: AssignedQuiz) =>
+  a.status === "completed" &&
+  a.passingScore != null &&
+  a.score != null &&
+  a.score < a.passingScore;
 
 function NewHireHomePage() {
   const navigate = useNavigate();
@@ -81,26 +93,27 @@ function NewHireHomePage() {
     };
   }, []);
 
-  // The "current" quiz is the soonest still-pending one (list is pre-sorted).
+  // The "current" quiz is the soonest still-pending or failed one (list is pre-sorted).
   const current = useMemo(
-    () => assignments.find((a) => a.status !== "completed") ?? assignments[0] ?? null,
+    () => assignments.find((a) => a.status !== "completed" || hasFailed(a)) ?? assignments[0] ?? null,
     [assignments]
   );
 
   const steps: QuizStep[] = useMemo(() => {
     const currentId = current?.assignmentId;
     return assignments.map((a) => {
-      const isDone = a.status === "completed";
-      const isCurrent = !isDone && a.assignmentId === currentId;
-      const status: StepStatus = isDone ? "done" : isCurrent ? "current" : "upcoming";
-      const statusLabel = isDone ? "Completed" : isCurrent ? "In Progress" : "Upcoming";
+      const failed = hasFailed(a);
+      const passed = hasPassed(a);
+      const isCurrent = !passed && !failed && a.assignmentId === currentId;
+      const status: StepStatus = passed ? "done" : failed ? "failed" : isCurrent ? "current" : "upcoming";
+      const statusLabel = passed ? "Completed" : failed ? "Completed · Not Passed" : isCurrent ? "In Progress" : "Upcoming";
       const due = formatDue(a.dueDate);
-      const date = isDone ? "Completed" : a.dueDate ? `Due ${due}` : "No due date";
+      const date = passed ? "Completed" : a.dueDate ? `Due ${due}` : "No due date";
       return { quizId: a.quizId, title: a.title, status, statusLabel, date };
     });
   }, [assignments, current]);
 
-  const pendingCount = assignments.filter((a) => a.status !== "completed").length;
+  const pendingCount = assignments.filter((a) => a.status !== "completed" || hasFailed(a)).length;
 
   return (
     <div className="app-shell">
@@ -154,13 +167,13 @@ function NewHireHomePage() {
 
             <button
               type="button"
-              className="sf-btn sf-btn-block"
-              disabled={!current || current.status === "completed"}
+              className={`sf-btn sf-btn-block${current && hasFailed(current) ? " sf-btn-retake" : ""}`}
+              disabled={!current || hasPassed(current)}
               onClick={() =>
                 current && navigate(`/learner-module?quizId=${current.quizId}`)
               }
             >
-              {current?.status === "completed" ? "Completed" : "Get Started"}{" "}
+              {current && hasPassed(current) ? "Completed" : current && hasFailed(current) ? "Retake Quiz" : "Get Started"}
               <ArrowRight aria-hidden />
             </button>
           </section>
@@ -210,12 +223,19 @@ function NewHireHomePage() {
                   >
                     <span className="nh-step-icon">
                       {step.status === "done" ? <CheckIcon aria-hidden /> : null}
+                      {step.status === "failed" ? <XCircleIcon aria-hidden /> : null}
                     </span>
                     <div className="nh-step-main">
                       <strong>{step.title}</strong>
                       <span>{step.statusLabel}</span>
                     </div>
-                    <span className="nh-step-date">{step.date}</span>
+                    {step.status === "failed" ? (
+                      <span className="nh-step-retake">
+                        <RefreshIcon aria-hidden /> Retake
+                      </span>
+                    ) : (
+                      <span className="nh-step-date">{step.date}</span>
+                    )}
                     <ChevronRight className="nh-step-chevron" aria-hidden />
                   </li>
                 ))}
