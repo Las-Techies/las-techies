@@ -30,7 +30,7 @@ type AuthContextValue = {
   ) => Promise<Session | null>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
-  signInWithGoogle: () => Promise<void>;
+  signInWithGoogle: (redirectTo?: string) => Promise<void>;
   setRole: (role: UserRole) => Promise<void>;
 };
 
@@ -132,7 +132,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Redirects to Google; Supabase bounces the user back to redirectTo with a
   // session already established. Google doesn't know about "manager" vs
   // "new hire", so role starts unset — LoginPage prompts for it afterward.
-  async function signInWithGoogle(): Promise<void> {
+  async function signInWithGoogle(redirectTo?: string): Promise<void> {
     // Tell the post-redirect handler that the provider_token it's about to see
     // is Google's, not a linked GitHub identity's.
     markPendingOAuthProvider("google");
@@ -142,7 +142,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Bounce back to /login (which forwards a signed-in user on to their
         // dashboard) rather than "/", the marketing landing page that has no
         // such redirect and would otherwise strand the user after auth.
-        redirectTo: `${window.location.origin}/login`,
+        redirectTo: redirectTo ?? `${window.location.origin}/login`,
         scopes: "openid email profile",
       },
     });
