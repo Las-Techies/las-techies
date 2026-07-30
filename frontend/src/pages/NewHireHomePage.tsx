@@ -106,7 +106,7 @@ function NewHireHomePage() {
       const passed = hasPassed(a);
       const isCurrent = !passed && !failed && a.assignmentId === currentId;
       const status: StepStatus = passed ? "done" : failed ? "failed" : isCurrent ? "current" : "upcoming";
-      const statusLabel = passed ? "Completed" : failed ? "Not Passed" : isCurrent ? "In Progress" : "Upcoming";
+      const statusLabel = passed ? "Completed" : failed ? "Completed · Not Passed" : isCurrent ? "In Progress" : "Upcoming";
       const due = formatDue(a.dueDate);
       const date = passed ? "Completed" : a.dueDate ? `Due ${due}` : "No due date";
       return { quizId: a.quizId, title: a.title, status, statusLabel, date };
@@ -167,13 +167,13 @@ function NewHireHomePage() {
 
             <button
               type="button"
-              className="sf-btn sf-btn-block"
+              className={`sf-btn sf-btn-block${current && hasFailed(current) ? " sf-btn-retake" : ""}`}
               disabled={!current || hasPassed(current)}
               onClick={() =>
                 current && navigate(`/learner-module?quizId=${current.quizId}`)
               }
             >
-              {hasPassed(current!) ? "Completed" : hasFailed(current!) ? "Retake Quiz" : "Get Started"}{" "}
+              {hasPassed(current!) ? "Completed" : hasFailed(current!) ? "Retake Quiz" : "Get Started"}
               <ArrowRight aria-hidden />
             </button>
           </section>

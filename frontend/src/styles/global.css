@@ -2324,6 +2324,15 @@ main.mgr-page > section.dropzone > input.sr-only {
   margin-top: 22px;
 }
 
+.nh-assigned .sf-btn-retake {
+  background: #c0392b;
+  border-color: #a93226;
+}
+
+.nh-assigned .sf-btn-retake:hover {
+  background: #a93226;
+}
+
 /* Journey timeline card */
 .nh-timeline {
   list-style: none;
