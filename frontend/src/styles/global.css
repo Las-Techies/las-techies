@@ -6734,6 +6734,83 @@ main.mgr-page > section.dropzone > input.sr-only {
   background: rgba(227, 248, 236, 0.8);
 }
 
+/* "Add users" action button on published Past Quizzes rows. */
+.dash-actions-col {
+  width: 44px;
+}
+
+.dash-actions-cell {
+  text-align: right;
+}
+
+.dash-assign-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  border: 1px solid rgba(11, 42, 84, 0.12);
+  background: rgba(255, 255, 255, 0.75);
+  color: var(--sf-navy);
+  cursor: pointer;
+  transition: border-color var(--ui-hover-dur) var(--ui-hover-ease),
+    background var(--ui-hover-dur) var(--ui-hover-ease),
+    color var(--ui-hover-dur) var(--ui-hover-ease);
+}
+
+.dash-assign-btn:hover {
+  border-color: var(--sf-blue);
+  background: #fff;
+  color: var(--sf-blue);
+}
+
+.dash-assign-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* "Add users" modal — narrower than the quiz-detail modal. */
+.dash-assign-modal {
+  width: min(560px, 94vw);
+  max-width: none;
+}
+
+/* An already-assigned learner: checked, disabled, visually de-emphasized. */
+.learner-roster-item.is-assigned {
+  cursor: default;
+  opacity: 0.7;
+  background: rgba(240, 244, 250, 0.7);
+}
+
+.learner-roster-item.is-assigned:hover {
+  border-color: rgba(11, 42, 84, 0.1);
+  background: rgba(240, 244, 250, 0.7);
+}
+
+.learner-roster-item.is-assigned input {
+  cursor: default;
+}
+
+.learner-assigned-tag {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #4a7d54;
+  background: rgba(227, 248, 236, 0.9);
+  border-radius: 999px;
+  padding: 3px 9px;
+}
+
+.dash-assign-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 18px;
+}
+
 @media (max-width: 900px) {
   .dash-stats {
     grid-template-columns: repeat(2, 1fr);

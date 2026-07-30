@@ -1,9 +1,24 @@
 import { useEffect, useMemo, useState } from "react";
 import AppNav from "../components/navigation/AppNav";
-import { apiFetch, getManagerDashboard, type ManagerDashboardData } from "../api/client";
+import {
+  apiFetch,
+  assignQuiz,
+  getManagerDashboard,
+  listTeamMembers,
+  type ManagerDashboardData,
+  type ManagerDashboardQuiz,
+  type TeamMember,
+} from "../api/client";
 import { describeError, type FriendlyError } from "../api/errors";
 import ApiErrorCard from "../components/ApiErrorCard";
-import { CalendarIcon, ChartBarIcon, CheckCircleIcon, ClipboardIcon, PeopleIcon } from "../components/icons";
+import {
+  CalendarIcon,
+  ChartBarIcon,
+  CheckCircleIcon,
+  ClipboardIcon,
+  PeopleIcon,
+  UserPlusIcon,
+} from "../components/icons";
 import type { GeneratedQuiz } from "../features/quiz/types";
 import { useLastNonNull, useModalTransition } from "../hooks/useModalTransition";
 
@@ -61,6 +76,24 @@ function ManagerDashboardPage() {
   const [quizModalError, setQuizModalError] = useState("");
   // Bumped by the Try again button to re-run the loader effect.
   const [reloadKey, setReloadKey] = useState(0);
+
+  // "Add users" modal: assign an already-published quiz to more learners (or
+  // invite brand-new ones by email). `assignTarget` is the quiz being assigned.
+  const [assignTarget, setAssignTarget] = useState<ManagerDashboardQuiz | null>(null);
+  const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
+  // Team roster is loaded lazily the first time the modal opens, then cached.
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
+  const [isLoadingMembers, setIsLoadingMembers] = useState(false);
+  const [membersError, setMembersError] = useState("");
+  const [hasLoadedMembers, setHasLoadedMembers] = useState(false);
+  // Team members newly ticked in the picker (already-assigned ones render
+  // checked-and-disabled and are never in here).
+  const [selectedLearnerIds, setSelectedLearnerIds] = useState<number[]>([]);
+  // Free-text email invites for people not yet on the team.
+  const [selectedLearners, setSelectedLearners] = useState<string[]>([]);
+  const [learnerEmail, setLearnerEmail] = useState("");
+  const [isAssigning, setIsAssigning] = useState(false);
+  const [assignError, setAssignError] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -121,6 +154,119 @@ function ManagerDashboardPage() {
   }
 
   const quizToShow = selectedQuiz ?? frozenSelectedQuiz;
+
+  const assignModal = useModalTransition(isAssignModalOpen);
+  const frozenAssignTarget = useLastNonNull(assignTarget);
+  const assignQuizToShow = assignTarget ?? frozenAssignTarget;
+
+  // Which team members are ALREADY assigned to the quiz being added to, derived
+  // from the dashboard's per-learner assignment data (no extra fetch). These
+  // render checked-and-disabled so the manager only adds new people. Matching
+  // is by email because dashboard learners and team-member rows are different
+  // shapes but share the email as a stable key.
+  const alreadyAssignedEmails = useMemo(() => {
+    if (!data || !assignQuizToShow) return new Set<string>();
+    const emails = data.learners
+      .filter((learner) =>
+        learner.assignments.some((assignment) => assignment.quizId === assignQuizToShow.id)
+      )
+      .map((learner) => learner.email.toLowerCase());
+    return new Set(emails);
+  }, [data, assignQuizToShow]);
+
+  function openAssignModal(quiz: ManagerDashboardQuiz) {
+    setAssignTarget(quiz);
+    setIsAssignModalOpen(true);
+    setAssignError("");
+    setSelectedLearnerIds([]);
+    setSelectedLearners([]);
+    setLearnerEmail("");
+
+    // Load the roster once, then reuse it for subsequent opens.
+    if (hasLoadedMembers) return;
+    setIsLoadingMembers(true);
+    setMembersError("");
+    listTeamMembers("new_hire")
+      .then((members) => {
+        setTeamMembers(members);
+        setHasLoadedMembers(true);
+      })
+      .catch((err) => {
+        setMembersError(err instanceof Error ? err.message : "Failed to load team members.");
+      })
+      .finally(() => setIsLoadingMembers(false));
+  }
+
+  function toggleLearner(id: number) {
+    setSelectedLearnerIds((prev) =>
+      prev.includes(id) ? prev.filter((value) => value !== id) : [...prev, id]
+    );
+  }
+
+  function addLearnerEmail() {
+    const email = learnerEmail.trim().toLowerCase();
+    if (!email) return;
+    setSelectedLearners((prev) => (prev.includes(email) ? prev : [...prev, email]));
+    setLearnerEmail("");
+  }
+
+  function removeLearner(email: string) {
+    setSelectedLearners((prev) => prev.filter((value) => value !== email));
+  }
+
+  async function handleConfirmAssign() {
+    if (!assignTarget) return;
+
+    setIsAssigning(true);
+    setAssignError("");
+    try {
+      // Tracked assignments for team members just ticked (already-assigned ones
+      // are disabled in the UI, so they can't reach here). Idempotent server-
+      // side, but we skip the call entirely when nothing new was selected.
+      let assignmentFailed = false;
+      if (selectedLearnerIds.length > 0) {
+        try {
+          await assignQuiz(assignTarget.id, selectedLearnerIds);
+        } catch {
+          assignmentFailed = true;
+        }
+      }
+
+      // Email invites for people not yet on the team (accepting the invite
+      // auto-creates their assignment server-side). Collected, not aborted.
+      const inviteResults = await Promise.allSettled(
+        selectedLearners.map((email) =>
+          apiFetch("/api/invites", {
+            method: "POST",
+            body: JSON.stringify({ email, quizId: assignTarget.id }),
+          })
+        )
+      );
+      const failedInvites = inviteResults.filter((r) => r.status === "rejected");
+
+      if (assignmentFailed || failedInvites.length > 0) {
+        const parts: string[] = [];
+        if (assignmentFailed) parts.push("assigning to the selected team members failed");
+        if (failedInvites.length > 0) {
+          parts.push(
+            `${failedInvites.length} of ${selectedLearners.length} invite email(s) could not be sent`
+          );
+        }
+        setAssignError(`${parts.join(" and ")}. Please try again.`);
+        // Refresh so any assignments that DID succeed are reflected.
+        setReloadKey((k) => k + 1);
+        return;
+      }
+
+      // Clean success — close and refresh the dashboard counts.
+      setIsAssignModalOpen(false);
+      setReloadKey((k) => k + 1);
+    } finally {
+      setIsAssigning(false);
+    }
+  }
+
+  const assignSelectionCount = selectedLearnerIds.length + selectedLearners.length;
 
   return (
     <div className="app-shell">
@@ -287,6 +433,9 @@ function ManagerDashboardPage() {
                         <th>Avg. time taken</th>
                         <th>Due date</th>
                         <th>Created</th>
+                        <th className="dash-actions-col">
+                          <span className="sr-only">Actions</span>
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
@@ -310,6 +459,19 @@ function ManagerDashboardPage() {
                           <td>{formatDuration(quiz.averageTimeTakenSeconds)}</td>
                           <td>{formatDate(quiz.dueDate)}</td>
                           <td>{formatDate(quiz.createdAt)}</td>
+                          <td className="dash-actions-cell">
+                            {quiz.status === "published" ? (
+                              <button
+                                type="button"
+                                className="dash-assign-btn"
+                                title="Add users to this quiz"
+                                aria-label={`Add users to ${quiz.title}`}
+                                onClick={() => openAssignModal(quiz)}
+                              >
+                                <UserPlusIcon />
+                              </button>
+                            ) : null}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -380,6 +542,134 @@ function ManagerDashboardPage() {
                     ))}
                   </div>
                 )}
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {assignModal.shouldRender ? (
+          <div
+            className={`modal-backdrop t-modal-backdrop ${assignModal.phaseClassName}`}
+            role="dialog"
+            aria-modal="true"
+            onClick={() => setIsAssignModalOpen(false)}
+          >
+            <div
+              className={`modal-card dash-assign-modal t-modal ${assignModal.phaseClassName}`}
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="dash-quiz-modal-head">
+                <div>
+                  <span className="dash-quiz-modal-eyebrow">Add users</span>
+                  <h3>{assignQuizToShow?.title ?? "Add users"}</h3>
+                </div>
+                <button
+                  type="button"
+                  className="rp-source-close"
+                  aria-label="Close add users"
+                  onClick={() => setIsAssignModalOpen(false)}
+                >
+                  ×
+                </button>
+              </div>
+
+              <div className="dash-quiz-modal-body">
+                <div className="assign-learners">
+                  <p className="rp-assign-label">Already on your team</p>
+                  {isLoadingMembers ? (
+                    <p className="cfg-empty">Loading team roster…</p>
+                  ) : membersError ? (
+                    <p className="form-error">{membersError}</p>
+                  ) : teamMembers.length === 0 ? (
+                    <p className="cfg-empty">No new hires on your team yet — invite one below.</p>
+                  ) : (
+                    <div className="learner-roster">
+                      {teamMembers.map((member) => {
+                        const isAssigned = alreadyAssignedEmails.has(member.email.toLowerCase());
+                        const checked = isAssigned || selectedLearnerIds.includes(member.id);
+                        return (
+                          <label
+                            key={member.id}
+                            className={`learner-roster-item ${isAssigned ? "is-assigned" : ""}`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              disabled={isAssigned}
+                              onChange={() => toggleLearner(member.id)}
+                            />
+                            <span className="learner-roster-name">
+                              {member.firstName} {member.lastName}
+                              <span className="learner-roster-email">{member.email}</span>
+                            </span>
+                            {isAssigned ? (
+                              <span className="learner-assigned-tag">Assigned</span>
+                            ) : null}
+                          </label>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  <p className="rp-assign-label">Invite someone new</p>
+                  <div className="learner-email-input">
+                    <input
+                      type="email"
+                      placeholder="Enter learner's email or Google Group email"
+                      value={learnerEmail}
+                      onChange={(event) => setLearnerEmail(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          event.preventDefault();
+                          addLearnerEmail();
+                        }
+                      }}
+                    />
+                    <button type="button" className="sf-btn" onClick={addLearnerEmail}>
+                      Add
+                    </button>
+                  </div>
+                  {selectedLearners.length > 0 ? (
+                    <div className="learner-chips">
+                      {selectedLearners.map((email) => (
+                        <span key={email} className="learner-chip">
+                          {email}
+                          <button
+                            type="button"
+                            aria-label={`Remove ${email}`}
+                            onClick={() => removeLearner(email)}
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
+
+                  {assignError ? <p className="form-error">{assignError}</p> : null}
+
+                  <div className="dash-assign-actions">
+                    <button
+                      type="button"
+                      className="secondary-btn"
+                      onClick={() => setIsAssignModalOpen(false)}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      className="sf-btn"
+                      disabled={assignSelectionCount === 0 || isAssigning}
+                      onClick={() => void handleConfirmAssign()}
+                    >
+                      {isAssigning
+                        ? "Adding…"
+                        : `Add ${assignSelectionCount} ${
+                            assignSelectionCount === 1 ? "user" : "users"
+                          }`}
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
