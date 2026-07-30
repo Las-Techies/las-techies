@@ -9,7 +9,7 @@ import {
   type ManagerDashboardQuiz,
   type TeamMember,
 } from "../api/client";
-import { describeError, type FriendlyError } from "../api/errors";
+import { describeError } from "../api/errors";
 import ApiErrorCard from "../components/ApiErrorCard";
 import {
   CalendarIcon,
@@ -87,8 +87,6 @@ function ManagerDashboardPage() {
   const [isQuizModalOpen, setIsQuizModalOpen] = useState(false);
   const [isQuizModalLoading, setIsQuizModalLoading] = useState(false);
   const [quizModalError, setQuizModalError] = useState("");
-  // Bumped by the Try again button to re-run the loader effect.
-  const [reloadKey, setReloadKey] = useState(0);
 
   // "Add users" modal: assign an already-published quiz to more learners (or
   // invite brand-new ones by email). `assignTarget` is the quiz being assigned.
@@ -349,13 +347,13 @@ function ManagerDashboardPage() {
         }
         setAssignError(`${parts.join(" and ")}. Please try again.`);
         // Refresh so any assignments that DID succeed are reflected.
-        setReloadKey((k) => k + 1);
+        void dashboardQuery.refetch();
         return;
       }
 
       // Clean success — close and refresh the dashboard counts.
       setIsAssignModalOpen(false);
-      setReloadKey((k) => k + 1);
+      void dashboardQuery.refetch();
     } finally {
       setIsAssigning(false);
     }
@@ -385,7 +383,7 @@ function ManagerDashboardPage() {
           </section>
         ) : loadError ? (
           <section className="glass dash-card">
-            <ApiErrorCard error={loadError} onRetry={() => setReloadKey((k) => k + 1)} />
+            <ApiErrorCard error={loadError} onRetry={() => void dashboardQuery.refetch()} />
           </section>
         ) : !data ? (
           <section className="glass dash-card">
