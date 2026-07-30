@@ -173,7 +173,7 @@ function NewHireHomePage() {
                 current && navigate(`/learner-module?quizId=${current.quizId}`)
               }
             >
-              {hasPassed(current!) ? "Completed" : hasFailed(current!) ? "Retake Quiz" : "Get Started"}
+              {current && hasPassed(current) ? "Completed" : current && hasFailed(current) ? "Retake Quiz" : "Get Started"}
               <ArrowRight aria-hidden />
             </button>
           </section>
