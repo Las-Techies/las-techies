@@ -13,7 +13,7 @@ function formatDate(iso: string | null): string {
 }
 
 function formatTakenDate(iso: string | null): string {
-  if (!iso) return "Not taken yet";
+  if (!iso) return "—";
   return new Date(iso).toLocaleDateString(undefined, {
     month: "short",
     day: "numeric",
@@ -232,6 +232,7 @@ function ManagerDashboardPage() {
                                   {statusDisplay.label}
                                 </span>
                                 <span className="dash-assignment-meta">
+                                  Score{" "}
                                   {assignment.status === "completed" && typeof assignment.score === "number"
                                     ? `${assignment.score}%`
                                     : "—"}
@@ -245,7 +246,7 @@ function ManagerDashboardPage() {
                                   ) : null}
                                 </span>
                                 <span className="dash-assignment-meta">
-                                  {formatDuration(assignment.timeTakenSeconds)}
+                                  Time {formatDuration(assignment.timeTakenSeconds)}
                                 </span>
                                 <span className="dash-assignment-meta muted">
                                   <CalendarIcon /> Due {formatDate(assignment.dueDate)}
