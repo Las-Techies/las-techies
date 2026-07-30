@@ -662,7 +662,7 @@ function UploadContentPage() {
                   "Google sign-in timed out. Please try again and complete the account chooser."
                 )
               ),
-            3500
+            10000
           )
         ),
       ]);
