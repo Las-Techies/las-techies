@@ -2382,6 +2382,21 @@ main.mgr-page > section.dropzone > input.sr-only {
   border: 2px solid #b9c9dc;
 }
 
+.nh-step.failed .nh-step-icon {
+  background: #fff0f0;
+  color: #c0392b;
+}
+
+.nh-step.failed .nh-step-icon svg {
+  width: 15px;
+  height: 15px;
+}
+
+.nh-step.failed .nh-step-main span {
+  color: #c0392b;
+  font-weight: 600;
+}
+
 .nh-step-main {
   flex: 1;
   min-width: 0;
@@ -2416,6 +2431,26 @@ main.mgr-page > section.dropzone > input.sr-only {
 .nh-step.current .nh-step-date {
   color: var(--sf-blue);
   font-weight: 700;
+}
+
+.nh-step-retake {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #c0392b;
+  background: #fff0f0;
+  border: 1px solid #f5c6c6;
+  border-radius: 999px;
+  padding: 4px 11px;
+  white-space: nowrap;
+}
+
+.nh-step-retake svg {
+  width: 13px;
+  height: 13px;
 }
 
 .nh-step-chevron {
