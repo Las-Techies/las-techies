@@ -521,10 +521,13 @@
 }
 .lp-member {
   text-align: center;
-  /* lifted/scaled by the avatar-group hover via --shift / --scale-active */
-  transform: translateY(var(--shift, 0px)) scale(var(--scale-active, 1));
-  transition: transform var(--ui-hover-dur, 0.15s) var(--ui-hover-ease, ease);
-  align-self: start;
+  align-self: stretch;
+  /* one white card wrapping the photo, name and bio for each member */
+  background: #fff;
+  border: 1px solid var(--lp-card-border);
+  border-radius: 22px;
+  box-shadow: 0 14px 34px rgba(9, 40, 82, 0.18);
+  padding: 28px 22px 26px;
 }
 .lp-member-trigger {
   display: block;
@@ -532,7 +535,7 @@
   padding: 0;
   border: 0;
   background: none;
-  cursor: pointer;
+  cursor: default;
   color: inherit;
   font: inherit;
 }
@@ -570,8 +573,11 @@
   overflow: hidden;
   min-height: 0;
 }
+.lp-member-bio[data-open="true"] .lp-member-bio-inner {
+  margin-top: 12px;
+}
 .lp-member-role {
-  margin: 12px 0 0;
+  margin: 0;
   font-size: 14.5px;
   font-weight: 600;
   color: var(--lp-muted);
@@ -636,8 +642,9 @@
    FOOTER
    =========================================================================== */
 .lp-footer {
-  border-top: 1px solid var(--lp-line);
+  border-top: 2px solid var(--lp-blue);
   margin-top: 10px;
+  background: #fff;
 }
 .lp-footer-inner {
   max-width: 1440px;

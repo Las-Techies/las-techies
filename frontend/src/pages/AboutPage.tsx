@@ -32,8 +32,6 @@ import {
   GithubIcon,
   LinkedInIcon,
 } from "../components/icons";
-import { useAvatarGroupHover } from "../hooks/useAvatarGroupHover";
-
 import "../styles/about.css";
 
 /* ---------- entrance presets (now scale-in, not just fade) ---------- */
@@ -310,12 +308,6 @@ function AboutPage() {
   const jumpingRef = useRef(false); // true while a nav jump is animating (suppresses the demo lock)
   const [scrolled, setScrolled] = useState(false);
 
-  // Team hover reveal: hovering a member grows a bio panel (role, bio, socials)
-  // out of their photo, mirroring the standalone Meet Our Team page. Driven by
-  // hover, with keyboard focus / click as fallbacks for people who can't hover.
-  const [openMemberId, setOpenMemberId] = useState<string | null>(null);
-  const teamHover = useAvatarGroupHover<HTMLDivElement>();
-
   /* ---- hero scroll-linked parallax ---- */
   const heroRef = useRef<HTMLElement>(null);
   const { scrollYProgress: heroProgress } = useScroll({
@@ -551,71 +543,46 @@ function AboutPage() {
           initial="hidden"
           whileInView="show"
           viewport={viewport}
-          ref={teamHover.rootRef}
-          {...teamHover.rootProps}
         >
-          {TEAM.map((m, index) => {
-            const isOpen = openMemberId === m.id;
-            return (
-              <motion.div
-                key={m.id}
-                className={`lp-member t-avatar ${isOpen ? "open" : ""}`}
-                variants={staggerChild}
-                onMouseEnter={() => {
-                  teamHover.getItemProps(index).onMouseEnter();
-                  setOpenMemberId(m.id);
-                }}
-                onMouseLeave={() =>
-                  setOpenMemberId((current) => (current === m.id ? null : current))
-                }
-              >
-                <button
-                  type="button"
-                  className="lp-member-trigger"
-                  aria-expanded={isOpen}
-                  onClick={() =>
-                    setOpenMemberId((current) => (current === m.id ? null : m.id))
-                  }
-                  onFocus={() => setOpenMemberId(m.id)}
-                  onBlur={() =>
-                    setOpenMemberId((current) => (current === m.id ? null : current))
-                  }
-                >
-                  <img className="lp-avatar" src={m.photo} alt={m.name} />
-                  <h3>{m.name}</h3>
-                </button>
+          {TEAM.map((m) => (
+            <motion.div
+              key={m.id}
+              className="lp-member open"
+              variants={staggerChild}
+            >
+              <div className="lp-member-trigger">
+                <img className="lp-avatar" src={m.photo} alt={m.name} />
+                <h3>{m.name}</h3>
+              </div>
 
-                {/* grid-template-rows 0fr -> 1fr accordion: the bio panel grows
-                    out of the photo on hover instead of popping a modal. */}
-                <div className="lp-member-bio" data-open={isOpen}>
-                  <div className="lp-member-bio-inner">
-                    <p className="lp-member-role">{m.role}</p>
-                    <p className="lp-member-text">{m.bio}</p>
-                    <div className="lp-member-links">
-                      <a
-                        href={m.linkedin}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="lp-member-social"
-                        tabIndex={isOpen ? 0 : -1}
-                      >
-                        <LinkedInIcon /> LinkedIn
-                      </a>
-                      <a
-                        href={m.github}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="lp-member-social"
-                        tabIndex={isOpen ? 0 : -1}
-                      >
-                        <GithubIcon /> GitHub
-                      </a>
-                    </div>
+              {/* bio card is always shown — role, bio, and socials live in a
+                  white box beneath every member (no hover / no toggle). */}
+              <div className="lp-member-bio" data-open="true">
+                <div className="lp-member-bio-inner">
+                  <p className="lp-member-role">{m.role}</p>
+                  <p className="lp-member-text">{m.bio}</p>
+                  <div className="lp-member-links">
+                    <a
+                      href={m.linkedin}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="lp-member-social"
+                    >
+                      <LinkedInIcon /> LinkedIn
+                    </a>
+                    <a
+                      href={m.github}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="lp-member-social"
+                    >
+                      <GithubIcon /> GitHub
+                    </a>
                   </div>
                 </div>
-              </motion.div>
-            );
-          })}
+              </div>
+            </motion.div>
+          ))}
         </motion.div>
       </section>
 
