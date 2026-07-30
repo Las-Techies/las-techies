@@ -521,10 +521,13 @@
 }
 .lp-member {
   text-align: center;
-  /* lifted/scaled by the avatar-group hover via --shift / --scale-active */
-  transform: translateY(var(--shift, 0px)) scale(var(--scale-active, 1));
-  transition: transform var(--ui-hover-dur, 0.15s) var(--ui-hover-ease, ease);
-  align-self: start;
+  align-self: stretch;
+  /* one white card wrapping the photo, name and bio for each member */
+  background: #fff;
+  border: 1px solid var(--lp-card-border);
+  border-radius: 22px;
+  box-shadow: 0 14px 34px rgba(9, 40, 82, 0.18);
+  padding: 28px 22px 26px;
 }
 .lp-member-trigger {
   display: block;
@@ -570,15 +573,8 @@
   overflow: hidden;
   min-height: 0;
 }
-/* white card behind the expanded bio so the role/bio/socials stay legible
-   against the blue-sky backdrop */
 .lp-member-bio[data-open="true"] .lp-member-bio-inner {
-  margin-top: 14px;
-  padding: 18px 18px 20px;
-  background: #fff;
-  border: 1px solid var(--lp-card-border);
-  border-radius: 18px;
-  box-shadow: 0 14px 34px rgba(9, 40, 82, 0.18);
+  margin-top: 12px;
 }
 .lp-member-role {
   margin: 0;
