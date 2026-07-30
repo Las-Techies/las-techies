@@ -70,7 +70,15 @@ export async function findOrCreateUserFromSupabase(input: {
         existingFirst.toLowerCase() === "unknown" ||
         existingLast === "");
 
-    const shouldSyncTeam = input.teamId !== null && existing.teamId !== input.teamId;
+    // The DB is the source of truth for an existing user's team, not the JWT.
+    // We only adopt the JWT's team_id when the user has NO team yet (their very
+    // first assignment — e.g. a freshly created manager, or the brief window
+    // during invite acceptance). Once a team is set, a JWT claim never changes
+    // it: managers switch teams via the DB (activateTeam), so their token's
+    // team_id goes intentionally stale, and honoring it here would silently
+    // revert their active team (the same failure mode that previously reset
+    // managers to the demo team after linking a second OAuth identity).
+    const shouldSyncTeam = input.teamId !== null && existing.teamId === null;
     if (shouldSyncTeam || hasBetterIncomingName) {
       return prisma.user.update({
         where: { id: existing.id },
@@ -86,11 +94,10 @@ export async function findOrCreateUserFromSupabase(input: {
       });
     }
 
-    // Keep an existing user's team in sync with their JWT, but only when the
-    // JWT actually asserts a team — a missing/invalid claim must never
-    // overwrite a real assignment (this is what previously reset managers
-    // back to the demo team after linking a second OAuth identity). Other
-    // fields (name/role) are still only applied on first creation for now.
+    // Existing user with a team already set: leave it untouched. Their team is
+    // owned by the DB now (see shouldSyncTeam above) — neither a missing claim
+    // nor a stale-but-present one may overwrite it. Other fields (name/role)
+    // are still only applied on first creation for now.
     return existing;
   }
 

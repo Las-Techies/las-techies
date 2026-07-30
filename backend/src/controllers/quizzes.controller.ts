@@ -605,8 +605,17 @@ function average(values: number[]): number | null {
 export async function getManagerDashboard(req: Request, res: Response, next: NextFunction) {
   try {
     const user = (req as any).user;
-    if (!user?.teamId) {
+    if (!user) {
       return res.status(401).json({ error: { message: "Unauthorized" } });
+    }
+
+    // A manager with no active team hasn't finished team setup yet (e.g. their
+    // team creation at signup was skipped because email confirmation deferred
+    // the session). This is an onboarding state, not an auth failure — signal
+    // it so the dashboard can prompt them to create a team instead of showing a
+    // misleading "session expired" sign-out.
+    if (!user.teamId) {
+      return res.json({ data: { quizzes: [], learners: [], needsTeam: true } });
     }
 
     const [teamQuizData, learners] = await Promise.all([
@@ -671,7 +680,18 @@ export async function getManagerDashboard(req: Request, res: Response, next: Nex
       };
     });
 
-    res.json({ data: { quizzes: quizSummaries, learners: learnerSummaries } });
+    res.json({
+      data: {
+        quizzes: quizSummaries,
+        learners: learnerSummaries,
+        needsTeam: false,
+        // The DB is the source of truth for the manager's active team (they
+        // switch teams server-side without a session refresh, so the JWT's
+        // team_id can be stale). Echo it back so the client marks the right
+        // team as active without reading it from the token.
+        activeTeamId: user.teamId,
+      },
+    });
   } catch (err) {
     next(err);
   }
