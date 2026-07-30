@@ -408,6 +408,15 @@ export type ManagerDashboardLearner = {
 export type ManagerDashboardData = {
   quizzes: ManagerDashboardQuiz[];
   learners: ManagerDashboardLearner[];
+  // True when the signed-in manager has no active team yet (team setup didn't
+  // complete at signup). The dashboard shows a "create your team" prompt rather
+  // than treating it as an auth error. Optional for backward compatibility.
+  needsTeam?: boolean;
+  // The manager's active team id, per the DB (the source of truth — managers
+  // switch teams server-side without a session refresh, so the JWT can lag).
+  // The dashboard uses this to mark the active team. Absent on the needsTeam
+  // placeholder and on older payloads.
+  activeTeamId?: number;
 };
 
 // One-call payload for the manager dashboard: every quiz on the team with
@@ -428,5 +437,27 @@ export type MyTeam = {
 // UI like the learner module header can show the team's real name.
 export async function getMyTeam(): Promise<MyTeam> {
   const res = await apiFetch<{ data: MyTeam }>("/api/teams/mine");
+  return res.data;
+}
+
+export type ManagedTeam = {
+  id: number;
+  name: string;
+};
+
+// Every team the calling manager owns, for the dashboard team switcher.
+// Newest first (matches the backend ordering).
+export async function listManagedTeams(): Promise<ManagedTeam[]> {
+  const res = await apiFetch<{ data: ManagedTeam[] }>("/api/teams/managed");
+  return res.data;
+}
+
+// Switches the manager's active team. The backend authorizes ownership and
+// writes the change to the DB (the source of truth for the active team), so it
+// takes effect on the next request — no session refresh needed.
+export async function activateTeam(teamId: number): Promise<ManagedTeam> {
+  const res = await apiFetch<{ data: ManagedTeam }>(`/api/teams/${teamId}/activate`, {
+    method: "POST",
+  });
   return res.data;
 }
