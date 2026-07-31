@@ -2764,7 +2764,7 @@ main.mgr-page > section.dropzone > input.sr-only {
   height: 56px;
   border-radius: 999px;
   border: none;
-  background: #0b4f94;
+  background: linear-gradient(135deg, #0b74e0 0%, #0b4f94 60%, #032d60 100%);
   color: #fff;
   display: flex;
   align-items: center;
@@ -2775,6 +2775,33 @@ main.mgr-page > section.dropzone > input.sr-only {
     transform var(--morph-open-dur) var(--morph-close-ease),
     filter var(--morph-fade-dur) var(--morph-close-ease),
     box-shadow var(--duration-fast) var(--ease-smooth-out);
+}
+
+/* Soft, slow "breathing" ring to draw the eye to the closed FAB without
+   being noisy. Sits behind the button and only shows while closed. */
+.chat-morph-plus::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  box-shadow: 0 0 0 0 rgba(11, 116, 224, 0.45);
+  animation: chatFabPulse 2.6s ease-out infinite;
+}
+
+.chat-morph[data-open="true"] .chat-morph-plus::before {
+  animation: none;
+}
+
+@keyframes chatFabPulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(11, 116, 224, 0.45);
+  }
+  70% {
+    box-shadow: 0 0 0 14px rgba(11, 116, 224, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(11, 116, 224, 0);
+  }
 }
 
 .chat-morph-plus:hover {
@@ -2829,6 +2856,10 @@ main.mgr-page > section.dropzone > input.sr-only {
   .chat-morph-menu {
     transition: none !important;
   }
+
+  .chat-morph-plus::before {
+    animation: none !important;
+  }
 }
 
 @media (max-width: 480px) {
@@ -2856,8 +2887,13 @@ main.mgr-page > section.dropzone > input.sr-only {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 12px;
+  margin: -18px -18px 12px;
+  padding: 14px 16px;
   position: relative;
+  background: linear-gradient(180deg, #f4f8fd 0%, #ffffff 100%);
+  border-bottom: 1px solid #e6eef7;
+  border-top-left-radius: inherit;
+  border-top-right-radius: inherit;
 }
 
 .ai-head-actions {
@@ -3055,7 +3091,8 @@ main.mgr-page > section.dropzone > input.sr-only {
   width: 26px;
   height: 26px;
   border-radius: 999px;
-  background: #eef4ff;
+  background: linear-gradient(135deg, #e3efff 0%, #cfe2fb 100%);
+  border: 1px solid #d4e5fa;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -3067,7 +3104,8 @@ main.mgr-page > section.dropzone > input.sr-only {
   font-size: 14.5px;
   line-height: 1.6;
   padding: 12px 14px;
-  border-radius: 12px;
+  border-radius: 14px;
+  box-shadow: 0 1px 2px rgba(2, 42, 84, 0.06);
 }
 
 .bubble.assistant {
@@ -3077,7 +3115,7 @@ main.mgr-page > section.dropzone > input.sr-only {
 }
 
 .bubble.user {
-  background: #0b4f94;
+  background: linear-gradient(135deg, #0b74e0 0%, #0b4f94 100%);
   color: #fff;
   border-top-right-radius: 4px;
 }
@@ -3213,10 +3251,89 @@ main.mgr-page > section.dropzone > input.sr-only {
 
 .ai-input-row input {
   margin-top: 0;
+  border-radius: 999px;
+  padding-left: 16px;
 }
 
 .ai-input-row .primary-btn {
   flex: none;
+}
+
+/* Circular icon send button, sized to match the pill input's height. */
+.ai-send-btn {
+  flex: none;
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  border: none;
+  background: linear-gradient(135deg, #0b74e0 0%, #0b4f94 100%);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  box-shadow: 0 4px 12px rgba(11, 79, 148, 0.28);
+  transition:
+    transform var(--ui-hover-dur) var(--ui-hover-ease),
+    box-shadow var(--ui-hover-dur) var(--ui-hover-ease),
+    filter var(--ui-hover-dur) var(--ui-hover-ease);
+}
+
+.ai-send-btn svg {
+  /* Nudge the paper-plane so it reads as centered in the circle. */
+  transform: translate(-1px, 1px);
+}
+
+.ai-send-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px rgba(11, 79, 148, 0.38);
+}
+
+.ai-send-btn:active:not(:disabled) {
+  transform: scale(0.94);
+}
+
+.ai-send-btn:disabled {
+  background: #cdd7e4;
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+/* ===== Suggested / follow-up question chips ===== */
+.ai-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 2px 2px 0 34px;
+  animation: fadeInUp 0.28s ease;
+}
+
+.ai-suggestion-chip {
+  border: 1px solid #cfe0f5;
+  background: #f4f8fd;
+  color: #0b5cab;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.3;
+  padding: 8px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  text-align: left;
+  transition:
+    background-color var(--ui-hover-dur) var(--ui-hover-ease),
+    border-color var(--ui-hover-dur) var(--ui-hover-ease),
+    transform var(--ui-hover-dur) var(--ui-hover-ease);
+}
+
+.ai-suggestion-chip:hover {
+  background: #e6f1fd;
+  border-color: #0b74e0;
+  transform: translateY(-1px);
+}
+
+.ai-suggestion-chip:active {
+  transform: scale(0.97);
 }
 
 /* ===== Source viewer modal ===== */
@@ -5211,6 +5328,7 @@ main.mgr-page > section.dropzone > input.sr-only {
   border-radius: 10px;
   border: 1px solid rgba(11, 42, 84, 0.14);
   background: rgba(255, 255, 255, 0.95);
+  font-family: inherit;
   font-size: 14px;
 }
 
@@ -6419,18 +6537,19 @@ main.mgr-page > section.dropzone > input.sr-only {
 
 .dash-stat-card {
   display: flex;
-  align-items: center;
+  align-items: stretch;
   gap: 14px;
-  padding: 18px 20px;
+  padding: 16px 20px;
 }
 
 .dash-stat-icon {
   flex: none;
-  width: 42px;
-  height: 42px;
+  align-self: stretch;
+  width: 44px;
+  min-height: 0;
   display: grid;
   place-items: center;
-  border-radius: 12px;
+  border-radius: 11px;
   background: #edf5ff;
   color: var(--sf-blue);
 }
@@ -6442,15 +6561,15 @@ main.mgr-page > section.dropzone > input.sr-only {
 
 .dash-stat-value {
   display: block;
-  font-size: 26px;
+  font-size: 32px;
   font-weight: 800;
   color: var(--sf-navy);
-  line-height: 1.1;
+  line-height: 1.15;
 }
 
 .dash-stat-label {
   display: block;
-  font-size: 13px;
+  font-size: 15px;
   color: #5c6b82;
   margin-top: 2px;
 }
@@ -6464,22 +6583,22 @@ main.mgr-page > section.dropzone > input.sr-only {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 16px;
+  font-size: 25px;
   font-weight: 700;
   color: var(--sf-navy);
   margin: 0 0 6px;
 }
 
 .dash-card-title svg {
-  width: 18px;
-  height: 18px;
+  width: 22px;
+  height: 22px;
   color: var(--sf-blue);
 }
 
 .dash-card-hint {
   margin: 0 0 16px;
   color: #5c6b82;
-  font-size: 13.5px;
+  font-size: 18px;
   line-height: 1.45;
 }
 
@@ -6487,7 +6606,7 @@ main.mgr-page > section.dropzone > input.sr-only {
   margin: 0;
   padding: 10px 0 0;
   color: #8a96a8;
-  font-size: 13px;
+  font-size: 17px;
 }
 
 .dash-learner-list {
@@ -6511,14 +6630,14 @@ main.mgr-page > section.dropzone > input.sr-only {
 
 .dash-avatar {
   flex: none;
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
   display: grid;
   place-items: center;
   border-radius: 999px;
   background: var(--sf-blue);
   color: #fff;
-  font-size: 13px;
+  font-size: 16px;
   font-weight: 700;
 }
 
@@ -6530,18 +6649,18 @@ main.mgr-page > section.dropzone > input.sr-only {
 
 .dash-learner-info strong {
   color: var(--sf-navy);
-  font-size: 14.5px;
+  font-size: 21px;
 }
 
 .dash-learner-info .muted {
-  font-size: 12.5px;
+  font-size: 17px;
   color: #8a96a8;
 }
 
 .dash-learner-summary {
   margin-left: auto;
   flex: none;
-  font-size: 12.5px;
+  font-size: 17px;
   font-weight: 600;
   color: #5c6b82;
   background: #f1f4f8;
@@ -6561,9 +6680,9 @@ main.mgr-page > section.dropzone > input.sr-only {
 .dash-assignment-row {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 6px 0;
-  font-size: 13px;
+  gap: 14px;
+  padding: 8px 0;
+  font-size: 17.5px;
 }
 
 .dash-assignment-title {
@@ -6587,8 +6706,8 @@ main.mgr-page > section.dropzone > input.sr-only {
 }
 
 .dash-assignment-meta svg {
-  width: 13px;
-  height: 13px;
+  width: 15px;
+  height: 15px;
 }
 
 .dash-assignment-meta.muted {
@@ -6598,7 +6717,7 @@ main.mgr-page > section.dropzone > input.sr-only {
 
 /* Small "took N attempts" marker next to a learner's best score. */
 .dash-attempt-badge {
-  font-size: 10.5px;
+  font-size: 14px;
   font-weight: 600;
   line-height: 1;
   padding: 2px 5px;
@@ -6609,10 +6728,10 @@ main.mgr-page > section.dropzone > input.sr-only {
 
 .dash-status-pill {
   flex: none;
-  font-size: 11.5px;
+  font-size: 15.5px;
   font-weight: 700;
   text-transform: capitalize;
-  padding: 3px 10px;
+  padding: 4px 12px;
   border-radius: 999px;
 }
 
@@ -6653,13 +6772,13 @@ main.mgr-page > section.dropzone > input.sr-only {
 .dash-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 13.5px;
+  font-size: 18px;
 }
 
 .dash-table th {
   text-align: left;
   color: #8a96a8;
-  font-size: 12px;
+  font-size: 15px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.02em;
@@ -6820,6 +6939,202 @@ main.mgr-page > section.dropzone > input.sr-only {
   .dash-assignment-row {
     flex-wrap: wrap;
   }
+}
+
+/* ===========================================================================
+   Match the Manager Dashboard's box + type scale on the learner / auth pages
+   ===========================================================================
+   Goal: the rest of the app should read at the same size as the Manager
+   Dashboard — same card box metrics and same font scale — instead of the
+   smaller/denser sizes each page used before.
+
+   Reference tokens taken from the dashboard:
+     card radius        22px      (.glass)
+     card padding       ~20-24px  (.dash-card)
+     card/section title 25px      (.dash-card-title)
+     description / hint 18px      (.dash-card-hint)
+     body text          16px      (.mgr-hero p)
+     hero H1            52px      (.mgr-hero h1)
+
+   Scope: the five page wrappers below are used ONLY by Login + Invite Signup,
+   New Hire Home, Learner Module, Quiz Taking, and Quiz Results. The About /
+   Meet-Our-Team landing pages and the already-matching manager wizard pages
+   are left untouched. The card classes targeted for box metrics
+   (.login-card / .nh-card / .quiz-panel / .score-card) are each unique to an
+   in-scope page, so they don't leak elsewhere.
+
+   NOTE ON !important: several base rules here use high-specificity selectors
+   (e.g. `.input-wrap input:not([type=radio]):not([type=checkbox])`) that would
+   otherwise beat a normal scoped rule, so !important guarantees the match
+   actually applies. CSS-only, presentation level — no markup or behavior. */
+
+/* Card containers: unify padding + radius to the dashboard's card metrics. */
+.login-card,
+.nh-card,
+.quiz-panel,
+.score-card {
+  padding: 20px 22px !important;
+  border-radius: 22px !important;
+}
+
+/* Hero headings -> dashboard hero scale (nudged up slightly). */
+.nh-hero-text h1,
+.page-wrap h1 {
+  font-size: 56px !important;
+}
+
+/* Card / section titles -> dashboard card-title scale (nudged up slightly). */
+.login-card h2,
+.nh-assigned-info h2,
+.quiz-intro-title,
+.score-card h3 {
+  font-size: 27px !important;
+}
+
+/* Card descriptions / subtitles -> dashboard hint scale (18px). */
+:is(.login-page, .nh-home, .quiz-stage, .results-stage, .page-wrap)
+  :is(
+    .login-sub,
+    .subtle,
+    .module-subtitle,
+    .score-sub,
+    .score-breakdown-label,
+    .quiz-intro-notice p
+  ) {
+  font-size: 19px !important;
+}
+
+/* Body text / controls / inputs -> dashboard body scale (18px, matching the
+   dashboard's table + row content). Broadened to also catch the secondary
+   readable text (meta lines, fact captions, progress text) that otherwise
+   kept these pages reading denser/smaller than the dashboard. */
+:is(.login-page, .nh-home, .quiz-stage, .results-stage, .page-wrap)
+  :is(
+    input:not([type="radio"]):not([type="checkbox"]),
+    textarea,
+    select,
+    .sf-btn,
+    .secondary-btn,
+    .answer-text,
+    .quiz-qcount,
+    .quiz-progress-count,
+    .quiz-intro-facts span,
+    .quiz-leave-modal p,
+    .review-q,
+    .bubble,
+    .file-name,
+    .doc-title,
+    .role-setup-intro,
+    .nh-step-main strong,
+    .nh-meta,
+    .nh-empty,
+    .module-progress-label,
+    .progress-label,
+    .recent-card-text strong
+  ) {
+  font-size: 18px !important;
+}
+
+/* Learner Module document reader content. */
+.page-wrap :is(.doc-page p, .doc-page h4) {
+  font-size: 18px !important;
+}
+
+/* Small form labels + inline messages. */
+:is(.login-page, .nh-home, .quiz-stage, .results-stage, .page-wrap)
+  :is(.field-label, .form-error, .form-info, .help-link) {
+  font-size: 16px !important;
+}
+
+/* ===========================================================================
+   Manager wizard pages (Upload + Generate / Configure Quiz / Review & Publish)
+   ===========================================================================
+   These share the `.mgr-page` wrapper with the dashboard, so instead of
+   scoping by wrapper (which would also hit the dashboard), we target each
+   page's own content classes — none of which appear on the dashboard — to
+   bring their readable text up to the same larger scale as the rest of the
+   app. CSS-only, presentation level. */
+
+/* Card / section titles. */
+.files-card-title,
+.import-bar-text strong,
+.review-question-card h3 {
+  font-size: 22px !important;
+}
+
+/* Body / readable text + form controls. */
+.dropzone-body p,
+.import-connect,
+.filetype-chip,
+.file-name,
+.file-status,
+.cfg-field-control input,
+.cfg-field-control select,
+.cfg-field-control textarea,
+.cfg-empty,
+.review-question-card li,
+.rp-answer-label,
+.rp-answer-value {
+  font-size: 18px !important;
+}
+
+/* Secondary captions / labels / hints. */
+.dropzone-secure,
+.files-card-hint,
+.import-bar-text span,
+.file-attribution,
+.cfg-field-label,
+.cfg-doc-summary,
+.cfg-doc-item,
+.review-question-card p,
+.rp-assign-label,
+.options-hint {
+  font-size: 16px !important;
+}
+
+/* Meet Our Team page: hero + names are already large; bump the small bio
+   role/text so it stays readable against the rest of the enlarged app. */
+.team-bio-role {
+  font-size: 16px !important;
+}
+
+.team-bio-text {
+  font-size: 17px !important;
+}
+
+/* Configure Quiz settings column: the right-side text values (docs dropdown,
+   passing-score chip) read at the same size as the Title input (18px, like
+   "quiz 2") so the column is visually consistent. */
+.cfg-doc-toggle,
+.cfg-slider-val,
+.cfg-score-input,
+.cfg-score-pct {
+  font-size: 18px !important;
+}
+
+/* The Difficulty segmented control holds three buttons in a tight space, so
+   18px overflowed and overlapped the label. Keep it readable but compact,
+   with a little more breathing room between options so they don't look
+   cramped. */
+.diff-seg {
+  gap: 10px !important;
+}
+
+.diff-seg button {
+  font-size: 15px !important;
+  padding: 6px 9px !important;
+}
+
+/* Sync the active button's text color with the sliding pill: when a button
+   becomes active its text waits for the pill to arrive before turning white
+   (no more white-text-on-grey flash), and turns back to grey immediately
+   when the pill leaves. */
+.diff-seg button {
+  transition: color 120ms var(--tabs-ease) !important;
+}
+
+.diff-seg button.on {
+  transition-delay: var(--tabs-dur) !important;
 }
 
 /* ===== GitHub repo picker modal ===== */
