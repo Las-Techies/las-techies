@@ -12,6 +12,7 @@ import {
   saveUploadedDocuments,
 } from "../features/quiz/storage";
 import {
+  loadGithubAccessToken,
   loadGoogleDriveAccessToken,
   markPendingOAuthProvider,
 } from "../features/auth/googleDriveToken";
@@ -275,10 +276,17 @@ function UploadContentPage() {
     setIsGithubPickerOpen(true);
     setGithubPickerLoading(true);
     try {
-      const { data } = await supabase.auth.getSession();
-      const token = data.session?.provider_token;
+      // Read our own snapshot of GitHub's token, not session.provider_token:
+      // Supabase drops provider_token on the first JWT refresh and keeps only
+      // one slot for it (so a Google login clobbers GitHub's). We captured
+      // GitHub's token when linkIdentity's redirect returned — see
+      // captureProviderTokenFromSession.
+      const token = loadGithubAccessToken(user?.id);
       if (!token) {
-        setError("GitHub access token unavailable. Try signing out and reconnecting GitHub.");
+        // Snapshot missing or aged out — the only way to get a fresh GitHub
+        // token is to re-run the OAuth link, which handleConnectGithub does.
+        setError("Your GitHub connection has expired. Click Connect GitHub to reconnect.");
+        setIsGithubConnected(false);
         setIsGithubPickerOpen(false);
         return;
       }
@@ -286,6 +294,14 @@ function UploadContentPage() {
         "https://api.github.com/user/repos?sort=updated&per_page=100&affiliation=owner,collaborator,organization_member",
         { headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json" } }
       );
+      if (res.status === 401) {
+        // GitHub rejected the snapshot (revoked, or stale past its real life).
+        // Fall back to the reconnect affordance rather than a dead-end error.
+        setError("Your GitHub connection is no longer valid. Click Connect GitHub to reconnect.");
+        setIsGithubConnected(false);
+        setIsGithubPickerOpen(false);
+        return;
+      }
       if (!res.ok) {
         throw new Error(`GitHub API error (${res.status})`);
       }
@@ -609,14 +625,21 @@ function UploadContentPage() {
     setIsImportingLink(true);
 
     try {
+      // Prefer our snapshotted GitHub token (survives JWT refresh) over the
+      // ephemeral session.provider_token; fall back to the session value for a
+      // brand-new login where the snapshot hasn't been written yet. The backend
+      // also has its own env.githubToken fallback for public repos, so a null
+      // here still imports public content.
       const { data } = await supabase.auth.getSession();
+      const githubAccessToken =
+        loadGithubAccessToken(user?.id) ?? data.session?.provider_token ?? undefined;
       const res = await apiFetch<GithubRepoImportResponse>(
         "/api/documents/import/github-repo",
         {
           method: "POST",
           body: JSON.stringify({
             repoUrl,
-            githubAccessToken: data.session?.provider_token,
+            githubAccessToken,
             maxFiles: 25,
           }),
         }

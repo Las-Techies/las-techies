@@ -9,8 +9,8 @@ import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "../lib/supabaseClient";
 import { QUIZ_ATTEMPT_STORAGE_KEY } from "../features/quiz/types";
 import {
-  captureGoogleProviderTokenFromSession,
-  clearGoogleDriveAccessToken,
+  captureProviderTokenFromSession,
+  clearProviderAccessTokens,
   markPendingOAuthProvider,
 } from "../features/auth/googleDriveToken";
 
@@ -55,16 +55,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       (event, newSession) => {
         setSession(newSession);
 
-        // This callback is the only place Google's access token is ever
+        // This callback is the only place a provider's access token is ever
         // observable — Supabase emits provider_token once, on the session
         // created by the OAuth exchange, and drops it on the next JWT
-        // refresh. Snapshot it here or lose it.
-        captureGoogleProviderTokenFromSession(newSession);
+        // refresh. Snapshot it here (Google or GitHub, per the pending marker)
+        // or lose it.
+        captureProviderTokenFromSession(newSession);
 
         // Covers sign-outs we didn't initiate (session expiry, or signOut in
-        // another tab) so a stale Drive token can't outlive its session.
+        // another tab) so a stale provider token can't outlive its session.
         if (event === "SIGNED_OUT") {
-          clearGoogleDriveAccessToken();
+          clearProviderAccessTokens();
         }
       }
     );
@@ -127,10 +128,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // here doesn't inherit a previous person's results (the Results page keys
     // "have they attempted the quiz?" off this).
     localStorage.removeItem(QUIZ_ATTEMPT_STORAGE_KEY);
-    // Same idea for the snapshotted Google Drive token — it's tied to
-    // whoever was just signed in, and must not carry over to the next
-    // person who signs in on this tab.
-    clearGoogleDriveAccessToken();
+    // Same idea for the snapshotted provider tokens (Google Drive, GitHub) —
+    // they're tied to whoever was just signed in, and must not carry over to
+    // the next person who signs in on this tab.
+    clearProviderAccessTokens();
   }
 
   // Sends a password-reset email. Supabase redirects the user back here
