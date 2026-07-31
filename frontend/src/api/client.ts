@@ -465,3 +465,18 @@ export async function activateTeam(teamId: number): Promise<ManagedTeam> {
   });
   return res.data;
 }
+
+export type GithubRepoSummary = {
+  full_name: string;
+  description: string | null;
+  private: boolean;
+};
+
+// Repositories for the "Pick from GitHub" modal. Listed by the backend using
+// the server's GitHub token — Supabase never hands the browser a usable GitHub
+// token (login is Google; a linked GitHub identity yields no provider_token),
+// so listing this client-side always 401'd.
+export async function listGithubRepos(): Promise<GithubRepoSummary[]> {
+  const res = await apiFetch<{ data: GithubRepoSummary[] }>("/api/documents/github/repos");
+  return res.data;
+}

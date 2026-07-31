@@ -12,7 +12,7 @@ import {
   captureProviderTokenFromSession,
   clearProviderAccessTokens,
   markPendingOAuthProvider,
-} from "../features/auth/googleDriveToken";
+} from "../features/auth/providerTokens";
 
 export type UserRole = "new_hire" | "manager";
 

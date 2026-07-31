@@ -8,6 +8,7 @@ import {
   importGoogleDriveDocument,
   importGoogleDriveFolder,
   importGithubRepo,
+  listGithubReposHandler,
   uploadDocument,
   getDocumentById,
   getDocumentFileUrl,
@@ -21,6 +22,7 @@ router.post("/upload", requireRole("manager"), upload.single("file"), uploadDocu
 router.post("/import/google-drive", requireRole("manager"), importGoogleDriveDocument);
 router.post("/import/google-drive-folder", requireRole("manager"), importGoogleDriveFolder);
 router.post("/import/github-repo", requireRole("manager"), importGithubRepo);
+router.get("/github/repos", requireRole("manager"), listGithubReposHandler);
 router.get("/mine", getMyDocuments);
 router.get("/team", getTeamDocuments);
 router.get("/:documentId/file-url", getDocumentFileUrl);
