@@ -105,7 +105,8 @@ function InviteSignupPage() {
     setError("");
     setIsGoogleLoading(true);
     try {
-      await signInWithGoogle();
+      const inviteRedirect = `${window.location.origin}/signup?invite=${encodeURIComponent(token)}`;
+      await signInWithGoogle(inviteRedirect);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Unable to start Google sign-in. Please try again."

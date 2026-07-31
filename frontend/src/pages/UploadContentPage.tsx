@@ -1,5 +1,6 @@
 import type { ChangeEventHandler, DragEventHandler } from "react";
 import { useEffect, useRef, useState } from "react";
+import { useModalTransition } from "../hooks/useModalTransition";
 import { Link } from "react-router-dom";
 import AppNav from "../components/navigation/AppNav";
 import WizardSteps from "../components/navigation/WizardSteps";
@@ -167,6 +168,11 @@ function UploadContentPage() {
   const [isGooglePickerLoading, setIsGooglePickerLoading] = useState(false);
   const [isGithubConnected, setIsGithubConnected] = useState(false);
   const [isConnectingGithub, setIsConnectingGithub] = useState(false);
+  const [isGithubPickerOpen, setIsGithubPickerOpen] = useState(false);
+  const [githubPickerLoading, setGithubPickerLoading] = useState(false);
+  const [githubPickerSearch, setGithubPickerSearch] = useState("");
+  const [githubRepos, setGithubRepos] = useState<Array<{ full_name: string; description: string | null; private: boolean }>>([]);
+  const githubPicker = useModalTransition(isGithubPickerOpen);
   // Set when Google's token is missing or Google itself rejected it, so the
   // error can offer a one-click reconnect instead of telling the user to sign
   // out and back in.
@@ -263,6 +269,35 @@ function UploadContentPage() {
 
     void hydrateUploads();
   }, []);
+
+  const handleOpenGithubPicker = async () => {
+    setGithubPickerSearch("");
+    setIsGithubPickerOpen(true);
+    setGithubPickerLoading(true);
+    try {
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.provider_token;
+      if (!token) {
+        setError("GitHub access token unavailable. Try signing out and reconnecting GitHub.");
+        setIsGithubPickerOpen(false);
+        return;
+      }
+      const res = await fetch(
+        "https://api.github.com/user/repos?sort=updated&per_page=100&affiliation=owner,collaborator,organization_member",
+        { headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json" } }
+      );
+      if (!res.ok) {
+        throw new Error(`GitHub API error (${res.status})`);
+      }
+      const repos = await res.json() as Array<{ full_name: string; description: string | null; private: boolean }>;
+      setGithubRepos(repos);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load GitHub repositories.");
+      setIsGithubPickerOpen(false);
+    } finally {
+      setGithubPickerLoading(false);
+    }
+  };
 
   const handleConnectGithub = async () => {
     try {
@@ -659,10 +694,10 @@ function UploadContentPage() {
             () =>
               reject(
                 new Error(
-                  "Google sign-in timed out. Please try again and complete the account chooser."
+                  "Google sign-in timed out. Please click again and finish choosing your Google account in the window that opens."
                 )
               ),
-            3500
+            90000
           )
         ),
       ]);
@@ -926,15 +961,27 @@ function UploadContentPage() {
             <strong>Import from link</strong>
             <span>Pull content from a public URL or repository.</span>
           </span>
-          <button
-            className="import-connect"
-            type="button"
-            onClick={() => void handleConnectGithub()}
-            disabled={isGithubConnected || isConnectingGithub}
-          >
-            <GithubIcon />
-            {isGithubConnected ? "Connected" : isConnectingGithub ? "Connecting…" : "Connect GitHub"}
-          </button>
+          {isGithubConnected ? (
+            <button
+              className="import-connect"
+              type="button"
+              onClick={() => void handleOpenGithubPicker()}
+              disabled={isImportingLink}
+            >
+              <GithubIcon />
+              Pick from GitHub
+            </button>
+          ) : (
+            <button
+              className="import-connect"
+              type="button"
+              onClick={() => void handleConnectGithub()}
+              disabled={isConnectingGithub}
+            >
+              <GithubIcon />
+              {isConnectingGithub ? "Connecting…" : "Connect GitHub"}
+            </button>
+          )}
           <button
             className="import-connect"
             type="button"
@@ -1075,6 +1122,72 @@ function UploadContentPage() {
           )}
         </div>
       </main>
+      {githubPicker.shouldRender ? (
+        <div
+          className={`modal-backdrop t-modal-backdrop ${githubPicker.phaseClassName}`}
+          onClick={() => setIsGithubPickerOpen(false)}
+          role="presentation"
+        >
+          <div
+            className={`modal-card t-modal github-picker-modal ${githubPicker.phaseClassName}`}
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Pick a GitHub repository"
+          >
+            <h3>Pick a GitHub repository</h3>
+            <input
+              type="search"
+              className="github-picker-search"
+              placeholder="Search repositories…"
+              value={githubPickerSearch}
+              onChange={(e) => setGithubPickerSearch(e.target.value)}
+              autoFocus
+            />
+            <div className="github-picker-list">
+              {githubPickerLoading ? (
+                <p className="github-picker-empty">Loading repositories…</p>
+              ) : githubRepos.length === 0 ? (
+                <p className="github-picker-empty">No repositories found.</p>
+              ) : (
+                githubRepos
+                  .filter((r) =>
+                    r.full_name.toLowerCase().includes(githubPickerSearch.toLowerCase())
+                  )
+                  .map((repo) => (
+                    <button
+                      key={repo.full_name}
+                      type="button"
+                      className="github-picker-repo"
+                      onClick={async () => {
+                        setIsGithubPickerOpen(false);
+                        await handleGithubRepoImport(`https://github.com/${repo.full_name}`);
+                      }}
+                    >
+                      <span className="github-picker-repo-name">
+                        <GithubIcon />
+                        {repo.full_name}
+                        {repo.private ? <span className="github-picker-private">Private</span> : null}
+                      </span>
+                      {repo.description ? (
+                        <span className="github-picker-repo-desc">{repo.description}</span>
+                      ) : null}
+                    </button>
+                  ))
+              )}
+            </div>
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="sf-btn"
+                onClick={() => setIsGithubPickerOpen(false)}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

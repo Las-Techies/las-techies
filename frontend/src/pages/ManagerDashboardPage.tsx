@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import AppNav from "../components/navigation/AppNav";
 import {
   apiFetch,
@@ -9,7 +9,7 @@ import {
   type ManagerDashboardQuiz,
   type TeamMember,
 } from "../api/client";
-import { describeError, type FriendlyError } from "../api/errors";
+import { describeError } from "../api/errors";
 import ApiErrorCard from "../components/ApiErrorCard";
 import {
   CalendarIcon,
@@ -21,6 +21,9 @@ import {
 } from "../components/icons";
 import type { GeneratedQuiz } from "../features/quiz/types";
 import { useLastNonNull, useModalTransition } from "../hooks/useModalTransition";
+import { useAuth } from "../context/AuthContext";
+import TeamSwitcher from "../components/TeamSwitcher";
+import { supabase } from "../lib/supabaseClient";
 
 function formatDate(iso: string | null): string {
   if (!iso) return "No due date";
@@ -67,6 +70,16 @@ function getAssignmentStatusDisplay(assignment: {
 }
 
 function ManagerDashboardPage() {
+  const { session } = useAuth();
+  // The manager's active team. The DB is the source of truth (they switch teams
+  // server-side without a session refresh, so the JWT's team_id can be stale) —
+  // we seed from the JWT for the very first render, then reconcile with the id
+  // the dashboard payload echoes back, and set it optimistically on switch so
+  // the switcher marks the new team instantly.
+  const [activeTeamId, setActiveTeamId] = useState<number | null>(() => {
+    const raw = session?.user.user_metadata?.team_id;
+    return Number.isInteger(Number(raw)) ? Number(raw) : null;
+  });
   const [data, setData] = useState<ManagerDashboardData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<FriendlyError | null>(null);
@@ -74,8 +87,6 @@ function ManagerDashboardPage() {
   const [isQuizModalOpen, setIsQuizModalOpen] = useState(false);
   const [isQuizModalLoading, setIsQuizModalLoading] = useState(false);
   const [quizModalError, setQuizModalError] = useState("");
-  // Bumped by the Try again button to re-run the loader effect.
-  const [reloadKey, setReloadKey] = useState(0);
 
   // "Add users" modal: assign an already-published quiz to more learners (or
   // invite brand-new ones by email). `assignTarget` is the quiz being assigned.
@@ -95,16 +106,61 @@ function ManagerDashboardPage() {
   const [isAssigning, setIsAssigning] = useState(false);
   const [assignError, setAssignError] = useState("");
 
+  // "Create your first team" prompt, shown when a manager has no active team
+  // yet (team setup didn't complete at signup). Creating one here recovers the
+  // account without needing to sign up again.
+  const [firstTeamName, setFirstTeamName] = useState("");
+  const [isCreatingFirstTeam, setIsCreatingFirstTeam] = useState(false);
+  const [firstTeamError, setFirstTeamError] = useState("");
+
+  // Per-team cache of the last dashboard payload, so switching back to a team
+  // you've already viewed shows instantly instead of flashing a loader. Kept in
+  // a ref (not state) since it's a side cache, not render state — reads/writes
+  // shouldn't themselves trigger re-renders.
+  const dashboardCacheRef = useRef<Map<number, ManagerDashboardData>>(new Map());
+
   useEffect(() => {
     let cancelled = false;
-    setIsLoading(true);
+
+    // Show cached data for this team immediately if we have it (no flash);
+    // otherwise fall back to whatever's already on screen. We only show the
+    // full-page "Loading…" state on the very first load, when there's nothing
+    // to display yet — a switch keeps the current view up until fresh data
+    // arrives, so it never blanks.
+    const cached = activeTeamId !== null ? dashboardCacheRef.current.get(activeTeamId) : undefined;
+    if (cached) {
+      setData(cached);
+      setIsLoading(false);
+    } else {
+      setData((prev) => {
+        if (prev === null) setIsLoading(true);
+        return prev;
+      });
+    }
     setLoadError(null);
+
     getManagerDashboard()
       .then((result) => {
-        if (!cancelled) setData(result);
+        if (cancelled) return;
+        setData(result);
+        // Reconcile our active-team id with the DB source of truth the payload
+        // echoes back — covers the first load (JWT seed may lag) and any case
+        // where our optimistic value drifted from the server.
+        if (typeof result.activeTeamId === "number") {
+          setActiveTeamId(result.activeTeamId);
+        }
+        // Only cache real team data (not the "needs team" placeholder). Key on
+        // the payload's own team id when present so an out-of-date activeTeamId
+        // never caches under the wrong key.
+        const cacheKey = result.activeTeamId ?? activeTeamId;
+        if (cacheKey !== null && cacheKey !== undefined && !result.needsTeam) {
+          dashboardCacheRef.current.set(cacheKey, result);
+        }
       })
       .catch((err) => {
-        if (!cancelled) setLoadError(describeError(err));
+        // Keep any stale/cached data visible on error rather than wiping it;
+        // only surface the error card when we have nothing to show.
+        if (!cancelled && !cached) setLoadError(describeError(err));
       })
       .finally(() => {
         if (!cancelled) setIsLoading(false);
@@ -112,7 +168,44 @@ function ManagerDashboardPage() {
     return () => {
       cancelled = true;
     };
-  }, [reloadKey]);
+  }, [reloadKey, activeTeamId]);
+
+  // Called after the manager switches or creates a team, with the now-active
+  // team id. Setting activeTeamId is what makes the loader effect refetch (and
+  // read any cached payload) for the new team — and it marks the right row in
+  // the switcher immediately. The roster cache is team-scoped, so drop it too
+  // (forcing a reload on the next "Add users" open).
+  function handleTeamChanged(teamId: number) {
+    setTeamMembers([]);
+    setHasLoadedMembers(false);
+    setActiveTeamId(teamId);
+  }
+
+  // Creates the manager's first team from the "needs team" prompt. Same
+  // endpoint signup uses: it creates the team owned by this manager, makes it
+  // active, and updates their JWT metadata — so we refresh the session before
+  // reloading the dashboard for the now-active team.
+  async function handleCreateFirstTeam() {
+    const name = firstTeamName.trim();
+    if (!name || isCreatingFirstTeam) return;
+    setIsCreatingFirstTeam(true);
+    setFirstTeamError("");
+    try {
+      const created = await apiFetch<{ data: { id: number; name: string } }>("/api/teams", {
+        method: "POST",
+        body: JSON.stringify({ name }),
+      });
+      await supabase.auth.refreshSession();
+      setFirstTeamName("");
+      handleTeamChanged(created.data.id);
+    } catch (err) {
+      setFirstTeamError(
+        err instanceof Error ? err.message : "Couldn't create your team. Please try again."
+      );
+    } finally {
+      setIsCreatingFirstTeam(false);
+    }
+  }
 
   const stats = useMemo(() => {
     if (!data) return null;
@@ -254,13 +347,13 @@ function ManagerDashboardPage() {
         }
         setAssignError(`${parts.join(" and ")}. Please try again.`);
         // Refresh so any assignments that DID succeed are reflected.
-        setReloadKey((k) => k + 1);
+        void dashboardQuery.refetch();
         return;
       }
 
       // Clean success — close and refresh the dashboard counts.
       setIsAssignModalOpen(false);
-      setReloadKey((k) => k + 1);
+      void dashboardQuery.refetch();
     } finally {
       setIsAssigning(false);
     }
@@ -277,6 +370,11 @@ function ManagerDashboardPage() {
             <h1>Team Dashboard</h1>
             <p>See how your new hires are progressing and how each quiz you've published is performing.</p>
           </div>
+          {data && !data.needsTeam ? (
+            <div className="mgr-hero-actions">
+              <TeamSwitcher activeTeamId={activeTeamId} onTeamChanged={handleTeamChanged} />
+            </div>
+          ) : null}
         </div>
 
         {isLoading ? (
@@ -285,11 +383,47 @@ function ManagerDashboardPage() {
           </section>
         ) : loadError ? (
           <section className="glass dash-card">
-            <ApiErrorCard error={loadError} onRetry={() => setReloadKey((k) => k + 1)} />
+            <ApiErrorCard error={loadError} onRetry={() => void dashboardQuery.refetch()} />
           </section>
         ) : !data ? (
           <section className="glass dash-card">
             <p className="cfg-empty">Couldn't load your dashboard. Try refreshing the page.</p>
+          </section>
+        ) : data.needsTeam ? (
+          <section className="glass dash-card">
+            <div className="dash-needs-team">
+              <span className="dash-needs-team-icon" aria-hidden>
+                <PeopleIcon />
+              </span>
+              <h3>Create your first team</h3>
+              <p>
+                You don't have a team yet. Name the team you'll be managing to set up your
+                dashboard — you can add new hires and create more teams afterward.
+              </p>
+              <div className="dash-needs-team-form">
+                <input
+                  type="text"
+                  placeholder="e.g. Frontline Ops Team"
+                  value={firstTeamName}
+                  onChange={(event) => setFirstTeamName(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      void handleCreateFirstTeam();
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  className="sf-btn"
+                  disabled={isCreatingFirstTeam || !firstTeamName.trim()}
+                  onClick={() => void handleCreateFirstTeam()}
+                >
+                  {isCreatingFirstTeam ? "Creating…" : "Create team"}
+                </button>
+              </div>
+              {firstTeamError ? <p className="form-error">{firstTeamError}</p> : null}
+            </div>
           </section>
         ) : (
           <>
