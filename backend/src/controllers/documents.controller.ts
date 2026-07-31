@@ -16,6 +16,7 @@ import {
   extractTextFromGithubFile,
   isSupportedGithubFile,
   listGithubRepoFiles,
+  listGithubRepos,
   parseGithubRepoUrl,
   extractTextFromGoogleDriveUrlWithToken,
 } from "../services/documentProcessor";
@@ -654,6 +655,28 @@ export async function importGoogleDriveFolder(//import from google drive folder 
         items,
       },
     });
+  } catch (error) {
+    next(error);
+  }
+}
+
+// Lists GitHub repositories for the "Pick from GitHub" modal. Runs server-side
+// using the server's GitHub token rather than a user token: Supabase never
+// gives the browser a usable GitHub token (login is Google; a linked GitHub
+// identity yields no provider_token), so the old client-side fetch always 401'd.
+export async function listGithubReposHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  try {
+    const user = (req as any).user as AuthUser | undefined;
+    if (!user?.id) {
+      return res.status(401).json({ error: { message: "Unauthorized" } });
+    }
+
+    const repos = await listGithubRepos();
+    return res.json({ data: repos });
   } catch (error) {
     next(error);
   }

@@ -4,18 +4,14 @@ import { useModalTransition } from "../hooks/useModalTransition";
 import { Link } from "react-router-dom";
 import AppNav from "../components/navigation/AppNav";
 import WizardSteps from "../components/navigation/WizardSteps";
-import { apiFetch } from "../api/client";
+import { apiFetch, listGithubRepos } from "../api/client";
 import {
   loadDeselectedDocumentIds,
   loadUploadedDocuments,
   saveDeselectedDocumentIds,
   saveUploadedDocuments,
 } from "../features/quiz/storage";
-import {
-  loadGithubAccessToken,
-  loadGoogleDriveAccessToken,
-  markPendingOAuthProvider,
-} from "../features/auth/googleDriveToken";
+import { loadGoogleDriveAccessToken } from "../features/auth/providerTokens";
 import {
   isGoogleDriveAuthConfigured,
   preloadGoogleDriveAuth,
@@ -167,8 +163,6 @@ function UploadContentPage() {
   const [linkInput, setLinkInput] = useState("");
   const [isImportingLink, setIsImportingLink] = useState(false);
   const [isGooglePickerLoading, setIsGooglePickerLoading] = useState(false);
-  const [isGithubConnected, setIsGithubConnected] = useState(false);
-  const [isConnectingGithub, setIsConnectingGithub] = useState(false);
   const [isGithubPickerOpen, setIsGithubPickerOpen] = useState(false);
   const [githubPickerLoading, setGithubPickerLoading] = useState(false);
   const [githubPickerSearch, setGithubPickerSearch] = useState("");
@@ -213,14 +207,6 @@ function UploadContentPage() {
   // Upload page was always too late, since it's already gone from the session
   // by the time the JWT has refreshed once. AuthContext now grabs it in
   // onAuthStateChange, the one moment Supabase emits it.
-  const refreshGithubConnectionStatus = async () => {
-    const { data } = await supabase.auth.getSession();
-    const identities = data.session?.user?.identities ?? [];
-    setIsGithubConnected(
-      identities.some((identity) => identity.provider === "github")
-    );
-  };
-
   useEffect(() => {
     // Fetch Google's script now, not at click time, so the popup opens
     // directly off the user's gesture instead of after a network round-trip.
@@ -229,15 +215,6 @@ function UploadContentPage() {
 
   useEffect(() => {
     const hydrateUploads = async () => {
-      // Deliberately not in the same try as the document fetch — a failure
-      // reading the session used to skip the document list entirely and drop
-      // silently to the local cache.
-      try {
-        await refreshGithubConnectionStatus();
-      } catch {
-        setIsGithubConnected(false);
-      }
-
       try {
         const res = await apiFetch<MyDocumentsResponse>("/api/documents/mine");
         const serverUploads: UploadedItem[] = res.data.map((document) => ({
@@ -276,36 +253,11 @@ function UploadContentPage() {
     setIsGithubPickerOpen(true);
     setGithubPickerLoading(true);
     try {
-      // Read our own snapshot of GitHub's token, not session.provider_token:
-      // Supabase drops provider_token on the first JWT refresh and keeps only
-      // one slot for it (so a Google login clobbers GitHub's). We captured
-      // GitHub's token when linkIdentity's redirect returned — see
-      // captureProviderTokenFromSession.
-      const token = loadGithubAccessToken(user?.id);
-      if (!token) {
-        // Snapshot missing or aged out — the only way to get a fresh GitHub
-        // token is to re-run the OAuth link, which handleConnectGithub does.
-        setError("Your GitHub connection has expired. Click Connect GitHub to reconnect.");
-        setIsGithubConnected(false);
-        setIsGithubPickerOpen(false);
-        return;
-      }
-      const res = await fetch(
-        "https://api.github.com/user/repos?sort=updated&per_page=100&affiliation=owner,collaborator,organization_member",
-        { headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json" } }
-      );
-      if (res.status === 401) {
-        // GitHub rejected the snapshot (revoked, or stale past its real life).
-        // Fall back to the reconnect affordance rather than a dead-end error.
-        setError("Your GitHub connection is no longer valid. Click Connect GitHub to reconnect.");
-        setIsGithubConnected(false);
-        setIsGithubPickerOpen(false);
-        return;
-      }
-      if (!res.ok) {
-        throw new Error(`GitHub API error (${res.status})`);
-      }
-      const repos = await res.json() as Array<{ full_name: string; description: string | null; private: boolean }>;
+      // Listed by the backend using the server's GitHub token. Supabase never
+      // hands the browser a usable GitHub token (login is Google; a linked
+      // GitHub identity yields no provider_token), so listing this client-side
+      // always 401'd — see listGithubRepos.
+      const repos = await listGithubRepos();
       setGithubRepos(repos);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load GitHub repositories.");
@@ -315,55 +267,23 @@ function UploadContentPage() {
     }
   };
 
-  const handleConnectGithub = async () => {
-    try {
-      setError("");
-      setIsConnectingGithub(true);
-      // linkIdentity (not signInWithOAuth) — this user is already signed in
-      // via Google, and we're attaching GitHub as a second identity on that
-      // same account. signInWithOAuth would instead run a brand-new sign-in
-      // exchange and hand back a freshly minted session/JWT that isn't
-      // guaranteed to carry this account's custom user_metadata (like
-      // team_id), which previously reset managers back to the default demo
-      // team the moment they connected GitHub.
-      //
-      // Mark the provider so the token this redirect brings back isn't
-      // mistaken for a Google one and stashed as the Drive credential.
-      markPendingOAuthProvider("github");
-      const { error: oauthError } = await supabase.auth.linkIdentity({
-        provider: "github",
-        options: {
-          // Return to Upload + Generate after linking so managers can continue
-          // importing from GitHub without being bounced to the dashboard.
-          redirectTo: `${window.location.origin}/upload-content`,
-        },
-      });
-      if (oauthError) {
-        throw oauthError;
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to connect GitHub.");
-      setIsConnectingGithub(false);
-    }
-  };
-
   // Gets a Drive access token for the import about to run.
   //
   // Preferred path asks Google directly (see features/auth/googleDriveAuth) —
   // fresh token per use, nothing stored, and the Supabase session is left
   // alone. The Supabase provider_token path below is kept only so behaviour is
   // unchanged until VITE_GOOGLE_CLIENT_ID is set, and can be deleted (along
-  // with googleDriveToken.ts) once the Google path is confirmed working.
+  // with providerTokens.ts) once the Google path is confirmed working.
   const resolveGoogleDriveToken = async (): Promise<string> => {
     if (isGoogleDriveAuthConfigured()) {
       return requestGoogleDriveAccessToken();
     }
 
     const { data } = await supabase.auth.getSession();
-    const liveProviderToken = isGithubConnected
-      ? undefined
-      : data.session?.provider_token;
-    const token = loadGoogleDriveAccessToken(user?.id) ?? liveProviderToken;
+    // Login is always Google now (GitHub is listed server-side, never linked
+    // to the session), so the session's provider_token is Google's when present.
+    const token =
+      loadGoogleDriveAccessToken(user?.id) ?? data.session?.provider_token;
 
     if (!token) {
       setNeedsGoogleReconsent(true);
@@ -625,21 +545,16 @@ function UploadContentPage() {
     setIsImportingLink(true);
 
     try {
-      // Prefer our snapshotted GitHub token (survives JWT refresh) over the
-      // ephemeral session.provider_token; fall back to the session value for a
-      // brand-new login where the snapshot hasn't been written yet. The backend
-      // also has its own env.githubToken fallback for public repos, so a null
-      // here still imports public content.
-      const { data } = await supabase.auth.getSession();
-      const githubAccessToken =
-        loadGithubAccessToken(user?.id) ?? data.session?.provider_token ?? undefined;
+      // No client token: Supabase never hands the browser a usable GitHub
+      // token (login is Google; a linked GitHub identity yields no
+      // provider_token). The backend authenticates with its own env.githubToken
+      // instead — see importGithubRepo / githubApiRequest.
       const res = await apiFetch<GithubRepoImportResponse>(
         "/api/documents/import/github-repo",
         {
           method: "POST",
           body: JSON.stringify({
             repoUrl,
-            githubAccessToken,
             maxFiles: 25,
           }),
         }
@@ -984,27 +899,15 @@ function UploadContentPage() {
             <strong>Import from link</strong>
             <span>Pull content from a public URL or repository.</span>
           </span>
-          {isGithubConnected ? (
-            <button
-              className="import-connect"
-              type="button"
-              onClick={() => void handleOpenGithubPicker()}
-              disabled={isImportingLink}
-            >
-              <GithubIcon />
-              Pick from GitHub
-            </button>
-          ) : (
-            <button
-              className="import-connect"
-              type="button"
-              onClick={() => void handleConnectGithub()}
-              disabled={isConnectingGithub}
-            >
-              <GithubIcon />
-              {isConnectingGithub ? "Connecting…" : "Connect GitHub"}
-            </button>
-          )}
+          <button
+            className="import-connect"
+            type="button"
+            onClick={() => void handleOpenGithubPicker()}
+            disabled={isImportingLink}
+          >
+            <GithubIcon />
+            Pick from GitHub
+          </button>
           <button
             className="import-connect"
             type="button"
