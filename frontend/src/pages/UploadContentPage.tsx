@@ -15,7 +15,7 @@ import {
   loadGithubAccessToken,
   loadGoogleDriveAccessToken,
   markPendingOAuthProvider,
-} from "../features/auth/googleDriveToken";
+} from "../features/auth/providerTokens";
 import {
   isGoogleDriveAuthConfigured,
   preloadGoogleDriveAuth,
