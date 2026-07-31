@@ -375,7 +375,11 @@ function ManagerDashboardPage() {
           </div>
           {data && !data.needsTeam ? (
             <div className="mgr-hero-actions">
-              <TeamSwitcher activeTeamId={activeTeamId} onTeamChanged={handleTeamChanged} />
+              <TeamSwitcher
+                activeTeamId={activeTeamId}
+                activeTeamName={data.activeTeamName ?? null}
+                onTeamChanged={handleTeamChanged}
+              />
             </div>
           ) : null}
         </div>

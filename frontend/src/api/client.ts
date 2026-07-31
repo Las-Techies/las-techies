@@ -417,6 +417,10 @@ export type ManagerDashboardData = {
   // The dashboard uses this to mark the active team. Absent on the needsTeam
   // placeholder and on older payloads.
   activeTeamId?: number;
+  // The active team's display name, so the team switcher can show it on first
+  // paint instead of a placeholder while it loads the owned-teams list. Absent
+  // on the needsTeam placeholder and on older payloads.
+  activeTeamName?: string | null;
 };
 
 // One-call payload for the manager dashboard: every quiz on the team with

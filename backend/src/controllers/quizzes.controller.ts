@@ -14,6 +14,7 @@ import {
   updateQuizStatus,
 } from "../models/quiz.model";
 import { findDocumentByIdForTeam } from "../models/document.model";
+import { findTeamById } from "../models/team.model";
 import { findTeamMembersByRole, findUsersByIdsForTeam } from "../models/user.model";
 import { sendMail } from "../services/mailer";
 import { env } from "../config/env";
@@ -618,9 +619,10 @@ export async function getManagerDashboard(req: Request, res: Response, next: Nex
       return res.json({ data: { quizzes: [], learners: [], needsTeam: true } });
     }
 
-    const [teamQuizData, learners] = await Promise.all([
+    const [teamQuizData, learners, activeTeam] = await Promise.all([
       findTeamQuizzesWithAssignments(user.teamId),
       findTeamMembersByRole(user.teamId, "new_hire"),
+      findTeamById(user.teamId),
     ]);
     const quizzes = teamQuizData?.quizzes ?? [];
     const joinedAssignments = teamQuizData?.joinedAssignments ?? [];
@@ -688,8 +690,11 @@ export async function getManagerDashboard(req: Request, res: Response, next: Nex
         // The DB is the source of truth for the manager's active team (they
         // switch teams server-side without a session refresh, so the JWT's
         // team_id can be stale). Echo it back so the client marks the right
-        // team as active without reading it from the token.
+        // team as active without reading it from the token — and its name, so
+        // the team switcher shows the real team on first paint instead of a
+        // placeholder while it separately loads the owned-teams list.
         activeTeamId: user.teamId,
+        activeTeamName: activeTeam?.name ?? null,
       },
     });
   } catch (err) {
