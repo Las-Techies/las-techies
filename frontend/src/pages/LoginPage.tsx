@@ -4,6 +4,7 @@ import mascotLogo from "../assets/panda-login.png";
 import { useAuth } from "../context/AuthContext";
 import { apiFetch } from "../api/client";
 import { supabase } from "../lib/supabaseClient";
+import { ensureManagerTeam } from "../features/auth/ensureManagerTeam";
 import {
   ArrowLeft,
   ChevronRight,
@@ -113,6 +114,16 @@ function LoginPage() {
         setError("Unable to log in. Please try again.");
         return;
       }
+
+      // Recover a manager whose team wasn't created at signup (e.g. they had to
+      // confirm their email first, so signUp returned no session). Creates the
+      // team from the name stashed in their metadata; no-ops if they already
+      // have one. Refresh so the new team_id is in the JWT before we navigate.
+      const created = await ensureManagerTeam(result);
+      if (created) {
+        await supabase.auth.refreshSession();
+      }
+
       navigate(routeForRole(result.user.user_metadata?.role));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to log in. Please try again.");
@@ -149,9 +160,13 @@ function LoginPage() {
         password,
         role,
         firstName.trim(),
-        lastName.trim()
+        lastName.trim(),
+        role === "manager" ? teamName.trim() : undefined
       );
       if (!result) {
+        // Email confirmation is on: no session yet, so we can't create the team
+        // now. The name is stashed in user_metadata (pending_team_name) and the
+        // team is created on their first login instead — see handleLogin.
         setError("Account created. Please confirm your email, then log in.");
         switchMode("login");
         return;
@@ -162,10 +177,7 @@ function LoginPage() {
       // metadata, so we refresh the session to pull the new team_id into the
       // JWT before any team-scoped requests run.
       if (role === "manager") {
-        await apiFetch("/api/teams", {
-          method: "POST",
-          body: JSON.stringify({ name: teamName.trim() }),
-        });
+        await ensureManagerTeam(result);
         await supabase.auth.refreshSession();
       }
 

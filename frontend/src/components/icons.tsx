@@ -104,6 +104,12 @@ export const ChevronDown = (props: IconProps) => (
   </svg>
 );
 
+export const ChevronUp = (props: IconProps) => (
+  <svg {...base(props)}>
+    <path d="M18 15l-6-6-6 6" />
+  </svg>
+);
+
 export const MoreHorizontal = (props: IconProps) => (
   <svg {...base(props)} fill="currentColor" stroke="none">
     <circle cx="5" cy="12" r="1.6" />
@@ -223,6 +229,16 @@ export const XCircleIcon = (props: IconProps) => (
 export const CheckPlain = (props: IconProps) => (
   <svg {...base(props)}>
     <path d="M5 12l4.5 4.5L19 7" />
+  </svg>
+);
+
+// Lucide "users" — two people, used for the manager team switcher.
+export const UsersIcon = (props: IconProps) => (
+  <svg {...base(props)}>
+    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+    <path d="M16 3.128a4 4 0 0 1 0 7.744" />
+    <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+    <circle cx="9" cy="7" r="4" />
   </svg>
 );
 

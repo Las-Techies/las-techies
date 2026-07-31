@@ -31,8 +31,8 @@ You have two options:
 - **Easiest for a quick local test:** ask a teammate to add you as a member
   on the existing Supabase project and reuse its credentials.
 - **Fully isolated (your own data):** create your own free project at
-  [supabase.com](https://supabase.com), then run migrations + the seed
-  script against it (step 5 below).
+  [supabase.com](https://supabase.com), then run the migrations against it
+  (step 5 below).
 
 Either way, you'll need four values from the Supabase dashboard:
 
@@ -89,8 +89,11 @@ From `backend/`:
 ```bash
 npx prisma migrate deploy
 npx prisma generate
-npm run seed   # optional — seeds a demo team, manager user, and sample onboarding docs
 ```
+
+There is no seed data — the app starts empty. Create a manager account through
+the signup flow (which creates their first team), and add new hires by inviting
+them from the dashboard.
 
 `prisma migrate deploy` enables the `vector` Postgres extension for you (via
 `CREATE EXTENSION IF NOT EXISTS vector;` in the migration) as long as your
@@ -101,8 +104,8 @@ document search (`backend/src/services/embeddings.ts` +
 manually first from the Supabase dashboard: **Database → Extensions → search
 "vector" → Enable**, then re-run the command above.
 
-If you already have documents from before this feature existed (e.g. the
-seeded demo docs), backfill their chat search index once with:
+If you already have documents from before this feature existed, backfill their
+chat search index once with:
 
 ```bash
 npm run backfill-embeddings
