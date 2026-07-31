@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Metric tiles preview</title>
+    <link rel="stylesheet" href="./src/styles/global.css" />
+    <style>
+      body::after { display: none; }
+      body { background: #eef4fb; padding: 24px; }
+      .pv-wrap { max-width: 1120px; margin: 0 auto; display: flex; flex-direction: column; gap: 26px; }
+      .pv-block { background: #fff; border-radius: 16px; padding: 20px; box-shadow: 0 8px 30px rgba(11,42,84,0.06); }
+      .pv-title { font: 700 13px/1 -apple-system, sans-serif; text-transform: uppercase; letter-spacing: .05em; color: #6b7d95; margin: 0 0 14px; }
+      .pv-results-card { max-width: 700px; }
+    </style>
+  </head>
+  <body>
+    <div class="pv-wrap">
+
+      <div class="pv-block">
+        <p class="pv-title">Manager Dashboard (reference)</p>
+        <div class="dash-stats">
+          <div class="glass dash-stat-card">
+            <span class="dash-stat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M2.5 19c0-3 2.9-5.3 6.5-5.3S15.5 16 15.5 19"/><path d="M16 5.2A3.2 3.2 0 0 1 16 11.4"/><path d="M17.5 13.9c2.6.5 4.5 2.5 4.5 5.1"/></svg></span>
+            <div><span class="dash-stat-value">6</span><span class="dash-stat-label">New hires</span></div>
+          </div>
+          <div class="glass dash-stat-card">
+            <span class="dash-stat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4" width="14" height="17" rx="2"/><rect x="9" y="2.5" width="6" height="4" rx="1"/><path d="M9 11h6"/><path d="M9 15h4"/></svg></span>
+            <div><span class="dash-stat-value">4</span><span class="dash-stat-label">Published quizzes</span></div>
+          </div>
+          <div class="glass dash-stat-card">
+            <span class="dash-stat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8 12l2.5 2.5L16 9"/></svg></span>
+            <div><span class="dash-stat-value">72%</span><span class="dash-stat-label">Completion rate</span></div>
+          </div>
+          <div class="glass dash-stat-card">
+            <span class="dash-stat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 20V12"/><path d="M12 20V6"/><path d="M19 20v-5"/></svg></span>
+            <div><span class="dash-stat-value">84%</span><span class="dash-stat-label">Average score</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="pv-block pv-results-card">
+        <p class="pv-title">Quiz Results &mdash; stat chips (now horizontal + stretched icon)</p>
+        <div class="stat-chips">
+          <div class="stat-chip">
+            <span class="stat-ic good"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4 4 10-10"/></svg></span>
+            <div class="stat-chip-text"><strong>8</strong><span>Correct</span></div>
+          </div>
+          <div class="stat-chip">
+            <span class="stat-ic bad"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"/></svg></span>
+            <div class="stat-chip-text"><strong>2</strong><span>Incorrect</span></div>
+          </div>
+          <div class="stat-chip">
+            <span class="stat-ic time"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>
+            <div class="stat-chip-text"><strong>4:12</strong><span>Time Taken</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="pv-block pv-results-card">
+        <p class="pv-title">Quiz Results &mdash; score ring (unchanged hero gauge)</p>
+        <div class="score-row">
+          <div class="score-ring" style="--pct:84%"><div class="score-ring-center"><strong>84%</strong><span>Your score</span></div></div>
+          <div class="score-meta">
+            <span class="pass-badge ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4 4 10-10"/></svg> Passed</span>
+            <p class="score-sub">Passing score: 70%</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="pv-block rp-card">
+        <p class="pv-title">Review &amp; Publish &mdash; summary strip (bigger values)</p>
+        <div class="review-summary">
+          <h3>Review Summary</h3>
+          <div class="review-summary-grid">
+            <div><span>Quiz Title</span><strong>Intro to Security Basics</strong></div>
+            <div><span>Questions</span><strong>10</strong></div>
+            <div><span>Passing Score</span><strong>70%</strong></div>
+            <div><span>Time Limit</span><strong>15 min</strong></div>
+            <div><span>Topic</span><strong>Security</strong></div>
+            <div><span>Due Date</span><strong>Aug 12, 2026</strong></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="pv-block pv-results-card">
+        <p class="pv-title">Quiz Taking &mdash; intro facts (bigger values)</p>
+        <ul class="quiz-intro-facts">
+          <li><strong>10</strong><span>Questions</span></li>
+          <li><strong>15 min</strong><span>Time Limit</span></li>
+          <li><strong>70%</strong><span>Passing Score</span></li>
+        </ul>
+      </div>
+
+    </div>
+  </body>
+</html>

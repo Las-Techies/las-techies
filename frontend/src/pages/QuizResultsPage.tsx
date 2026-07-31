@@ -460,15 +460,19 @@ function QuizResultsPage() {
                     <span className="stat-ic good">
                       <CheckPlain />
                     </span>
-                    <strong>{correctCount}</strong>
-                    <span>Correct</span>
+                    <div className="stat-chip-text">
+                      <strong>{correctCount}</strong>
+                      <span>Correct</span>
+                    </div>
                   </div>
                   <div className="stat-chip">
                     <span className="stat-ic bad">
                       <XPlain />
                     </span>
-                    <strong>{incorrectCount}</strong>
-                    <span>Incorrect</span>
+                    <div className="stat-chip-text">
+                      <strong>{incorrectCount}</strong>
+                      <span>Incorrect</span>
+                    </div>
                   </div>
                 </>
               ) : null}
@@ -476,8 +480,10 @@ function QuizResultsPage() {
                 <span className="stat-ic time">
                   <ClockIcon />
                 </span>
-                <strong>{timeTaken}</strong>
-                <span>Time Taken</span>
+                <div className="stat-chip-text">
+                  <strong>{timeTaken}</strong>
+                  <span>Time Taken</span>
+                </div>
               </div>
             </div>
           </section>

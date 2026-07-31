@@ -189,6 +189,14 @@ const GREETING: ChatMessage = {
   text: "Hi, I'm Sage! I can answer questions about these materials. What would you like to know?",
 };
 
+// Shown as clickable chips under the greeting on a fresh thread, to give
+// new hires an obvious first move instead of a blank input.
+const STARTER_PROMPTS = [
+  "Summarize the key points",
+  "What should I focus on first?",
+  "Quiz me on this material",
+];
+
 function DocIcon({ kind }: { kind: SourceKind }) {
   if (kind === "google_drive") {
     return (
@@ -300,6 +308,25 @@ function ChatBubbleIcon() {
   );
 }
 
+function SendIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="18"
+      height="18"
+      fill="none"
+      stroke="#fff"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="m22 2-7 20-4-9-9-4Z" />
+      <path d="M22 2 11 13" />
+    </svg>
+  );
+}
+
 function DeleteChatIcon() {
   return (
     <svg
@@ -346,6 +373,7 @@ function LearnerModulePage() {
   const [deletingConversationId, setDeletingConversationId] = useState<number | null>(null);
   const historyRef = useRef<HTMLDivElement>(null);
   const [draft, setDraft] = useState("");
+  const [followUps, setFollowUps] = useState<string[]>([]);
   const [isTyping, setIsTyping] = useState(false);
   const messagesRef = useRef<HTMLDivElement>(null);
   const [moduleTitle, setModuleTitle] = useState("");
@@ -638,11 +666,16 @@ function LearnerModulePage() {
       });
   };
 
-  const sendMessage = () => {
-    const text = draft.trim();
+  // Sends `raw` to Sage; used both by the input's Send action (with the
+  // current draft) and by the starter/follow-up suggestion chips (with the
+  // chip's text). Follow-up suggestions are cleared on send and refreshed
+  // from the new answer.
+  const submitMessage = (raw: string) => {
+    const text = raw.trim();
     if (!text || isTyping || isConversationLoading) return;
     setMessages((prev) => [...prev, { role: "user", text }]);
     setDraft("");
+    setFollowUps([]);
     setIsTyping(true);
     sendChatMessage({ message: text, conversationId: conversationId ?? undefined })
       .then((res) => {
@@ -651,6 +684,7 @@ function LearnerModulePage() {
           ...prev,
           { role: "assistant", text: res.answer, sources: res.sources },
         ]);
+        setFollowUps(res.followUps ?? []);
         refreshConversations();
       })
       .catch(() => {
@@ -664,6 +698,8 @@ function LearnerModulePage() {
       })
       .finally(() => setIsTyping(false));
   };
+
+  const sendMessage = () => submitMessage(draft);
 
   const toggleHistory = () => {
     setIsHistoryOpen((open) => {
@@ -686,12 +722,14 @@ function LearnerModulePage() {
     if (isTyping || isConversationLoading) return;
     setIsHistoryOpen(false);
     setConversationId(null);
+    setFollowUps([]);
     setMessages([GREETING]);
   };
 
   const switchConversation = (id: number) => {
     setIsHistoryOpen(false);
     if (id === conversationId) return;
+    setFollowUps([]);
     setIsConversationLoading(true);
     getChatConversation(id)
       .then((res) => {
@@ -1043,6 +1081,39 @@ function LearnerModulePage() {
                     </div>
                   </div>
                 ) : null}
+
+                {/* On a fresh thread show starter prompts; after Sage answers,
+                    show the follow-up questions the API suggested. Both are
+                    just one-tap shortcuts that submit their own text. */}
+                {!isTyping && messages.length === 1 ? (
+                  <div className="ai-suggestions" aria-label="Suggested questions">
+                    {STARTER_PROMPTS.map((prompt) => (
+                      <button
+                        key={prompt}
+                        type="button"
+                        className="ai-suggestion-chip"
+                        onClick={() => submitMessage(prompt)}
+                      >
+                        {prompt}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+
+                {!isTyping && messages.length > 1 && followUps.length > 0 ? (
+                  <div className="ai-suggestions" aria-label="Suggested follow-up questions">
+                    {followUps.map((prompt) => (
+                      <button
+                        key={prompt}
+                        type="button"
+                        className="ai-suggestion-chip"
+                        onClick={() => submitMessage(prompt)}
+                      >
+                        {prompt}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
               </>
             )}
           </div>
@@ -1058,11 +1129,13 @@ function LearnerModulePage() {
             />
             <button
               type="button"
-              className="primary-btn"
+              className="ai-send-btn"
               onClick={sendMessage}
-              disabled={isTyping || isConversationLoading}
+              disabled={isTyping || isConversationLoading || draft.trim().length === 0}
+              aria-label="Send message"
+              title="Send"
             >
-              Send
+              <SendIcon />
             </button>
           </div>
         </div>
