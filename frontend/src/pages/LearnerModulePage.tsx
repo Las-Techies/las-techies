@@ -6,7 +6,6 @@ import {
   type MouseEvent as ReactMouseEvent,
   type ReactNode,
 } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import AppNav from "../components/navigation/AppNav";
 import { useAuth } from "../context/AuthContext";
@@ -46,15 +45,6 @@ type DisplayDoc = {
   addedLabel: string;
   // null means the current user uploaded it themselves.
   attribution: string | null;
-};
-
-type ModuleBootstrapData = {
-  docs: DisplayDoc[];
-  teamName: string;
-  moduleTitle: string;
-  quizId: number | null;
-  timeLimit: number | null;
-  hasNoTimeLimit: boolean;
 };
 
 const PDF_MIME = "application/pdf";
@@ -367,6 +357,9 @@ function LearnerModulePage() {
   // Which assigned quiz this module page is for. Falls back to "my latest"
   // (below) when arriving without a quizId, e.g. an old bookmark.
   const quizIdParam = searchParams.get("quizId");
+  const [quizId, setQuizId] = useState<number | null>(
+    quizIdParam ? Number(quizIdParam) : null
+  );
   const [activeFilter, setActiveFilter] = useState<Filter>("All");
   const [readIds, setReadIds] = useState<Set<string>>(() => new Set());
   const [openDoc, setOpenDoc] = useState<DisplayDoc | null>(null);
@@ -383,7 +376,11 @@ function LearnerModulePage() {
   const [followUps, setFollowUps] = useState<string[]>([]);
   const [isTyping, setIsTyping] = useState(false);
   const messagesRef = useRef<HTMLDivElement>(null);
+  const [moduleTitle, setModuleTitle] = useState("");
+  const [teamName, setTeamName] = useState("");
   const [recentVisible, setRecentVisible] = useState(5);
+  const [docs, setDocs] = useState<DisplayDoc[]>([]);
+  const [loading, setLoading] = useState(true);
   const [sourceText, setSourceText] = useState<Record<number, string>>({});
   const [sourceLoadingId, setSourceLoadingId] = useState<number | null>(null);
   const [sourceError, setSourceError] = useState("");
@@ -393,6 +390,10 @@ function LearnerModulePage() {
   // signed URLs expire after a few minutes.
   const [fileUrlLoadingId, setFileUrlLoadingId] = useState<number | null>(null);
   const [fileUrl, setFileUrl] = useState<DocumentFileUrl | null>(null);
+  const [timeLimit, setTimeLimit] = useState<number | null>(null);
+  // Distinguishes "haven't heard back from the API yet" (both stay null/false)
+  // from "the manager genuinely left this quiz untimed".
+  const [hasNoTimeLimit, setHasNoTimeLimit] = useState(false);
   const [confirmStart, setConfirmStart] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
   // Frozen copy so the doc-source modal keeps showing its last document
@@ -402,67 +403,85 @@ function LearnerModulePage() {
   const docModal = useModalTransition(Boolean(openDoc));
   const confirmModal = useModalTransition(confirmStart);
 
-  const moduleBootstrapQuery = useQuery<ModuleBootstrapData>({
-    queryKey: ["uploads-module-bootstrap", quizIdParam],
-    queryFn: async () => {
-      // Team-scoped, not uploader-scoped: the manager uploaded these documents,
-      // so /mine (uploadedByUserId === this user) would be empty for a new hire.
-      const teamDocs = await listTeamDocuments().catch(() => []);
-      const docs = teamDocs
-        .filter((doc) => doc.status.toLowerCase() === "ready")
-        .map<DisplayDoc>((doc) => ({
-          id: `doc-${doc.id}`,
-          remoteId: doc.id,
-          title: doc.title,
-          kind:
-            doc.sourceType === "google_drive"
-              ? "google_drive"
-              : doc.sourceType === "github"
-                ? "github"
-                : "file",
-          typeLabel: fileTypeLabel(doc.title),
-          addedLabel: relativeAddedLabel(doc.createdAt),
-          attribution: doc.isMine ? null : doc.uploadedByName,
-        }));
+  // Load the team's real uploaded documents — everyone's, not just this
+  // user's own uploads, since the library is scoped to the whole team (and
+  // the assigned quiz's title + time limit) from the backend. A loading
+  // skeleton shows while the request is in flight; if it fails or returns
+  // nothing we land on a clean empty state — never demo/fake data.
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    // Team-scoped, not uploader-scoped: the manager uploaded these documents,
+    // so /mine (uploadedByUserId === this user) would be empty for a new hire.
+    // The new hire should see everything on their team.
+    listTeamDocuments()
+      .then((teamDocs) => {
+        if (cancelled) return;
+        const files = teamDocs
+          .filter((doc) => doc.status.toLowerCase() === "ready")
+          .map<DisplayDoc>((doc) => ({
+            id: `doc-${doc.id}`,
+            remoteId: doc.id,
+            title: doc.title,
+            kind:
+              doc.sourceType === "google_drive"
+                ? "google_drive"
+                : doc.sourceType === "github"
+                  ? "github"
+                  : "file",
+            typeLabel: fileTypeLabel(doc.title),
+            addedLabel: relativeAddedLabel(doc.createdAt),
+            attribution: doc.isMine ? null : doc.uploadedByName,
+          }));
+        setDocs(files);
+      })
+      .catch(() => {
+        /* land on the empty state rather than showing fake data */
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    // Refresh behavior for new assignments:
+    // - If the URL carries quizId, still fetch that specific quiz.
+    // - Also fetch the user's latest assigned/published quiz and prefer it when
+    //   present, so a page refresh can pick up a newly assigned quiz.
+    const specificQuizPromise = quizIdParam
+      ? apiFetch<GeneratedQuiz | null>(`/api/quizzes/${quizIdParam}`).catch(() => null)
+      : Promise.resolve<GeneratedQuiz | null>(null);
+    const latestQuizPromise = apiFetch<GeneratedQuiz | null>("/api/quizzes/mine/latest").catch(
+      () => null
+    );
 
-      // Refresh behavior for new assignments:
-      // - If the URL carries quizId, still fetch that specific quiz.
-      // - Also fetch the user's latest assigned/published quiz and prefer it when
-      //   present, so a page refresh can pick up a newly assigned quiz.
-      const specificQuizPromise = quizIdParam
-        ? apiFetch<GeneratedQuiz | null>(`/api/quizzes/${quizIdParam}`).catch(() => null)
-        : Promise.resolve<GeneratedQuiz | null>(null);
-      const latestQuizPromise = apiFetch<GeneratedQuiz | null>("/api/quizzes/mine/latest").catch(
-        () => null
-      );
-      const [specificQuiz, latestQuiz] = await Promise.all([specificQuizPromise, latestQuizPromise]);
+    Promise.all([specificQuizPromise, latestQuizPromise]).then(([specificQuiz, latestQuiz]) => {
+      if (cancelled) return;
       const quiz = latestQuiz ?? specificQuiz;
+      if (!quiz) return;
 
-      // Header shows the team's name rather than the quiz title, so a manager
-      // previewing this page and a new hire completing it both see "their"
-      // module framed around the team, not whichever quiz happens to load.
-      const teamName = await getMyTeam()
-        .then((team) => team.name)
-        .catch(() => "");
+      if (quiz.title) setModuleTitle(quiz.title);
+      if (quiz.timeLimitMinutes) {
+        setTimeLimit(quiz.timeLimitMinutes);
+        setHasNoTimeLimit(false);
+      } else {
+        setTimeLimit(null);
+        setHasNoTimeLimit(true);
+      }
+      setQuizId(quiz.id);
+    });
 
-      return {
-        docs,
-        teamName,
-        moduleTitle: quiz?.title ?? "",
-        quizId: quiz?.id ?? null,
-        timeLimit: quiz?.timeLimitMinutes ?? null,
-        hasNoTimeLimit: Boolean(quiz) && !quiz?.timeLimitMinutes,
-      };
-    },
-  });
-
-  const docs = moduleBootstrapQuery.data?.docs ?? [];
-  const loading = moduleBootstrapQuery.isLoading;
-  const teamName = moduleBootstrapQuery.data?.teamName ?? "";
-  const moduleTitle = moduleBootstrapQuery.data?.moduleTitle ?? "";
-  const quizId = moduleBootstrapQuery.data?.quizId ?? (quizIdParam ? Number(quizIdParam) : null);
-  const timeLimit = moduleBootstrapQuery.data?.timeLimit ?? null;
-  const hasNoTimeLimit = moduleBootstrapQuery.data?.hasNoTimeLimit ?? false;
+    // Header shows the team's name rather than the quiz title, so a manager
+    // previewing this page and a new hire completing it both see "their"
+    // module framed around the team, not whichever quiz happens to load.
+    getMyTeam()
+      .then((team) => {
+        if (!cancelled) setTeamName(team.name);
+      })
+      .catch(() => {
+        /* fall back to the generic "Onboarding module" heading */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [quizIdParam]);
 
   // Hydrate the chat panel from the user's most recently active thread, if
   // any. Conversations already come back sorted by updatedAt desc, so the

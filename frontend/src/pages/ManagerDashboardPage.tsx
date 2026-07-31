@@ -1,5 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useEffect, useMemo, useRef, useState } from "react";
 import AppNav from "../components/navigation/AppNav";
 import {
   apiFetch,
@@ -10,7 +9,7 @@ import {
   type ManagerDashboardQuiz,
   type TeamMember,
 } from "../api/client";
-import { describeError } from "../api/errors";
+import { describeError, type FriendlyError } from "../api/errors";
 import ApiErrorCard from "../components/ApiErrorCard";
 import {
   CalendarIcon,
@@ -81,6 +80,9 @@ function ManagerDashboardPage() {
     const raw = session?.user.user_metadata?.team_id;
     return Number.isInteger(Number(raw)) ? Number(raw) : null;
   });
+  const [data, setData] = useState<ManagerDashboardData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<FriendlyError | null>(null);
   const [selectedQuiz, setSelectedQuiz] = useState<GeneratedQuiz | null>(null);
   const [isQuizModalOpen, setIsQuizModalOpen] = useState(false);
   const [isQuizModalLoading, setIsQuizModalLoading] = useState(false);
@@ -111,21 +113,65 @@ function ManagerDashboardPage() {
   const [isCreatingFirstTeam, setIsCreatingFirstTeam] = useState(false);
   const [firstTeamError, setFirstTeamError] = useState("");
 
-  const dashboardQuery = useQuery<ManagerDashboardData>({
-    queryKey: ["manager-dashboard", activeTeamId],
-    queryFn: getManagerDashboard,
-    placeholderData: (previousData) => previousData,
-  });
-  const data = dashboardQuery.data ?? null;
-  const isLoading = dashboardQuery.isLoading;
-  const loadError = dashboardQuery.error ? describeError(dashboardQuery.error) : null;
+  // Bumped by retry/refresh actions to re-run dashboard loading.
+  const [reloadKey, setReloadKey] = useState(0);
 
-  // Reconcile the local active team with the server-returned source of truth.
+  // Per-team cache of the last dashboard payload, so switching back to a team
+  // you've already viewed shows instantly instead of flashing a loader. Kept in
+  // a ref (not state) since it's a side cache, not render state — reads/writes
+  // shouldn't themselves trigger re-renders.
+  const dashboardCacheRef = useRef<Map<number, ManagerDashboardData>>(new Map());
+
   useEffect(() => {
-    if (typeof data?.activeTeamId === "number" && data.activeTeamId !== activeTeamId) {
-      setActiveTeamId(data.activeTeamId);
+    let cancelled = false;
+
+    // Show cached data for this team immediately if we have it (no flash);
+    // otherwise fall back to whatever's already on screen. We only show the
+    // full-page "Loading…" state on the very first load, when there's nothing
+    // to display yet — a switch keeps the current view up until fresh data
+    // arrives, so it never blanks.
+    const cached = activeTeamId !== null ? dashboardCacheRef.current.get(activeTeamId) : undefined;
+    if (cached) {
+      setData(cached);
+      setIsLoading(false);
+    } else {
+      setData((prev) => {
+        if (prev === null) setIsLoading(true);
+        return prev;
+      });
     }
-  }, [data, activeTeamId]);
+    setLoadError(null);
+
+    getManagerDashboard()
+      .then((result) => {
+        if (cancelled) return;
+        setData(result);
+        // Reconcile our active-team id with the DB source of truth the payload
+        // echoes back — covers the first load (JWT seed may lag) and any case
+        // where our optimistic value drifted from the server.
+        if (typeof result.activeTeamId === "number") {
+          setActiveTeamId(result.activeTeamId);
+        }
+        // Only cache real team data (not the "needs team" placeholder). Key on
+        // the payload's own team id when present so an out-of-date activeTeamId
+        // never caches under the wrong key.
+        const cacheKey = result.activeTeamId ?? activeTeamId;
+        if (cacheKey !== null && cacheKey !== undefined && !result.needsTeam) {
+          dashboardCacheRef.current.set(cacheKey, result);
+        }
+      })
+      .catch((err) => {
+        // Keep any stale/cached data visible on error rather than wiping it;
+        // only surface the error card when we have nothing to show.
+        if (!cancelled && !cached) setLoadError(describeError(err));
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [reloadKey, activeTeamId]);
 
   // Called after the manager switches or creates a team, with the now-active
   // team id. Setting activeTeamId is what makes the loader effect refetch (and
@@ -304,13 +350,13 @@ function ManagerDashboardPage() {
         }
         setAssignError(`${parts.join(" and ")}. Please try again.`);
         // Refresh so any assignments that DID succeed are reflected.
-        void dashboardQuery.refetch();
+        setReloadKey((k) => k + 1);
         return;
       }
 
       // Clean success — close and refresh the dashboard counts.
       setIsAssignModalOpen(false);
-      void dashboardQuery.refetch();
+      setReloadKey((k) => k + 1);
     } finally {
       setIsAssigning(false);
     }
@@ -340,7 +386,7 @@ function ManagerDashboardPage() {
           </section>
         ) : loadError ? (
           <section className="glass dash-card">
-            <ApiErrorCard error={loadError} onRetry={() => void dashboardQuery.refetch()} />
+            <ApiErrorCard error={loadError} onRetry={() => setReloadKey((k) => k + 1)} />
           </section>
         ) : !data ? (
           <section className="glass dash-card">
