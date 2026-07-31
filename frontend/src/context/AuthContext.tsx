@@ -26,7 +26,12 @@ type AuthContextValue = {
     password: string,
     role: UserRole,
     firstName: string,
-    lastName: string
+    lastName: string,
+    // For managers: the team they named at signup. Stashed in user_metadata as
+    // pending_team_name so it survives an email-confirmation gap (when signUp
+    // returns no session and the team can't be created inline) and can be
+    // created on their first authenticated login instead.
+    teamName?: string
   ) => Promise<Session | null>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
@@ -85,13 +90,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     password: string,
     role: UserRole,
     firstName: string,
-    lastName: string
+    lastName: string,
+    teamName?: string
   ): Promise<Session | null> {
     const result = await supabase.auth.signUp({
       email,
       password,
       options: {
-        data: { role, first_name: firstName, last_name: lastName },
+        data: {
+          role,
+          first_name: firstName,
+          last_name: lastName,
+          // Only managers name a team. Persisting it here means a manager who
+          // has to confirm their email first doesn't lose the team name — the
+          // next authenticated session creates the team from it.
+          ...(role === "manager" && teamName?.trim()
+            ? { pending_team_name: teamName.trim() }
+            : {}),
+        },
       },
     });
     if (result.error) {

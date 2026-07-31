@@ -12,8 +12,16 @@ model Team {
   id          Int      @id @default(autoincrement())
   name        String
   description String?
+  // The manager who owns this team. A manager may own many teams (one manager
+  // -> many teams); a team has exactly one owning manager. Nullable so teams
+  // created before this column existed (and legacy/seed rows) stay valid.
+  // References User.id, but kept as a bare Int for consistency with the rest of
+  // the schema (teamId etc. are not declared Prisma relations either).
+  managerId   Int?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  @@index([managerId])
 }
 
 model User {
