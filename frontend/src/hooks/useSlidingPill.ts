@@ -57,6 +57,19 @@ export function useSlidingPill<
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Re-snap the pill whenever the bar's size changes — e.g. a web font loads
+  // in after first paint and the buttons reflow, or font-size/padding changes.
+  // Without this the pill keeps its stale geometry and drifts off the active
+  // button, which reads as a color "glitch" (white label off the blue pill).
+  useLayoutEffect(() => {
+    const container = containerRef.current;
+    if (!container || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(() => move(false));
+    observer.observe(container);
+    return () => observer.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const setItemRef = (key: string | number) => (el: HTMLElement | null) => {
     if (el) itemsRef.current.set(key, el);
     else itemsRef.current.delete(key);
