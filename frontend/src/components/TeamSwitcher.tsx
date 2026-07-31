@@ -19,11 +19,17 @@ import { CheckPlain, ChevronDown, ChevronUp, UsersIcon } from "./icons";
  */
 function TeamSwitcher({
   activeTeamId,
+  activeTeamName,
   onTeamChanged,
 }: {
   // The manager's currently active team id (from the dashboard payload), used
   // to mark the active row. Null until the dashboard knows it.
   activeTeamId: number | null;
+  // The active team's name, straight from the dashboard payload. Lets the
+  // trigger show the real team name on first paint instead of waiting for the
+  // owned-teams list (loaded separately below) to resolve — otherwise the
+  // label flashes a placeholder for a beat before the name appears.
+  activeTeamName: string | null;
   // Called after the active team changes (switch or create), with the id of the
   // now-active team — the dashboard reloads its data (and marks that team) in
   // response.
@@ -67,8 +73,14 @@ function TeamSwitcher({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [isOpen]);
 
+  // The owned-teams match is keyed on activeTeamId, so it's always consistent
+  // with the active team — including right after an optimistic switch, when
+  // activeTeamId has already changed but the dashboard hasn't refetched a fresh
+  // activeTeamName yet. Prefer it, then fall back to the payload's name (correct
+  // on first paint, before the teams list has loaded), then a neutral
+  // placeholder only if we have neither.
   const activeTeam = teams.find((team) => team.id === activeTeamId) ?? null;
-  const activeLabel = activeTeam?.name ?? "Your team";
+  const activeLabel = activeTeam?.name ?? activeTeamName ?? "Your team";
 
   async function handleSwitch(teamId: number) {
     if (teamId === activeTeamId || isBusy) return;
