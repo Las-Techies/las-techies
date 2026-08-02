@@ -7,6 +7,7 @@ import WizardSteps from "../components/navigation/WizardSteps";
 import {
   API_ORIGIN,
   apiFetch,
+  getGithubConnectionStatus,
   getGithubOauthUrl,
   GithubNotConnectedError,
   listGithubRepos,
@@ -174,6 +175,9 @@ function UploadContentPage() {
   const [githubPickerLoading, setGithubPickerLoading] = useState(false);
   const [githubPickerSearch, setGithubPickerSearch] = useState("");
   const [githubRepos, setGithubRepos] = useState<Array<{ full_name: string; description: string | null; private: boolean }>>([]);
+  // The connected GitHub username, shown as "Connected as <login>" in the
+  // picker so a manager can confirm which account's repos they're seeing.
+  const [githubLogin, setGithubLogin] = useState<string | null>(null);
   const githubPicker = useModalTransition(isGithubPickerOpen);
   // Set when Google's token is missing or Google itself rejected it, so the
   // error can offer a one-click reconnect instead of telling the user to sign
@@ -315,6 +319,14 @@ function UploadContentPage() {
   const loadGithubReposIntoPicker = async () => {
     const repos = await listGithubRepos();
     setGithubRepos(repos);
+    // Best-effort: label the picker with the connected account. A failure here
+    // shouldn't block showing the repos we already loaded.
+    try {
+      const status = await getGithubConnectionStatus();
+      setGithubLogin(status.githubLogin);
+    } catch {
+      setGithubLogin(null);
+    }
   };
 
   const handleOpenGithubPicker = async () => {
@@ -1144,6 +1156,11 @@ function UploadContentPage() {
             aria-label="Pick a GitHub repository"
           >
             <h3>Pick a GitHub repository</h3>
+            {githubLogin ? (
+              <p className="github-picker-connected">
+                Connected as <strong>{githubLogin}</strong>
+              </p>
+            ) : null}
             <input
               type="search"
               className="github-picker-search"
