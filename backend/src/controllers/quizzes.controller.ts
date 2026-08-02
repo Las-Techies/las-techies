@@ -10,6 +10,7 @@ import {
   findTeamQuizzesWithAssignments,
   isValidQuizStatus,
   markAssignmentComplete,
+  deleteQuizForTeam,
   updateQuizQuestions,
   updateQuizStatus,
 } from "../models/quiz.model";
@@ -83,6 +84,36 @@ export async function updateQuiz(req: Request, res: Response, next: NextFunction
 
     const quiz = await findQuizById(id);
     res.json(quiz);
+  } catch (err) {
+    next(err);
+  }
+}
+
+// Deletes a draft quiz on the manager's own team.
+export async function deleteQuiz(req: Request, res: Response, next: NextFunction) {
+  try {
+    const user = (req as any).user;
+    const id = Number(req.params.quizId);
+    if (!Number.isFinite(id)) {
+      return res.status(400).json({ error: { message: "Invalid quiz id" } });
+    }
+
+    const quiz = await findQuizByIdForTeam(id, user.teamId);
+    if (!quiz) {
+      return res.status(404).json({ error: { message: "Quiz not found" } });
+    }
+    if (quiz.status !== "draft") {
+      return res
+        .status(400)
+        .json({ error: { message: "Only draft quizzes can be deleted." } });
+    }
+
+    const result = await deleteQuizForTeam(id, user.teamId);
+    if (result.count === 0) {
+      return res.status(404).json({ error: { message: "Quiz not found" } });
+    }
+
+    return res.status(204).send();
   } catch (err) {
     next(err);
   }

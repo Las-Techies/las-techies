@@ -339,6 +339,19 @@ export function assignQuiz(quizId: number, userIds: number[]): Promise<void> {
   });
 }
 
+export function updateQuizStatus(quizId: number, status: "draft" | "published"): Promise<void> {
+  return apiFetch<void>(`/api/quizzes/${quizId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ status }),
+  });
+}
+
+export function deleteQuiz(quizId: number): Promise<void> {
+  return apiFetch<void>(`/api/quizzes/${quizId}`, {
+    method: "DELETE",
+  });
+}
+
 // Every quiz assigned to the caller, soonest-due-and-pending first.
 export function listAssignedQuizzes(): Promise<AssignedQuiz[]> {
   return apiFetch<AssignedQuiz[]>("/api/quizzes/assigned/mine");

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import AppNav from "../components/navigation/AppNav";
 import WizardSteps from "../components/navigation/WizardSteps";
 import { apiFetch, assignQuiz, listTeamMembers, type TeamMember } from "../api/client";
@@ -43,6 +43,8 @@ const questionBankDefault = [
 
 function ReviewPublishPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const quizIdParam = searchParams.get("quizId");
   const [quizConfig, setQuizConfig] = useState<QuizConfig>(DEFAULT_QUIZ_CONFIG);
   const [quiz, setQuiz] = useState<GeneratedQuiz | null>(null);
   const [isLoadingQuiz, setIsLoadingQuiz] = useState(false);
@@ -77,11 +79,14 @@ function ReviewPublishPage() {
     setQuizConfig(loadQuizConfig());
 
     setIsLoadingQuiz(true);
-    apiFetch<GeneratedQuiz | null>("/api/quizzes/mine/latest")
+    const request = quizIdParam
+      ? apiFetch<GeneratedQuiz | null>(`/api/quizzes/${quizIdParam}`)
+      : apiFetch<GeneratedQuiz | null>("/api/quizzes/mine/latest");
+    request
       .then((data) => setQuiz(data))
       .catch(() => setQuiz(null))
       .finally(() => setIsLoadingQuiz(false));
-  }, []);
+  }, [quizIdParam]);
 
   // Real roster of new hires on this manager's team, so "Assign Learners"
   // maps to actual accounts (tracked assignments) instead of only free-text
@@ -498,7 +503,10 @@ function ReviewPublishPage() {
           </div>
 
           <div className="mgr-foot" style={{ justifyContent: "center", gap: 18 }}>
-            <Link className="ghost-btn btn-link" to="/configure-quiz">
+            <Link
+              className="ghost-btn btn-link"
+              to={quiz ? `/configure-quiz?quizId=${quiz.id}` : "/configure-quiz"}
+            >
               <ArrowLeft /> Back to Configure Quiz
             </Link>
             <button
