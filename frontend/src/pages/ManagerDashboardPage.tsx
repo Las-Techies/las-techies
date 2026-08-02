@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import AppNav from "../components/navigation/AppNav";
 import {
   apiFetch,
   assignQuiz,
+  deleteQuiz,
   getManagerDashboard,
   listTeamMembers,
+  updateQuizStatus,
   type ManagerDashboardData,
   type ManagerDashboardQuiz,
   type TeamMember,
@@ -70,6 +73,7 @@ function getAssignmentStatusDisplay(assignment: {
 }
 
 function ManagerDashboardPage() {
+  const navigate = useNavigate();
   const { session } = useAuth();
   // The manager's active team. The DB is the source of truth (they switch teams
   // server-side without a session refresh, so the JWT's team_id can be stale) —
@@ -112,6 +116,10 @@ function ManagerDashboardPage() {
   const [firstTeamName, setFirstTeamName] = useState("");
   const [isCreatingFirstTeam, setIsCreatingFirstTeam] = useState(false);
   const [firstTeamError, setFirstTeamError] = useState("");
+  const [openDraftMenuQuizId, setOpenDraftMenuQuizId] = useState<number | null>(null);
+  const [draftActionBusyQuizId, setDraftActionBusyQuizId] = useState<number | null>(null);
+  const [draftActionError, setDraftActionError] = useState("");
+  const draftMenuRef = useRef<HTMLDivElement | null>(null);
 
   // Bumped by retry/refresh actions to re-run dashboard loading.
   const [reloadKey, setReloadKey] = useState(0);
@@ -172,6 +180,17 @@ function ManagerDashboardPage() {
       cancelled = true;
     };
   }, [reloadKey, activeTeamId]);
+
+  useEffect(() => {
+    if (openDraftMenuQuizId === null) return;
+    const handleClickOutside = (event: MouseEvent) => {
+      if (draftMenuRef.current && !draftMenuRef.current.contains(event.target as Node)) {
+        setOpenDraftMenuQuizId(null);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [openDraftMenuQuizId]);
 
   // Called after the manager switches or creates a team, with the now-active
   // team id. Setting activeTeamId is what makes the loader effect refetch (and
@@ -291,6 +310,55 @@ function ManagerDashboardPage() {
         setMembersError(err instanceof Error ? err.message : "Failed to load team members.");
       })
       .finally(() => setIsLoadingMembers(false));
+  }
+
+  function openDraftActions(quizId: number) {
+    setDraftActionError("");
+    setOpenDraftMenuQuizId((current) => (current === quizId ? null : quizId));
+  }
+
+  function handleEditDraft(quizId: number) {
+    setOpenDraftMenuQuizId(null);
+    navigate(`/configure-quiz?quizId=${quizId}`);
+  }
+
+  async function handlePublishDraft(quiz: ManagerDashboardQuiz) {
+    if (draftActionBusyQuizId !== null) return;
+    setDraftActionBusyQuizId(quiz.id);
+    setDraftActionError("");
+    setOpenDraftMenuQuizId(null);
+    try {
+      await updateQuizStatus(quiz.id, "published");
+      setReloadKey((k) => k + 1);
+    } catch (err) {
+      setDraftActionError(
+        err instanceof Error ? err.message : "Couldn't publish this draft. Please try again."
+      );
+    } finally {
+      setDraftActionBusyQuizId(null);
+    }
+  }
+
+  async function handleDeleteDraft(quiz: ManagerDashboardQuiz) {
+    if (draftActionBusyQuizId !== null) return;
+    const confirmed = window.confirm(
+      `Delete "${quiz.title}"? This will permanently remove the draft quiz.`
+    );
+    if (!confirmed) return;
+
+    setDraftActionBusyQuizId(quiz.id);
+    setDraftActionError("");
+    setOpenDraftMenuQuizId(null);
+    try {
+      await deleteQuiz(quiz.id);
+      setReloadKey((k) => k + 1);
+    } catch (err) {
+      setDraftActionError(
+        err instanceof Error ? err.message : "Couldn't delete this draft. Please try again."
+      );
+    } finally {
+      setDraftActionBusyQuizId(null);
+    }
   }
 
   function toggleLearner(id: number) {
@@ -558,6 +626,7 @@ function ManagerDashboardPage() {
                 <ClipboardIcon /> Past Quizzes
               </h3>
               <p className="dash-card-hint">Every quiz your team has created, published or not.</p>
+              {draftActionError ? <p className="form-error">{draftActionError}</p> : null}
 
               {data.quizzes.length === 0 ? (
                 <p className="cfg-empty">You haven't created any quizzes yet.</p>
@@ -611,7 +680,48 @@ function ManagerDashboardPage() {
                               >
                                 <UserPlusIcon />
                               </button>
-                            ) : null}
+                            ) : (
+                              <div
+                                className="dash-draft-actions"
+                                ref={openDraftMenuQuizId === quiz.id ? draftMenuRef : null}
+                              >
+                                <button
+                                  type="button"
+                                  className="dash-actions-more"
+                                  aria-label={`Draft actions for ${quiz.title}`}
+                                  onClick={() => openDraftActions(quiz.id)}
+                                  disabled={draftActionBusyQuizId === quiz.id}
+                                >
+                                  ⋯
+                                </button>
+                                {openDraftMenuQuizId === quiz.id ? (
+                                  <div className="dash-actions-menu" role="menu">
+                                    <button
+                                      type="button"
+                                      role="menuitem"
+                                      onClick={() => handleEditDraft(quiz.id)}
+                                    >
+                                      Edit
+                                    </button>
+                                    <button
+                                      type="button"
+                                      role="menuitem"
+                                      onClick={() => void handlePublishDraft(quiz)}
+                                    >
+                                      Publish
+                                    </button>
+                                    <button
+                                      type="button"
+                                      role="menuitem"
+                                      className="danger"
+                                      onClick={() => void handleDeleteDraft(quiz)}
+                                    >
+                                      Delete
+                                    </button>
+                                  </div>
+                                ) : null}
+                              </div>
+                            )}
                           </td>
                         </tr>
                       ))}

@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import AppNav from "../components/navigation/AppNav";
 import WizardSteps from "../components/navigation/WizardSteps";
 import mascot from "../assets/panda-peek.png";
@@ -131,6 +131,8 @@ function ConfigureQuizPage() {
   // expands a question to show its options for viewing/editing.
   const [expandedQuestionIds, setExpandedQuestionIds] = useState<Set<number>>(new Set());
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const quizIdParam = searchParams.get("quizId");
   const todayIso = useMemo(() => new Date().toISOString().split("T")[0], []);
 
   const updateForm = <K extends keyof QuizFormState>(field: K, value: QuizFormState[K]) => {
@@ -155,7 +157,9 @@ function ConfigureQuizPage() {
 
     (async () => {
       try {
-        const latest = await apiFetch<GeneratedQuiz | null>("/api/quizzes/mine/latest");
+        const latest = quizIdParam
+          ? await apiFetch<GeneratedQuiz | null>(`/api/quizzes/${quizIdParam}`)
+          : await apiFetch<GeneratedQuiz | null>("/api/quizzes/mine/latest");
         // A published quiz is finalized — don't resume it into the editor, so
         // that after publishing, starting the workflow again begins a fresh
         // (blank) quiz instead of reopening the one that was just published.
@@ -191,7 +195,7 @@ function ConfigureQuizPage() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [quizIdParam]);
 
   // Loads every "ready" document visible to the team (any manager's uploads)
   // from the backend, so this manager generates from the same live library
@@ -349,7 +353,7 @@ function ConfigureQuizPage() {
       return;
     }
     setError("");
-    navigate("/review-publish");
+    navigate(quiz ? `/review-publish?quizId=${quiz.id}` : "/review-publish");
   };
 
   function startEditPrompt(question: QuizQuestion) {

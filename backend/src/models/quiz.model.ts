@@ -71,6 +71,12 @@ export function updateQuizStatus(id: number, teamId: number, status: QuizStatus)
   });
 }
 
+export function deleteQuizForTeam(id: number, teamId: number) {
+  return prisma.quiz.deleteMany({
+    where: { id, teamId },
+  });
+}
+
 // Persists a full replacement of questionsPayload — used after editing or
 // regenerating a single question in place.
 export function updateQuizQuestions(
