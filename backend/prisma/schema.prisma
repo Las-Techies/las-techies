@@ -37,6 +37,30 @@ model User {
   updatedAt      DateTime @updatedAt
 }
 
+// A manager's personal GitHub OAuth connection, so the "Pick from GitHub"
+// importer lists that manager's OWN repos (owner/collaborator/org) instead of a
+// single shared server token's repos. The access token is stored ENCRYPTED
+// (AES-256-GCM, see services/crypto.ts) — never in plaintext. One row per user
+// (userId is unique); reconnecting upserts. References User.id as a bare Int,
+// per the schema's convention of not declaring Prisma relations for FKs.
+model GithubConnection {
+  id             Int      @id @default(autoincrement())
+  userId         Int      @unique
+  // AES-256-GCM ciphertext of the GitHub OAuth access token, encoded by
+  // services/crypto.ts (iv:tag:ciphertext, all base64). Decrypted only in
+  // memory, at the moment a GitHub API call is made on this user's behalf.
+  accessTokenEnc String
+  // The GitHub login (username) the token belongs to, purely for display /
+  // debugging — lets the UI show "Connected as <login>". Nullable in case the
+  // identity lookup fails but the token itself is valid.
+  githubLogin    String?
+  // The scopes GitHub actually granted, so a later feature can detect a
+  // downgrade (e.g. user approved public_repo only) and prompt to reconnect.
+  scope          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
 model Document {
   id               Int      @id @default(autoincrement())
   teamId           Int

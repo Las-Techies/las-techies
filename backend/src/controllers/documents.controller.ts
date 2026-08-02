@@ -23,6 +23,10 @@ import {
 import { embedDocument, embedDocumentsWithConcurrency } from "../services/documentEmbedder";
 import { getSignedFileUrl, uploadOriginalFile } from "../services/documentStorage";
 import { findQuizzesReferencingDocument } from "../models/quiz.model";
+import {
+  deleteGithubConnection,
+  getGithubAccessToken,
+} from "../models/githubConnection.model";
 
 type AuthUser = {
   id: number;
@@ -44,7 +48,6 @@ type ImportGoogleDriveFolderBody = {
 type ImportGithubRepoBody = {
   repoUrl?: string;
   branch?: string;
-  githubAccessToken?: string;
   maxFiles?: number;
 };
 
@@ -675,8 +678,35 @@ export async function listGithubReposHandler(
       return res.status(401).json({ error: { message: "Unauthorized" } });
     }
 
-    const repos = await listGithubRepos();
-    return res.json({ data: repos });
+    const githubAccessToken = await getGithubAccessToken(user.id);
+    if (!githubAccessToken) {
+      // 409 (not 401 — the app session is fine) signals the frontend to launch
+      // the "Connect GitHub" flow rather than treating it as an auth failure.
+      return res.status(409).json({
+        error: {
+          code: "github_not_connected",
+          message: "Connect your GitHub account to list your repositories.",
+        },
+      });
+    }
+
+    try {
+      const repos = await listGithubRepos(githubAccessToken);
+      return res.json({ data: repos });
+    } catch (error) {
+      // A 401 from GitHub means the stored token was revoked/expired. Drop it
+      // so the next open cleanly re-prompts, and tell the client to reconnect.
+      if (error instanceof Error && /\(401\)/.test(error.message)) {
+        await deleteGithubConnection(user.id);
+        return res.status(409).json({
+          error: {
+            code: "github_not_connected",
+            message: "Your GitHub connection expired. Reconnect to continue.",
+          },
+        });
+      }
+      throw error;
+    }
   } catch (error) {
     next(error);
   }
@@ -701,7 +731,17 @@ export async function importGithubRepo(
     }
 
     const maxFiles = Math.min(Math.max(Number(req.body?.maxFiles ?? 25), 1), 100);
-    const githubAccessToken = req.body?.githubAccessToken?.trim() || undefined;
+    // Always the signed-in manager's own stored token — no client-supplied or
+    // shared fallback. Missing means they haven't connected GitHub yet.
+    const githubAccessToken = (await getGithubAccessToken(user.id)) ?? undefined;
+    if (!githubAccessToken) {
+      return res.status(409).json({
+        error: {
+          code: "github_not_connected",
+          message: "Connect your GitHub account before importing a repository.",
+        },
+      });
+    }
     const { owner, repo } = parseGithubRepoUrl(repoUrl);
     const { branch, files } = await listGithubRepoFiles(
       owner,

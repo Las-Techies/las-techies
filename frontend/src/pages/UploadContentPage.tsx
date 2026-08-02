@@ -4,7 +4,13 @@ import { useModalTransition } from "../hooks/useModalTransition";
 import { Link } from "react-router-dom";
 import AppNav from "../components/navigation/AppNav";
 import WizardSteps from "../components/navigation/WizardSteps";
-import { apiFetch, listGithubRepos } from "../api/client";
+import {
+  API_ORIGIN,
+  apiFetch,
+  getGithubOauthUrl,
+  GithubNotConnectedError,
+  listGithubRepos,
+} from "../api/client";
 import {
   loadDeselectedDocumentIds,
   loadUploadedDocuments,
@@ -164,6 +170,7 @@ function UploadContentPage() {
   const [isImportingLink, setIsImportingLink] = useState(false);
   const [isGooglePickerLoading, setIsGooglePickerLoading] = useState(false);
   const [isGithubPickerOpen, setIsGithubPickerOpen] = useState(false);
+  const [isConnectingGithub, setIsConnectingGithub] = useState(false);
   const [githubPickerLoading, setGithubPickerLoading] = useState(false);
   const [githubPickerSearch, setGithubPickerSearch] = useState("");
   const [githubRepos, setGithubRepos] = useState<Array<{ full_name: string; description: string | null; private: boolean }>>([]);
@@ -248,21 +255,96 @@ function UploadContentPage() {
     void hydrateUploads();
   }, []);
 
+  // Runs the GitHub OAuth connect flow in a popup and resolves once the popup
+  // reports back (via postMessage) that the account was connected. The backend
+  // stores the resulting token; nothing sensitive touches the browser here.
+  // Rejects if the user closes the popup or GitHub denies authorization.
+  const connectGithubViaPopup = async (): Promise<void> => {
+    const authorizeUrl = await getGithubOauthUrl();
+    const popup = window.open(
+      authorizeUrl,
+      "github-oauth",
+      "width=720,height=800,menubar=no,toolbar=no"
+    );
+    if (!popup) {
+      throw new Error(
+        "Couldn't open the GitHub sign-in window. Allow popups for this site and try again."
+      );
+    }
+
+    return new Promise<void>((resolve, reject) => {
+      let settled = false;
+      const finish = (fn: () => void) => {
+        if (settled) return;
+        settled = true;
+        window.removeEventListener("message", onMessage);
+        clearInterval(closedTimer);
+        fn();
+      };
+
+      const onMessage = (event: MessageEvent) => {
+        // The callback page is served by the BACKEND, so its postMessage comes
+        // from the API origin (e.g. localhost:4000) — not this page's origin.
+        // Verifying against API_ORIGIN is what makes the success message land.
+        if (event.origin !== API_ORIGIN) return;
+        const data = event.data as
+          | { source?: string; ok?: boolean; message?: string }
+          | null;
+        if (!data || data.source !== "github-oauth") return;
+        popup.close();
+        if (data.ok) {
+          finish(resolve);
+        } else {
+          finish(() =>
+            reject(new Error(data.message || "GitHub connection failed."))
+          );
+        }
+      };
+
+      window.addEventListener("message", onMessage);
+
+      // If the user closes the popup without finishing, stop waiting.
+      const closedTimer = setInterval(() => {
+        if (popup.closed) {
+          finish(() => reject(new Error("GitHub connection was cancelled.")));
+        }
+      }, 500);
+    });
+  };
+
+  const loadGithubReposIntoPicker = async () => {
+    const repos = await listGithubRepos();
+    setGithubRepos(repos);
+  };
+
   const handleOpenGithubPicker = async () => {
+    setError("");
     setGithubPickerSearch("");
     setIsGithubPickerOpen(true);
     setGithubPickerLoading(true);
     try {
-      // Listed by the backend using the server's GitHub token. Supabase never
-      // hands the browser a usable GitHub token (login is Google; a linked
-      // GitHub identity yields no provider_token), so listing this client-side
-      // always 401'd — see listGithubRepos.
-      const repos = await listGithubRepos();
-      setGithubRepos(repos);
+      // Listed by the backend using THIS manager's own connected GitHub token,
+      // so they see their own repos. If they haven't connected yet (or the
+      // token was revoked), listGithubRepos throws GithubNotConnectedError —
+      // run the connect popup, then retry the listing once.
+      try {
+        await loadGithubReposIntoPicker();
+      } catch (err) {
+        if (!(err instanceof GithubNotConnectedError)) throw err;
+        setGithubPickerLoading(false);
+        setIsConnectingGithub(true);
+        await connectGithubViaPopup();
+        setIsConnectingGithub(false);
+        setGithubPickerLoading(true);
+        await loadGithubReposIntoPicker();
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load GitHub repositories.");
+      setError(
+        err instanceof Error ? err.message : "Failed to load GitHub repositories."
+      );
       setIsGithubPickerOpen(false);
     } finally {
+      setIsConnectingGithub(false);
       setGithubPickerLoading(false);
     }
   };
@@ -903,10 +985,10 @@ function UploadContentPage() {
             className="import-connect"
             type="button"
             onClick={() => void handleOpenGithubPicker()}
-            disabled={isImportingLink}
+            disabled={isImportingLink || isConnectingGithub}
           >
             <GithubIcon />
-            Pick from GitHub
+            {isConnectingGithub ? "Connecting…" : "Pick from GitHub"}
           </button>
           <button
             className="import-connect"

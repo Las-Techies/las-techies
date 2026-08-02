@@ -13,6 +13,10 @@ import {
   getDocumentById,
   getDocumentFileUrl,
 } from "../controllers/documents.controller";
+import {
+  githubConnectionStatusHandler,
+  githubOauthStartHandler,
+} from "../controllers/githubOauth.controller";
 
 
 const router = Router();
@@ -23,6 +27,8 @@ router.post("/import/google-drive", requireRole("manager"), importGoogleDriveDoc
 router.post("/import/google-drive-folder", requireRole("manager"), importGoogleDriveFolder);
 router.post("/import/github-repo", requireRole("manager"), importGithubRepo);
 router.get("/github/repos", requireRole("manager"), listGithubReposHandler);
+router.get("/github/connection", requireRole("manager"), githubConnectionStatusHandler);
+router.get("/github/oauth/start", requireRole("manager"), githubOauthStartHandler);
 router.get("/mine", getMyDocuments);
 router.get("/team", getTeamDocuments);
 router.get("/:documentId/file-url", getDocumentFileUrl);

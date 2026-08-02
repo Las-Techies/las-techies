@@ -10,6 +10,10 @@ export const env = {
   databaseUrl: required("DATABASE_URL"),
   port: Number(process.env.PORT ?? 4000),
   appUrl: process.env.APP_URL ?? "http://localhost:5173",
+  // This backend's own public base URL. Used to build the GitHub OAuth
+  // `redirect_uri`, which must byte-for-byte match the callback URL registered
+  // on the GitHub OAuth App. Defaults to the local dev port.
+  apiUrl: process.env.API_URL ?? "http://localhost:4000",
 
   // Local defaults (Salesforce gateway path used during localhost development).
   llmGatewayUrl: process.env.LLM_GATEWAY_URL ?? "",
@@ -46,6 +50,17 @@ export const env = {
   // learner-facing viewer can show the real file instead of extracted text.
   documentsStorageBucket: process.env.SUPABASE_DOCUMENTS_BUCKET ?? "documents",
   githubToken: process.env.GITHUB_TOKEN ?? "",
+  // Per-user GitHub OAuth (the "Pick from GitHub" importer authenticates as the
+  // signed-in manager so they see their OWN repos). Registered as a GitHub
+  // OAuth App at github.com/settings/developers; the callback URL there must be
+  // `${appUrl-or-backend}/github/oauth/callback`. Blank => the connect flow is
+  // disabled and the picker just tells the user it's unavailable.
+  githubOauthClientId: process.env.GITHUB_OAUTH_CLIENT_ID ?? "",
+  githubOauthClientSecret: process.env.GITHUB_OAUTH_CLIENT_SECRET ?? "",
+  // 32-byte key (hex or base64) used to AES-256-GCM encrypt stored GitHub OAuth
+  // tokens at rest AND to HMAC-sign the OAuth `state` parameter. Generate with
+  // `openssl rand -hex 32`. Required for the GitHub connect flow to work.
+  githubTokenEncKey: process.env.GITHUB_TOKEN_ENC_KEY ?? "",
   gmailUser: required("GMAIL_USER"),
   gmailAppPassword: required("GMAIL_APP_PASSWORD"),
   // Optional: restrict invited emails to a single domain (e.g. salesforce.com).
