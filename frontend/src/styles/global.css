@@ -7469,6 +7469,16 @@ main.mgr-page > section.dropzone > input.sr-only {
   color: #032d60;
 }
 
+.github-picker-connected {
+  color: #706e6b;
+  font-size: 13px;
+  margin: 0 0 12px;
+}
+
+.github-picker-connected strong {
+  color: #032d60;
+}
+
 .github-picker-search {
   width: 100%;
   box-sizing: border-box;

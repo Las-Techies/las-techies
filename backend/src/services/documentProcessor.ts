@@ -405,16 +405,18 @@ export type GithubRepoSummary = {
   private: boolean;
 };
 
-// Lists repositories visible to the token used by githubApiRequest. In
-// practice that's the server's env.githubToken (a PAT), so it returns the
-// public repos and org/collaborator repos that account can see — not each
-// end-user's personal private repos. This runs server-side precisely because
-// Supabase never hands the browser a usable GitHub token (the login provider
-// is Google; a linked GitHub identity yields no provider_token), so the old
-// client-side listing always 401'd.
-export async function listGithubRepos(): Promise<GithubRepoSummary[]> {
+// Lists repositories visible to the given token — in practice the signed-in
+// manager's own GitHub OAuth token, so it returns the repos THAT account owns
+// or collaborates on (public and private, per the `repo` scope) plus its org
+// repos. Runs server-side because Supabase never hands the browser a usable
+// GitHub token (login is Google; a linked GitHub identity yields no
+// provider_token), so client-side listing always 401'd.
+export async function listGithubRepos(
+  githubAccessToken: string
+): Promise<GithubRepoSummary[]> {
   const response = await githubApiRequest(
-    "/user/repos?sort=updated&per_page=100&affiliation=owner,collaborator,organization_member"
+    "/user/repos?sort=updated&per_page=100&affiliation=owner,collaborator,organization_member",
+    githubAccessToken
   );
   const payload = (await response.json()) as Array<{
     full_name?: string;

@@ -9,6 +9,7 @@ import usersRouter from "./routes/users.routes";
 import invitesRouter from "./routes/invites.routes";
 import teamsRouter from "./routes/teams.routes";
 import { getInviteByTokenHandler } from "./controllers/invites.controller";
+import { githubOauthCallbackHandler } from "./controllers/githubOauth.controller";
 
 export const app = express();
 
@@ -22,6 +23,12 @@ app.get("/health", (_req, res) => res.json({ ok: true }));
 // auth. Registered ahead of requireAuth so GET matches here and skips it.
 // (POST /api/invites and POST /:token/accept still go through requireAuth.)
 app.get("/api/invites/:token", getInviteByTokenHandler);
+
+// GitHub OAuth callback: GitHub redirects the user's browser straight here with
+// no Authorization header, so — like the invite preview above — it must be
+// registered ahead of the `/api` requireAuth guard. It authenticates the user
+// via the signed `state` it issued at the start of the flow instead of a JWT.
+app.get("/github/oauth/callback", githubOauthCallbackHandler);
 
 app.use("/api", requireAuth);
 app.use("/api/quizzes", quizzesRouter);

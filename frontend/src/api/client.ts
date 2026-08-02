@@ -4,6 +4,12 @@ import { ApiError, logApiError } from "./errors";
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:4000";
 
+// The backend's origin (scheme + host + port), e.g. "http://localhost:4000".
+// Exported so the GitHub OAuth popup handler can verify postMessage events come
+// from the backend-served callback page (which posts from THIS origin, not the
+// frontend's).
+export const API_ORIGIN = new URL(BASE_URL).origin;
+
 /**
  * Fetch wrapper for the backend API.
  * - Attaches the current Supabase JWT as a Bearer token so requireAuth can
@@ -485,11 +491,50 @@ export type GithubRepoSummary = {
   private: boolean;
 };
 
-// Repositories for the "Pick from GitHub" modal. Listed by the backend using
-// the server's GitHub token — Supabase never hands the browser a usable GitHub
-// token (login is Google; a linked GitHub identity yields no provider_token),
-// so listing this client-side always 401'd.
+// Thrown by listGithubRepos when the signed-in manager hasn't connected their
+// GitHub account (or the stored token was revoked). Lets the caller launch the
+// connect flow instead of showing a generic error. Backed by the backend's 409
+// `github_not_connected` response.
+export class GithubNotConnectedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "GithubNotConnectedError";
+  }
+}
+
+// Repositories for the "Pick from GitHub" modal, listed by the backend using
+// THIS manager's own stored GitHub OAuth token — so they see their own repos.
+// Throws GithubNotConnectedError (backend 409) when no connection exists yet.
 export async function listGithubRepos(): Promise<GithubRepoSummary[]> {
-  const res = await apiFetch<{ data: GithubRepoSummary[] }>("/api/documents/github/repos");
+  try {
+    const res = await apiFetch<{ data: GithubRepoSummary[] }>("/api/documents/github/repos");
+    return res.data;
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 409) {
+      throw new GithubNotConnectedError(err.message);
+    }
+    throw err;
+  }
+}
+
+export type GithubConnectionStatus = {
+  connected: boolean;
+  githubLogin: string | null;
+};
+
+// Whether the signed-in manager has a GitHub account connected, and as whom.
+export async function getGithubConnectionStatus(): Promise<GithubConnectionStatus> {
+  const res = await apiFetch<{ data: GithubConnectionStatus }>(
+    "/api/documents/github/connection"
+  );
   return res.data;
+}
+
+// The GitHub authorize URL to open (in a popup) so the manager can connect
+// their account. The URL carries a signed state binding the flow to this user.
+export async function getGithubOauthUrl(): Promise<string> {
+  const res = await apiFetch<{ data: { url: string } }>(
+    "/api/documents/github/oauth/start"
+  );
+  return res.data.url;
 }
