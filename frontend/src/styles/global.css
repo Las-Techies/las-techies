@@ -2681,6 +2681,12 @@ main.mgr-page > section.dropzone > input.sr-only {
   flex: none;
 }
 
+.doc-icon.drive {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+}
+
 .read-badge {
   font-size: 12px;
   font-weight: 600;
