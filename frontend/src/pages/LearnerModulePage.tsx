@@ -29,6 +29,7 @@ import { saveModuleProgress } from "../features/quiz/storage";
 import type { GeneratedQuiz } from "../features/quiz/types";
 import { type SourceKind } from "../features/learner/data";
 import { useLastNonNull, useModalTransition } from "../hooks/useModalTransition";
+import googleDriveLogo from "../assets/google-drive-logo.png";
 
 type Filter = "All" | "Files" | "Google Drive" | "GitHub";
 const FILTERS: Filter[] = ["All", "Files", "Google Drive", "GitHub"];
@@ -200,12 +201,7 @@ const STARTER_PROMPTS = [
 function DocIcon({ kind }: { kind: SourceKind }) {
   if (kind === "google_drive") {
     return (
-      <svg className="doc-icon confluence" viewBox="0 0 24 24" width="22" height="22" aria-hidden>
-        <path
-          d="M4 16.5c3-4 6-4 9 0 2.6 3.2 5 2.4 7-.5l-3-2c-1 1.4-1.9 1.6-3 .2-3.2-4.2-6.8-4.2-10 .3l3 2z"
-          fill="#1868db"
-        />
-      </svg>
+      <img className="doc-icon drive" src={googleDriveLogo} alt="" aria-hidden />
     );
   }
   if (kind === "github") {
