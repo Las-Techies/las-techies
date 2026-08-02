@@ -649,7 +649,7 @@ function ManagerDashboardPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {data.quizzes.map((quiz) => (
+                      {data.quizzes.map((quiz, index) => (
                         <tr key={quiz.id}>
                           <td>
                             <button
@@ -695,7 +695,12 @@ function ManagerDashboardPage() {
                                   ⋯
                                 </button>
                                 {openDraftMenuQuizId === quiz.id ? (
-                                  <div className="dash-actions-menu" role="menu">
+                                  <div
+                                    className={`dash-actions-menu ${
+                                      index >= data.quizzes.length - 2 ? "up" : "down"
+                                    }`}
+                                    role="menu"
+                                  >
                                     <button
                                       type="button"
                                       role="menuitem"

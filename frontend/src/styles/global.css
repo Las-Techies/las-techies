@@ -7131,6 +7131,82 @@ main.mgr-page > section.dropzone > input.sr-only {
   height: 18px;
 }
 
+.dash-draft-actions {
+  position: relative;
+  display: inline-flex;
+}
+
+.dash-actions-more {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  border: 1px solid rgba(11, 42, 84, 0.12);
+  background: rgba(255, 255, 255, 0.75);
+  color: var(--sf-navy);
+  cursor: pointer;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1;
+  font-family: inherit;
+  transition: border-color var(--ui-hover-dur) var(--ui-hover-ease),
+    background var(--ui-hover-dur) var(--ui-hover-ease),
+    color var(--ui-hover-dur) var(--ui-hover-ease);
+}
+
+.dash-actions-more:hover:not(:disabled) {
+  border-color: var(--sf-blue);
+  background: #fff;
+  color: var(--sf-blue);
+}
+
+.dash-actions-menu {
+  position: absolute;
+  right: 0;
+  z-index: 12;
+  min-width: 140px;
+  background: #fff;
+  border: 1px solid rgba(11, 42, 84, 0.14);
+  border-radius: 12px;
+  box-shadow: 0 12px 28px rgba(11, 42, 84, 0.16);
+  padding: 6px;
+  display: grid;
+  gap: 4px;
+}
+
+.dash-actions-menu.down {
+  top: calc(100% + 6px);
+  bottom: auto;
+}
+
+.dash-actions-menu.up {
+  bottom: calc(100% + 6px);
+  top: auto;
+}
+
+.dash-actions-menu button {
+  text-align: left;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--sf-navy);
+  cursor: pointer;
+}
+
+.dash-actions-menu button:hover {
+  background: rgba(46, 108, 220, 0.08);
+}
+
+.dash-actions-menu button.danger {
+  color: #b32222;
+}
+
 /* "Add users" modal — narrower than the quiz-detail modal. */
 .dash-assign-modal {
   width: min(560px, 94vw);
