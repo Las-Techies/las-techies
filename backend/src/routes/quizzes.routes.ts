@@ -11,6 +11,7 @@ import {
   regenerateQuestion,
   updateQuestion,
   updateQuiz,
+  deleteQuiz,
 } from "../controllers/quizzes.controller";
 
 const router = Router();
@@ -21,6 +22,7 @@ router.get("/assigned/mine", getAssignedQuizzes);
 router.get("/manager/dashboard", requireRole("manager"), getManagerDashboard);
 router.get("/:quizId", getQuiz);
 router.patch("/:quizId", requireRole("manager"), updateQuiz);
+router.delete("/:quizId", requireRole("manager"), deleteQuiz);
 router.patch("/:quizId/questions/:questionId", requireRole("manager"), updateQuestion);
 router.post(
   "/:quizId/questions/:questionId/regenerate",
