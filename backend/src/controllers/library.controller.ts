@@ -8,10 +8,14 @@ import {
   touchConversation,
 } from "../models/chatConversation.model";
 import { createMessage, listMessagesForConversation } from "../models/chatMessage.model";
-import { findSimilarChunks } from "../models/documentChunk.model";
+import { findSimilarChunks, sampleTeamChunks } from "../models/documentChunk.model";
 import { findTeamById } from "../models/team.model";
 import { embedBatch, embedText } from "../services/embeddings";
-import { computeConfidence, generateChatAnswer } from "../services/chatGenerator";
+import {
+  computeConfidence,
+  generateChatAnswer,
+  generateStarterQuestions,
+} from "../services/chatGenerator";
 
 type AuthUser = {
   id: number;
@@ -89,6 +93,84 @@ async function filterAnswerableFollowUps(
   return followUps.filter((_followUp, i) => answerable[i]);
 }
 
+type PreparedChatTurn = {
+  conversationId: number;
+  isNewConversation: boolean;
+  message: string;
+  history: { role: "user" | "assistant"; content: string }[];
+  chunks: Awaited<ReturnType<typeof findSimilarChunks>>;
+  teamName: string | null | undefined;
+  selectedDocumentIds: number[] | undefined;
+};
+
+// Everything both the streaming and non-streaming chat handlers need before
+// calling the generator: validated input, the resolved (or newly created)
+// conversation, recent history, and the retrieved chunks. Returns a
+// `{ status, message }` error descriptor instead of throwing so each caller can
+// surface it in the shape it needs (JSON body, or an SSE error event).
+async function prepareChatTurn(
+  user: AuthUser,
+  body: any
+): Promise<{ error: { status: number; message: string } } | { data: PreparedChatTurn }> {
+  const message = typeof body?.message === "string" ? body.message.trim() : "";
+  if (!message) {
+    return { error: { status: 400, message: "message must be a non-empty string" } };
+  }
+
+  const selectedDocumentIds = parseSelectedDocumentIds(body?.selectedDocumentIds);
+
+  let conversationId: number;
+  let isNewConversation = false;
+  if (body?.conversationId !== undefined) {
+    const requestedId = Number(body.conversationId);
+    if (!Number.isInteger(requestedId)) {
+      return { error: { status: 400, message: "Invalid conversationId" } };
+    }
+    const conversation = await findConversationForUser(requestedId, user.id, user.teamId);
+    if (!conversation) {
+      return { error: { status: 404, message: "Conversation not found" } };
+    }
+    conversationId = conversation.id;
+  } else {
+    const conversation = await createConversation({ teamId: user.teamId, userId: user.id });
+    conversationId = conversation.id;
+    isNewConversation = true;
+  }
+
+  const history = isNewConversation
+    ? []
+    : (await listMessagesForConversation(conversationId, HISTORY_LIMIT)).map((m) => ({
+        role: m.role as "user" | "assistant",
+        content: m.content,
+      }));
+
+  // Cheap, no-LLM query rewrite: substitute the user's actual team name for
+  // generic "my/our/this team" phrasing before embedding, so retrieval for
+  // team-overview-style questions doesn't rely on the document literally
+  // containing the word "team". Adds one indexed lookup, not another
+  // model/LLM call, so it doesn't add meaningful latency to the request.
+  const team = await findTeamById(user.teamId);
+  const retrievalQuery = buildRetrievalQuery(message, team?.name);
+
+  const queryEmbedding = await embedText(retrievalQuery);
+  const chunks = await findSimilarChunks(user.teamId, queryEmbedding, {
+    ...(selectedDocumentIds ? { documentIds: selectedDocumentIds } : {}),
+    limit: RETRIEVAL_TOP_K,
+  });
+
+  return {
+    data: {
+      conversationId,
+      isNewConversation,
+      message,
+      history,
+      chunks,
+      teamName: team?.name,
+      selectedDocumentIds,
+    },
+  };
+}
+
 // Sends a message in a conversation (creating the conversation on first
 // message if `conversationId` is omitted), retrieves relevant document
 // chunks via pgvector, generates a cited answer, and persists both sides
@@ -98,51 +180,19 @@ export async function postChatMessage(req: Request, res: Response, next: NextFun
     const user = getAuthUser(req);
     if (!user) return res.status(401).json({ error: { message: "Unauthorized" } });
 
-    const message = typeof req.body?.message === "string" ? req.body.message.trim() : "";
-    if (!message) {
-      return res.status(400).json({ error: { message: "message must be a non-empty string" } });
+    const prepared = await prepareChatTurn(user, req.body);
+    if ("error" in prepared) {
+      return res.status(prepared.error.status).json({ error: { message: prepared.error.message } });
     }
-
-    const selectedDocumentIds = parseSelectedDocumentIds(req.body?.selectedDocumentIds);
-
-    let conversationId: number;
-    let isNewConversation = false;
-    if (req.body?.conversationId !== undefined) {
-      const requestedId = Number(req.body.conversationId);
-      if (!Number.isInteger(requestedId)) {
-        return res.status(400).json({ error: { message: "Invalid conversationId" } });
-      }
-      const conversation = await findConversationForUser(requestedId, user.id, user.teamId);
-      if (!conversation) {
-        return res.status(404).json({ error: { message: "Conversation not found" } });
-      }
-      conversationId = conversation.id;
-    } else {
-      const conversation = await createConversation({ teamId: user.teamId, userId: user.id });
-      conversationId = conversation.id;
-      isNewConversation = true;
-    }
-
-    const history = isNewConversation
-      ? []
-      : (await listMessagesForConversation(conversationId, HISTORY_LIMIT)).map((m) => ({
-          role: m.role as "user" | "assistant",
-          content: m.content,
-        }));
-
-    // Cheap, no-LLM query rewrite: substitute the user's actual team name for
-    // generic "my/our/this team" phrasing before embedding, so retrieval for
-    // team-overview-style questions doesn't rely on the document literally
-    // containing the word "team". Adds one indexed lookup, not another
-    // model/LLM call, so it doesn't add meaningful latency to the request.
-    const team = await findTeamById(user.teamId);
-    const retrievalQuery = buildRetrievalQuery(message, team?.name);
-
-    const queryEmbedding = await embedText(retrievalQuery);
-    const chunks = await findSimilarChunks(user.teamId, queryEmbedding, {
-      ...(selectedDocumentIds ? { documentIds: selectedDocumentIds } : {}),
-      limit: RETRIEVAL_TOP_K,
-    });
+    const {
+      conversationId,
+      isNewConversation,
+      message,
+      history,
+      chunks,
+      teamName,
+      selectedDocumentIds,
+    } = prepared.data;
 
     const result = await generateChatAnswer(chunks, history, message);
 
@@ -152,7 +202,7 @@ export async function postChatMessage(req: Request, res: Response, next: NextFun
     const followUps = await filterAnswerableFollowUps(
       result.followUps,
       user.teamId,
-      team?.name,
+      teamName,
       selectedDocumentIds
     );
 
@@ -176,6 +226,34 @@ export async function postChatMessage(req: Request, res: Response, next: NextFun
       confidence: result.confidence,
       followUps,
     });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// Starter questions for a fresh chat, grounded in the team's own documents and
+// validated for answerability the same way follow-ups are — so the suggestion
+// chips a new hire sees are ones Sage can actually answer, not generic
+// placeholders. Returns an empty list (never an error) when there are no docs
+// or the LLM is unavailable; the UI just shows no chips.
+export async function getStarterQuestions(req: Request, res: Response, next: NextFunction) {
+  try {
+    const user = getAuthUser(req);
+    if (!user) return res.status(401).json({ error: { message: "Unauthorized" } });
+
+    const sample = await sampleTeamChunks(user.teamId, 4);
+    if (sample.length === 0) return res.json({ data: { questions: [] } });
+
+    const team = await findTeamById(user.teamId);
+    const proposed = await generateStarterQuestions(sample, 3);
+    const questions = await filterAnswerableFollowUps(
+      proposed,
+      user.teamId,
+      team?.name,
+      undefined
+    );
+
+    res.json({ data: { questions } });
   } catch (err) {
     next(err);
   }

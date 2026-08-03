@@ -19,6 +19,7 @@ import {
   getDocumentFileUrl,
   getDocumentDetail,
   getMyTeam,
+  getStarterQuestions,
   listChatConversations,
   listTeamDocuments,
   sendChatMessage,
@@ -354,6 +355,10 @@ function LearnerModulePage() {
   const historyRef = useRef<HTMLDivElement>(null);
   const [draft, setDraft] = useState("");
   const [followUps, setFollowUps] = useState<string[]>([]);
+  // Starter chips for a fresh thread, grounded in the team's own docs and
+  // pre-validated for answerability by the backend. Falls back to the static
+  // STARTER_PROMPTS only until these load (or if none come back).
+  const [starterPrompts, setStarterPrompts] = useState<string[]>([]);
   const [isTyping, setIsTyping] = useState(false);
   const messagesRef = useRef<HTMLDivElement>(null);
   const [teamName, setTeamName] = useState("");
@@ -465,6 +470,22 @@ function LearnerModulePage() {
       cancelled = true;
     };
   }, [quizIdParam]);
+
+  // Load doc-grounded starter questions for a fresh chat. Best-effort: on
+  // failure or an empty result we simply fall back to the static prompts.
+  useEffect(() => {
+    let cancelled = false;
+    getStarterQuestions()
+      .then((questions) => {
+        if (!cancelled && questions.length > 0) setStarterPrompts(questions);
+      })
+      .catch(() => {
+        /* keep the static fallback */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Hydrate the chat panel from the user's most recently active thread, if
   // any. Conversations already come back sorted by updatedAt desc, so the
@@ -710,7 +731,9 @@ function LearnerModulePage() {
           },
         ]);
       })
-      .finally(() => setIsTyping(false));
+      .finally(() => {
+        setIsTyping(false);
+      });
   };
 
   const sendMessage = () => submitMessage(draft);
@@ -1115,10 +1138,11 @@ function LearnerModulePage() {
 
                 {/* On a fresh thread show starter prompts; after Sage answers,
                     show the follow-up questions the API suggested. Both are
-                    just one-tap shortcuts that submit their own text. */}
+                    just one-tap shortcuts that submit their own text. The
+                    starters are doc-grounded when available, else static. */}
                 {!isTyping && messages.length === 1 ? (
                   <div className="ai-suggestions" aria-label="Suggested questions">
-                    {STARTER_PROMPTS.map((prompt) => (
+                    {(starterPrompts.length > 0 ? starterPrompts : STARTER_PROMPTS).map((prompt) => (
                       <button
                         key={prompt}
                         type="button"

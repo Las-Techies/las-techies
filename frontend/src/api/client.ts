@@ -202,6 +202,16 @@ export function sendChatMessage(input: {
   });
 }
 
+// Starter questions for a fresh chat, grounded in the team's own documents and
+// pre-validated server-side for answerability. May be fewer than 3, or empty
+// (no docs / LLM unavailable) — the UI just shows no chips in that case.
+export async function getStarterQuestions(): Promise<string[]> {
+  const res = await apiFetch<{ data: { questions: string[] } }>(
+    "/api/library/chat/starters"
+  );
+  return res.data.questions;
+}
+
 export async function listChatConversations(): Promise<ChatConversationSummary[]> {
   const res = await apiFetch<{ data: ChatConversationSummary[] }>(
     "/api/library/chat/conversations"

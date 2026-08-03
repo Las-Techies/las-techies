@@ -29,6 +29,28 @@ export function deleteChunksForDocument(documentId: number) {
   return prisma.documentChunk.deleteMany({ where: { documentId } });
 }
 
+// A small sample of a team's document chunks, one of the earliest chunks per
+// document (chunkIndex asc = the start of each doc, which tends to hold the
+// overview/intro), across distinct documents. Used to ground the starter
+// questions on a fresh chat without embedding a query. `limit` caps how many
+// documents contribute.
+export async function sampleTeamChunks(
+  teamId: number,
+  limit = 4
+): Promise<{ documentTitle: string; content: string }[]> {
+  const rows = await prisma.$queryRaw<
+    { documentTitle: string; content: string }[]
+  >(Prisma.sql`
+    SELECT DISTINCT ON (dc."documentId") d.title AS "documentTitle", dc.content
+    FROM "DocumentChunk" dc
+    JOIN "Document" d ON d.id = dc."documentId"
+    WHERE dc."teamId" = ${teamId}
+    ORDER BY dc."documentId", dc."chunkIndex" ASC
+    LIMIT ${limit}
+  `);
+  return rows;
+}
+
 export function countChunksForDocument(documentId: number) {
   return prisma.documentChunk.count({ where: { documentId } });
 }
