@@ -14,6 +14,7 @@ import { loadDeselectedDocumentIds, saveQuizConfig } from "../features/quiz/stor
 import { useSlidingPill } from "../hooks/useSlidingPill";
 import type { GeneratedQuiz, QuizDifficulty, QuizQuestion } from "../features/quiz/types";
 import { PencilIcon, RegenerateIcon } from "../components/icons/QuizIcons";
+import Skeleton from "../components/Skeleton";
 import {
   ArrowLeft,
   ArrowRight,
@@ -827,7 +828,12 @@ function ConfigureQuizPage() {
                       <article className="qcard" key={question.id}>
                         <div className="qcard-head">
                           <span className="qcard-num">{index + 1}</span>
-                          {isEditingPrompt ? (
+                          {isRegeneratingThisQuestion ? (
+                            <div className="qcard-prompt" style={{ flex: 1, display: "grid", gap: 8 }}>
+                              <Skeleton width="92%" height={16} />
+                              <Skeleton width="68%" height={16} />
+                            </div>
+                          ) : isEditingPrompt ? (
                             <textarea
                               className="inline-edit-input qcard-prompt"
                               autoFocus
@@ -864,7 +870,7 @@ function ConfigureQuizPage() {
                             </button>
                             <button
                               type="button"
-                              className={`qcard-icon-btn ${isRegeneratingThisQuestion ? "spinning" : ""}`}
+                              className="qcard-icon-btn"
                               title="Regenerate question"
                               aria-label="Regenerate question"
                               disabled={isRegeneratingThisQuestion}
@@ -894,7 +900,16 @@ function ConfigureQuizPage() {
                           <p className="form-error">{fieldErrorByQuestionId[question.id]}</p>
                         ) : null}
 
-                        {isExpanded ? (
+                        {isRegeneratingThisQuestion ? (
+                          <ul className="qopts">
+                            {[0, 1, 2, 3].map((i) => (
+                              <li className="qopt" key={i}>
+                                <span className="qopt-radio" aria-hidden />
+                                <Skeleton width={`${72 - i * 9}%`} height={14} />
+                              </li>
+                            ))}
+                          </ul>
+                        ) : isExpanded ? (
                           <ul className="qopts">
                             {question.options.map((option, optIndex) => {
                               const isEditingThisOption =
