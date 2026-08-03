@@ -57,6 +57,34 @@ export function createQuiz(input: {
   });
 }
 
+export function updateDraftQuiz(input: {
+  id: number;
+  teamId: number;
+  title: string;
+  description?: string;
+  sourceDocumentIds: number[];
+  generationConfig: GenerationConfig;
+  questionsPayload: QuizQuestion[];
+  passingScore?: number | undefined;
+  timeLimitMinutes?: number | undefined;
+  dueDate?: Date | undefined;
+}) {
+  return prisma.quiz.updateMany({
+    where: { id: input.id, teamId: input.teamId, status: "draft" },
+    data: {
+      title: input.title,
+      description: input.description ?? null,
+      sourceDocumentIds: input.sourceDocumentIds,
+      generationConfig: input.generationConfig as unknown as object,
+      questionsPayload: input.questionsPayload as unknown as object,
+      passingScore: input.passingScore ?? null,
+      timeLimitMinutes: input.timeLimitMinutes ?? null,
+      dueDate: input.dueDate ?? null,
+      status: "draft",
+    },
+  });
+}
+
 const ALLOWED_STATUSES = ["draft", "published"] as const;
 export type QuizStatus = (typeof ALLOWED_STATUSES)[number];
 

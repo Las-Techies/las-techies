@@ -133,6 +133,8 @@ function ConfigureQuizPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const quizIdParam = searchParams.get("quizId");
+  const parsedQuizIdParam = quizIdParam ? Number(quizIdParam) : NaN;
+  const requestedQuizId = Number.isFinite(parsedQuizIdParam) ? parsedQuizIdParam : null;
   const todayIso = useMemo(() => new Date().toISOString().split("T")[0], []);
 
   const updateForm = <K extends keyof QuizFormState>(field: K, value: QuizFormState[K]) => {
@@ -280,6 +282,7 @@ function ConfigureQuizPage() {
       const generatedQuiz = await streamQuizGeneration(
         {
           documentIds,
+          replaceQuizId: quiz?.status === "draft" ? quiz.id : requestedQuizId,
           config: {
             numQuestions: count,
             difficulty: form.difficulty.toLowerCase(),
