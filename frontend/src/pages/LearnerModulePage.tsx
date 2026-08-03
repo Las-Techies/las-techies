@@ -25,7 +25,7 @@ import {
   type DocumentFileUrl,
 } from "../api/client";
 import { isMarkdownSource, openSourceUrl } from "../features/documents/source";
-import { saveModuleProgress } from "../features/quiz/storage";
+import { loadReadDocIds, saveReadDocIds } from "../features/quiz/storage";
 import type { GeneratedQuiz } from "../features/quiz/types";
 import { type SourceKind } from "../features/learner/data";
 import { useLastNonNull, useModalTransition } from "../hooks/useModalTransition";
@@ -568,9 +568,30 @@ function LearnerModulePage() {
     0
   );
 
+  // Read-progress persists per learner + quiz in localStorage, so opening a few
+  // docs and then refreshing (or coming back tomorrow) restores the bar and the
+  // per-row Read badges instead of resetting to "0 / N". It's per-browser only
+  // — not synced across devices and not visible to managers by design.
+  const readProgressKey =
+    user?.id && quizId !== null ? `${user.id}:${quizId}` : null;
+  // The storage key we've already hydrated `readIds` from. Guards the persist
+  // effect below so the initial empty set can't overwrite stored progress
+  // before hydration runs, and so switching quizzes reloads cleanly.
+  const hydratedKeyRef = useRef<string | null>(null);
+
   useEffect(() => {
-    saveModuleProgress({ read: readCount, total: totalDocs });
-  }, [readCount, totalDocs]);
+    if (!user?.id || quizId === null) return;
+    setReadIds(loadReadDocIds(user.id, quizId));
+    hydratedKeyRef.current = `${user.id}:${quizId}`;
+  }, [user?.id, quizId]);
+
+  useEffect(() => {
+    // Only persist once we've hydrated for the current key — otherwise the
+    // empty starting set would clobber saved progress on first render.
+    if (!user?.id || quizId === null) return;
+    if (hydratedKeyRef.current !== readProgressKey) return;
+    saveReadDocIds(user.id, quizId, readIds);
+  }, [readIds, user?.id, quizId, readProgressKey]);
 
   const loadSource = (remoteId: number) => {
     if (sourceText[remoteId]) return;
