@@ -217,6 +217,75 @@ body::before {
 .sf-btn:hover:not(:disabled) {
   filter: brightness(1.04);
   box-shadow: 0 14px 28px rgba(11, 92, 171, 0.48);
+  transform: translateY(-1px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sf-btn:hover:not(:disabled),
+  .sf-btn:active:not(:disabled) {
+    transform: none;
+  }
+}
+
+/* --- Skeleton loading placeholders --- */
+.skeleton {
+  display: block;
+  position: relative;
+  overflow: hidden;
+  background: rgba(148, 163, 184, 0.2);
+  border-radius: 8px;
+  /* Keep a sensible footprint even if width/height aren't passed. */
+  min-width: 12px;
+  min-height: 12px;
+}
+
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.55) 50%,
+    transparent 100%
+  );
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes skeleton-shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* A card built entirely from skeletons shouldn't also show its hover-lift. */
+.dash-stat-card.is-skeleton,
+.dash-learner-card.is-skeleton {
+  cursor: default;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton::after {
+    animation: none;
+  }
+}
+
+/* Small inline spinner for the "View source" button while it resolves. */
+.source-btn-spin {
+  display: inline-block;
+  width: 15px;
+  height: 15px;
+  border-radius: 999px;
+  border: 2px solid rgba(11, 92, 171, 0.3);
+  border-top-color: var(--sf-blue);
+  animation: aiLoadingSpin 0.7s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .source-btn-spin {
+    animation-duration: 1.4s;
+  }
 }
 
 .sf-btn:active:not(:disabled) {
@@ -2126,8 +2195,9 @@ main.mgr-page > section.dropzone > input.sr-only {
 }
 
 .progress-label {
-  color: #706e6b;
+  color: #2b2f38;
   font-size: 13px;
+  font-weight: 600;
   white-space: nowrap;
 }
 
@@ -2551,8 +2621,8 @@ main.mgr-page > section.dropzone > input.sr-only {
   border: 1px solid #dddbda;
   background: #fff;
   border-radius: 999px;
-  padding: 7px 16px;
-  font-size: 13px;
+  padding: 8px 18px;
+  font-size: 15px;
   color: #3d3d3d;
   cursor: pointer;
   transition: all var(--ui-hover-dur) var(--ui-hover-ease);
@@ -2688,35 +2758,43 @@ main.mgr-page > section.dropzone > input.sr-only {
 }
 
 .read-badge {
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 15px;
+  font-weight: 700;
   border-radius: 999px;
-  padding: 4px 10px;
+  padding: 5px 13px;
   border: 1px solid transparent;
   white-space: nowrap;
 }
 
 .read-badge.read {
-  background: #e9f6ec;
-  color: #1a7f37;
-  border-color: #b6e0c2;
+  background: #e3f8ec;
+  color: #036b3a;
+  border-color: #bfe6cd;
 }
 
 .read-badge.unread {
-  background: #f4f4f4;
-  color: #6b6b6b;
-  border-color: #dcdcdc;
+  background: #eef1f5;
+  color: #5c6b82;
+  border-color: #dbe1ea;
 }
 
 .view-source {
   border: none;
   background: none;
   color: #0b5cab;
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 15px;
+  font-weight: 700;
   cursor: pointer;
-  padding: 4px;
+  padding: 4px 6px;
   white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.view-source:disabled {
+  cursor: default;
+  opacity: 0.55;
 }
 
 .view-source:hover {
@@ -2735,12 +2813,18 @@ main.mgr-page > section.dropzone > input.sr-only {
   position: fixed;
   bottom: 24px;
   right: 24px;
-  width: 56px;
-  height: 56px;
-  border-radius: var(--morph-r-closed);
+  width: 182px;
+  height: 60px;
+  border-radius: 999px;
   overflow: hidden;
-  box-shadow: 0 10px 24px rgba(11, 79, 148, 0.35);
+  box-shadow:
+    0 10px 26px rgba(11, 79, 148, 0.42),
+    0 0 0 0 rgba(11, 116, 224, 0.45);
   z-index: 60;
+  /* Soft blue "sonar" glow to draw the eye to the closed pill. Lives on the
+     container's own box-shadow (not a child pseudo) so overflow:hidden doesn't
+     clip it. Disabled once the panel opens. */
+  animation: chatMorphPing 2.8s ease-out infinite;
   transition:
     width var(--morph-close-dur) var(--morph-close-ease),
     height var(--morph-close-dur) var(--morph-close-ease),
@@ -2752,6 +2836,7 @@ main.mgr-page > section.dropzone > input.sr-only {
   width: min(440px, 92vw);
   height: calc(100vh - 120px);
   border-radius: 18px;
+  animation: none;
   box-shadow: -10px 0 34px rgba(2, 42, 84, 0.2);
   transition:
     width var(--morph-open-dur) var(--morph-ease),
@@ -2766,57 +2851,155 @@ main.mgr-page > section.dropzone > input.sr-only {
 .chat-morph-plus {
   position: absolute;
   inset: auto 0 0 auto;
-  width: 56px;
-  height: 56px;
+  width: 182px;
+  height: 60px;
   border-radius: 999px;
-  border: none;
+  border: 3px solid #fff;
+  box-sizing: border-box;
+  padding: 0 20px;
+  overflow: hidden;
   background: linear-gradient(135deg, #0b74e0 0%, #0b4f94 60%, #032d60 100%);
   color: #fff;
+  font-weight: 800;
+  font-size: 16px;
+  letter-spacing: 0.01em;
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 8px;
   cursor: pointer;
   transition:
     opacity var(--morph-fade-dur) var(--morph-close-ease),
     transform var(--morph-open-dur) var(--morph-close-ease),
     filter var(--morph-fade-dur) var(--morph-close-ease),
-    box-shadow var(--duration-fast) var(--ease-smooth-out);
+    color var(--duration-fast) var(--ease-smooth-out);
 }
 
-/* Soft, slow "breathing" ring to draw the eye to the closed FAB without
-   being noisy. Sits behind the button and only shows while closed. */
-.chat-morph-plus::before {
+/* Label + mascot ride above the hover sweep. */
+.chat-fab-label {
+  position: relative;
+  z-index: 1;
+  white-space: nowrap;
+}
+
+/* Mascot (upper body, arms raised) sits centered ON TOP of the pill. It's a
+   fixed sibling of `.chat-morph` (not a child) so `.chat-morph`'s overflow:hidden
+   — needed to clip the morph animation — can't crop the panda's hat or paws.
+   Centered over the 182px pill: pill center is 115px from the right, so
+   right = 115 - width/2. */
+.chat-fab-mascot-wrap {
+  position: fixed;
+  right: 59px;
+  bottom: 54px;
+  width: 112px;
+  height: 116px;
+  /* Behind the pill (z 60) so the button's opaque top edge slices the panda
+     off in a clean straight line — it reads as rising up from behind the
+     button rather than floating on top of it. */
+  z-index: 59;
+  pointer-events: none;
+  transition:
+    opacity var(--morph-fade-dur) var(--ease-smooth-out),
+    transform var(--morph-open-dur) var(--ease-smooth-out);
+}
+
+/* Soft pulsing halo behind the panda. A replaced <img> can't host a ::before,
+   so the glow lives on the wrapper and the image stacks above it. */
+.chat-fab-mascot-wrap::before {
+  content: "";
+  position: absolute;
+  inset: 8px 10px 34px 10px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 50% 45%,
+    rgba(96, 170, 255, 0.8) 0%,
+    rgba(11, 116, 224, 0.4) 46%,
+    rgba(11, 116, 224, 0) 72%
+  );
+  filter: blur(4px);
+  z-index: 0;
+  animation: sageGlow 2.8s ease-in-out infinite;
+}
+
+.chat-fab-mascot {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  /* Grow upward out of the button on hover. */
+  transform-origin: center bottom;
+  transform: scale(1);
+  transition: transform 0.3s var(--ease-smooth-out);
+}
+
+@keyframes sageGlow {
+  0%,
+  100% {
+    opacity: 0.5;
+    transform: scale(0.9);
+  }
+  50% {
+    opacity: 0.95;
+    transform: scale(1.1);
+  }
+}
+
+/* Hovering the pill gives the mascot a subtle grow (no bouncy hop) — just a
+   slight "small to big" nudge that draws the eye to the chat. */
+.chat-morph:hover ~ .chat-fab-mascot-wrap .chat-fab-mascot {
+  transform: scale(1.06);
+}
+
+/* Tuck the mascot away as the pill morphs into the open chat panel. */
+.chat-fab-mascot-wrap[data-open="true"] {
+  opacity: 0;
+  transform: translateY(10px) scale(0.7);
+}
+
+/* Hover: a white panel sweeps across from the left and the text flips to blue
+   — a noticeable "inverted colors" wipe from one side to the other. */
+.chat-morph-plus::after {
   content: "";
   position: absolute;
   inset: 0;
-  border-radius: 999px;
-  box-shadow: 0 0 0 0 rgba(11, 116, 224, 0.45);
-  animation: chatFabPulse 2.6s ease-out infinite;
+  background: #ffffff;
+  transform: translateX(-101%);
+  transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+  z-index: 0;
 }
 
-.chat-morph[data-open="true"] .chat-morph-plus::before {
-  animation: none;
+.chat-morph-plus:hover::after,
+.chat-morph-plus:focus-visible::after {
+  transform: translateX(0);
 }
 
-@keyframes chatFabPulse {
+@keyframes chatMorphPing {
   0% {
-    box-shadow: 0 0 0 0 rgba(11, 116, 224, 0.45);
+    box-shadow:
+      0 10px 26px rgba(11, 79, 148, 0.42),
+      0 0 0 0 rgba(11, 116, 224, 0.5);
   }
   70% {
-    box-shadow: 0 0 0 14px rgba(11, 116, 224, 0);
+    box-shadow:
+      0 10px 26px rgba(11, 79, 148, 0.42),
+      0 0 0 16px rgba(11, 116, 224, 0);
   }
   100% {
-    box-shadow: 0 0 0 0 rgba(11, 116, 224, 0);
+    box-shadow:
+      0 10px 26px rgba(11, 79, 148, 0.42),
+      0 0 0 0 rgba(11, 116, 224, 0);
   }
 }
 
-.chat-morph-plus:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 14px 28px rgba(11, 79, 148, 0.42);
+/* Text flips to blue as the white panel wipes across (see ::after above). */
+.chat-morph-plus:hover,
+.chat-morph-plus:focus-visible {
+  color: #0b3f7a;
 }
 
 .chat-morph-plus:active {
-  transform: scale(0.95);
+  filter: brightness(0.97);
 }
 
 .chat-morph[data-open="true"] .chat-morph-plus {
@@ -2859,12 +3042,35 @@ main.mgr-page > section.dropzone > input.sr-only {
 @media (prefers-reduced-motion: reduce) {
   .chat-morph,
   .chat-morph-plus,
+  .chat-morph-plus::after,
   .chat-morph-menu {
     transition: none !important;
   }
 
-  .chat-morph-plus::before {
+  .chat-morph {
     animation: none !important;
+  }
+
+  .chat-fab-mascot-wrap {
+    transition: none !important;
+  }
+
+  .chat-fab-mascot-wrap::before {
+    animation: none !important;
+    opacity: 0.7;
+  }
+
+  .chat-fab-mascot,
+  .chat-morph:hover ~ .chat-fab-mascot-wrap .chat-fab-mascot {
+    animation: none !important;
+    transition: none !important;
+    transform: none !important;
+  }
+
+  /* No wipe animation — flip straight to the inverted colors on hover. */
+  .chat-morph-plus:hover::after,
+  .chat-morph-plus:focus-visible::after {
+    transform: translateX(0);
   }
 }
 
@@ -3838,7 +4044,7 @@ main.mgr-page > section.dropzone > input.sr-only {
   flex-direction: column;
   align-items: center;
   gap: 8px;
-  color: rgba(6, 32, 66, 0.55);
+  color: rgba(6, 32, 66, 0.74);
 }
 
 .wizard-num {
@@ -3848,10 +4054,11 @@ main.mgr-page > section.dropzone > input.sr-only {
   display: grid;
   place-items: center;
   font-size: 14px;
-  font-weight: 700;
-  background: #fff;
-  color: var(--sf-blue);
-  border: 1px solid rgba(11, 92, 171, 0.3);
+  font-weight: 800;
+  background: rgba(255, 255, 255, 0.94);
+  color: var(--sf-blue-strong);
+  border: 1px solid rgba(11, 92, 171, 0.5);
+  box-shadow: 0 2px 6px rgba(9, 40, 82, 0.12);
 }
 
 .wizard-step.active .wizard-num {
@@ -3869,7 +4076,7 @@ main.mgr-page > section.dropzone > input.sr-only {
 
 .wizard-label {
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 700;
   white-space: nowrap;
 }
 
@@ -5066,20 +5273,42 @@ main.mgr-page > section.dropzone > input.sr-only {
 .dropzone {
   padding: 44px;
   border-radius: 22px;
-  border: 2px dashed rgba(255, 255, 255, 0.85);
-  background: rgba(255, 255, 255, 0.32);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+  border: 2px dashed rgba(11, 92, 171, 0.42);
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.66) 0%,
+    rgba(223, 238, 255, 0.5) 100%
+  );
+  backdrop-filter: blur(16px) saturate(145%);
+  -webkit-backdrop-filter: blur(16px) saturate(145%);
+  box-shadow:
+    0 18px 44px rgba(9, 40, 82, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6);
   display: flex;
   align-items: center;
   gap: 34px;
   cursor: pointer;
-  transition: background var(--ui-hover-dur) var(--ui-hover-ease), border-color var(--ui-hover-dur) var(--ui-hover-ease);
+  transition:
+    background var(--ui-hover-dur) var(--ui-hover-ease),
+    border-color var(--ui-hover-dur) var(--ui-hover-ease),
+    box-shadow var(--ui-hover-dur) var(--ui-hover-ease);
+}
+
+.dropzone:hover {
+  border-color: rgba(11, 92, 171, 0.62);
+  box-shadow:
+    0 22px 52px rgba(9, 40, 82, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7);
 }
 
 .dropzone.active {
-  background: rgba(255, 255, 255, 0.5);
-  border-color: #fff;
+  background: linear-gradient(
+    180deg,
+    rgba(234, 243, 255, 0.88) 0%,
+    rgba(206, 229, 255, 0.74) 100%
+  );
+  border-style: solid;
+  border-color: var(--sf-blue);
 }
 
 .dropzone-cloud {
@@ -5126,11 +5355,12 @@ main.mgr-page > section.dropzone > input.sr-only {
   gap: 8px;
   padding: 8px 14px;
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.85);
-  border: 1px solid rgba(11, 42, 84, 0.1);
+  background: rgba(240, 246, 255, 0.9);
+  border: 1px solid rgba(11, 92, 171, 0.16);
+  box-shadow: 0 2px 6px rgba(9, 40, 82, 0.06);
   font-size: 13px;
   font-weight: 700;
-  color: #35475f;
+  color: #2c3f5a;
 }
 
 .filetype-chip .tag {
@@ -6228,18 +6458,20 @@ main.mgr-page > section.dropzone > input.sr-only {
 
 .rp-card .review-summary h3 {
   color: var(--sf-blue);
+  font-size: 13px;
+  margin-bottom: 16px;
 }
 
 .rp-card .review-summary-grid {
   display: flex;
   flex-wrap: wrap;
-  gap: 14px 0;
+  gap: 18px 0;
 }
 
 .rp-card .review-summary-grid > div {
-  flex: 1 1 130px;
+  flex: 1 1 140px;
   min-width: 120px;
-  padding: 2px 24px;
+  padding: 6px 16px;
   border-left: 1px solid rgba(11, 42, 84, 0.14);
 }
 
@@ -6248,9 +6480,15 @@ main.mgr-page > section.dropzone > input.sr-only {
   border-left: none;
 }
 
+.rp-card .review-summary-grid span {
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+
 .rp-card .review-summary-grid strong {
   color: var(--sf-navy);
-  font-size: 18px;
+  font-size: 22px;
+  line-height: 1.2;
 }
 
 .rp-qcards {

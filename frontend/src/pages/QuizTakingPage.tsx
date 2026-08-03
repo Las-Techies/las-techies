@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import AppNav from "../components/navigation/AppNav";
+import Skeleton from "../components/Skeleton";
 import { apiFetch, completeQuizAssignment } from "../api/client";
 import { saveQuizAttempt } from "../features/quiz/storage";
 import type { GeneratedQuiz, QuizQuestion } from "../features/quiz/types";
@@ -210,8 +211,14 @@ function QuizTakingPage() {
 
       <main className="quiz-stage">
         {isLoading ? (
-          <section className="glass quiz-panel">
-            <p className="cfg-empty">Loading quiz…</p>
+          <section className="glass quiz-panel" aria-busy="true">
+            <Skeleton width={140} height={12} />
+            <Skeleton width="80%" height={24} style={{ marginTop: 16 }} />
+            <div style={{ display: "grid", gap: 12, marginTop: 24 }}>
+              {[0, 1, 2, 3].map((i) => (
+                <Skeleton key={i} width="100%" height={54} radius={12} />
+              ))}
+            </div>
           </section>
         ) : total === 0 ? (
           <section className="glass quiz-panel">

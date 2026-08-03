@@ -8,6 +8,8 @@ import {
 } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import AppNav from "../components/navigation/AppNav";
+import Skeleton from "../components/Skeleton";
+import askSageMascot from "../assets/panda-ask-sage.png";
 import { useAuth } from "../context/AuthContext";
 import { getPreviewRole } from "../features/auth/previewRole";
 import {
@@ -286,24 +288,6 @@ function HistoryIcon() {
   );
 }
 
-function ChatBubbleIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      width="26"
-      height="26"
-      fill="none"
-      stroke="#fff"
-      strokeWidth="2.25"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden
-    >
-      <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5Z" />
-    </svg>
-  );
-}
-
 function SendIcon() {
   return (
     <svg
@@ -372,7 +356,6 @@ function LearnerModulePage() {
   const [followUps, setFollowUps] = useState<string[]>([]);
   const [isTyping, setIsTyping] = useState(false);
   const messagesRef = useRef<HTMLDivElement>(null);
-  const [moduleTitle, setModuleTitle] = useState("");
   const [teamName, setTeamName] = useState("");
   const [recentVisible, setRecentVisible] = useState(5);
   const [docs, setDocs] = useState<DisplayDoc[]>([]);
@@ -380,6 +363,11 @@ function LearnerModulePage() {
   const [sourceText, setSourceText] = useState<Record<number, string>>({});
   const [sourceLoadingId, setSourceLoadingId] = useState<number | null>(null);
   const [sourceError, setSourceError] = useState("");
+  // Which doc row is currently resolving its source (markdown docs fetch a
+  // detail record before linking out to a new tab, which takes a beat with no
+  // visible modal). Drives the spinner on the clicked "View source" and
+  // disables the others so a slow open can't be mistaken for a dead click.
+  const [openingSourceId, setOpeningSourceId] = useState<string | null>(null);
   // Signed URL (+ mime type) for the document's original file, so the modal
   // can embed the real PDF/DOCX instead of the extracted-text fallback.
   // Fetched fresh every time the modal opens rather than cached, since
@@ -453,7 +441,6 @@ function LearnerModulePage() {
       const quiz = latestQuiz ?? specificQuiz;
       if (!quiz) return;
 
-      if (quiz.title) setModuleTitle(quiz.title);
       if (quiz.timeLimitMinutes) {
         setTimeLimit(quiz.timeLimitMinutes);
         setHasNoTimeLimit(false);
@@ -611,6 +598,9 @@ function LearnerModulePage() {
   };
 
   const openSource = (doc: DisplayDoc) => {
+    // Ignore clicks on other rows while one source is still resolving.
+    if (openingSourceId) return;
+
     // Mark read regardless of how the source opens.
     setReadIds((prev) => {
       const next = new Set(prev);
@@ -622,7 +612,10 @@ function LearnerModulePage() {
     // and has a source URL, link out in a new tab instead of the in-app viewer.
     // We fetch detail to get the URL (the doc list doesn't carry it); only for
     // markdown, so the common PDF/DOCX path keeps its single file-URL fetch.
+    // This fetch has no modal to signal progress, so flag the row as "opening"
+    // to spin its button and lock the others until the tab opens.
     if (isMarkdownSource(doc.title)) {
+      setOpeningSourceId(doc.id);
       getDocumentDetail(doc.remoteId)
         .then((detail) => {
           if (detail.sourceUrl) {
@@ -631,10 +624,14 @@ function LearnerModulePage() {
             openSourceModal(doc); // bare .md upload with no link — show text
           }
         })
-        .catch(() => openSourceModal(doc));
+        .catch(() => openSourceModal(doc))
+        .finally(() => setOpeningSourceId(null));
       return;
     }
 
+    // Non-markdown: the modal opens immediately and shows its own loading
+    // skeleton (and blocks the list behind its overlay), so no button spinner
+    // is needed here.
     openSourceModal(doc);
   };
 
@@ -801,7 +798,6 @@ function LearnerModulePage() {
         ) : (
           <>
             <h1>{teamName || "Onboarding module"}</h1>
-            {moduleTitle ? <p className="module-subtitle">{moduleTitle}</p> : null}
           </>
         )}
 
@@ -897,9 +893,18 @@ function LearnerModulePage() {
                             <button
                               type="button"
                               className="view-source"
+                              disabled={openingSourceId !== null}
+                              aria-busy={openingSourceId === doc.id}
                               onClick={() => openSource(doc)}
                             >
-                              View source
+                              {openingSourceId === doc.id ? (
+                                <>
+                                  <span className="source-btn-spin" aria-hidden />
+                                  Opening…
+                                </>
+                              ) : (
+                                "View source"
+                              )}
                             </button>
                           </div>
                         );
@@ -948,7 +953,7 @@ function LearnerModulePage() {
           aria-expanded={isChatOpen}
           tabIndex={isChatOpen ? -1 : 0}
         >
-          <ChatBubbleIcon />
+          <span className="chat-fab-label">Ask Sage</span>
         </button>
 
         <div className="card ai-card chat-morph-menu" aria-hidden={!isChatOpen}>
@@ -1040,9 +1045,18 @@ function LearnerModulePage() {
           </div>
           <div className="ai-messages" ref={messagesRef}>
             {isConversationLoading ? (
-              <div className="ai-loading" aria-live="polite">
-                <span className="ai-loading-spinner" aria-hidden />
-                Loading Sage's last session…
+              <div className="ai-conversation-skeleton" aria-busy="true">
+                <div className="bubble-row assistant">
+                  <Skeleton width={28} height={28} radius={999} />
+                  <Skeleton width={240} height={58} radius={16} />
+                </div>
+                <div className="bubble-row user">
+                  <Skeleton width={180} height={42} radius={16} />
+                </div>
+                <div className="bubble-row assistant">
+                  <Skeleton width={28} height={28} radius={999} />
+                  <Skeleton width={208} height={48} radius={16} />
+                </div>
               </div>
             ) : (
               <>
@@ -1157,6 +1171,13 @@ function LearnerModulePage() {
           </div>
         </div>
       </div>
+
+      {/* Mascot lives OUTSIDE `.chat-morph` (which clips its children for the
+          morph animation) so it can pop above the pill's top-right corner with
+          its own glow. Fades out as the pill morphs open. */}
+      <span className="chat-fab-mascot-wrap" data-open={isChatOpen} aria-hidden>
+        <img className="chat-fab-mascot" src={askSageMascot} alt="" />
+      </span>
 
       {docModal.shouldRender && frozenOpenDoc ? (
         <div

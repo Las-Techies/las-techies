@@ -14,6 +14,11 @@ import {
 } from "../api/client";
 import { describeError, type FriendlyError } from "../api/errors";
 import ApiErrorCard from "../components/ApiErrorCard";
+import FadeSwap from "../components/FadeSwap";
+import CountUp from "../components/CountUp";
+import Skeleton, { QuizCardsSkeleton, RosterSkeleton } from "../components/Skeleton";
+import { motion } from "framer-motion";
+import { staggerParent, staggerChild } from "../lib/motion";
 import {
   CalendarIcon,
   ChartBarIcon,
@@ -432,6 +437,19 @@ function ManagerDashboardPage() {
 
   const assignSelectionCount = selectedLearnerIds.length + selectedLearners.length;
 
+  // Identifies which mutually-exclusive body state is showing, so FadeSwap
+  // cross-fades when it changes (e.g. loading -> content) but stays put while
+  // only the data within a state refreshes (e.g. switching teams).
+  const viewKey = isLoading
+    ? "loading"
+    : loadError
+      ? "error"
+      : !data
+        ? "empty"
+        : data.needsTeam
+          ? "needs-team"
+          : "content";
+
   return (
     <div className="app-shell">
       <AppNav />
@@ -452,10 +470,40 @@ function ManagerDashboardPage() {
           ) : null}
         </div>
 
+        <FadeSwap swapKey={viewKey}>
         {isLoading ? (
-          <section className="glass dash-card">
-            <p className="cfg-empty">Loading dashboard…</p>
-          </section>
+          <>
+            <div className="dash-stats">
+              {[0, 1, 2, 3].map((i) => (
+                <div className="glass dash-stat-card is-skeleton" key={i}>
+                  <Skeleton width={44} height={44} radius={12} />
+                  <div style={{ display: "grid", gap: 10 }}>
+                    <Skeleton width={52} height={24} />
+                    <Skeleton width={88} height={12} />
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <section className="glass dash-card">
+              <Skeleton width={190} height={18} />
+              <Skeleton width="58%" height={12} style={{ marginTop: 12 }} />
+              <div className="dash-learner-list" style={{ marginTop: 18 }}>
+                {[0, 1, 2].map((i) => (
+                  <div className="dash-learner-card is-skeleton" key={i}>
+                    <div className="dash-learner-head">
+                      <Skeleton width={40} height={40} radius={999} />
+                      <div className="dash-learner-info" style={{ flex: 1, display: "grid", gap: 8 }}>
+                        <Skeleton width={150} height={14} />
+                        <Skeleton width={110} height={11} />
+                      </div>
+                      <Skeleton width={96} height={12} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          </>
         ) : loadError ? (
           <section className="glass dash-card">
             <ApiErrorCard error={loadError} onRetry={() => setReloadKey((k) => k + 1)} />
@@ -502,48 +550,77 @@ function ManagerDashboardPage() {
           </section>
         ) : (
           <>
-            <div className="dash-stats">
-              <div className="glass dash-stat-card">
+            <motion.div
+              className="dash-stats"
+              variants={staggerParent}
+              initial="hidden"
+              animate="show"
+            >
+              <motion.div
+                className="glass dash-stat-card"
+                variants={staggerChild}
+                whileHover={{ y: -4, scale: 1.015 }}
+                transition={{ type: "spring", stiffness: 300, damping: 22 }}
+              >
                 <span className="dash-stat-icon">
                   <PeopleIcon />
                 </span>
                 <div>
-                  <span className="dash-stat-value">{stats?.learnerCount ?? 0}</span>
+                  <CountUp className="dash-stat-value" value={stats?.learnerCount ?? 0} />
                   <span className="dash-stat-label">New hires</span>
                 </div>
-              </div>
-              <div className="glass dash-stat-card">
+              </motion.div>
+              <motion.div
+                className="glass dash-stat-card"
+                variants={staggerChild}
+                whileHover={{ y: -4, scale: 1.015 }}
+                transition={{ type: "spring", stiffness: 300, damping: 22 }}
+              >
                 <span className="dash-stat-icon">
                   <ClipboardIcon />
                 </span>
                 <div>
-                  <span className="dash-stat-value">{stats?.publishedCount ?? 0}</span>
+                  <CountUp className="dash-stat-value" value={stats?.publishedCount ?? 0} />
                   <span className="dash-stat-label">Published quizzes</span>
                 </div>
-              </div>
-              <div className="glass dash-stat-card">
+              </motion.div>
+              <motion.div
+                className="glass dash-stat-card"
+                variants={staggerChild}
+                whileHover={{ y: -4, scale: 1.015 }}
+                transition={{ type: "spring", stiffness: 300, damping: 22 }}
+              >
                 <span className="dash-stat-icon">
                   <CheckCircleIcon />
                 </span>
                 <div>
-                  <span className="dash-stat-value">
-                    {stats?.completionRate !== null ? `${stats?.completionRate}%` : "—"}
-                  </span>
+                  {stats && stats.completionRate !== null ? (
+                    <CountUp className="dash-stat-value" value={stats.completionRate} suffix="%" />
+                  ) : (
+                    <span className="dash-stat-value">—</span>
+                  )}
                   <span className="dash-stat-label">Completion rate</span>
                 </div>
-              </div>
-              <div className="glass dash-stat-card">
+              </motion.div>
+              <motion.div
+                className="glass dash-stat-card"
+                variants={staggerChild}
+                whileHover={{ y: -4, scale: 1.015 }}
+                transition={{ type: "spring", stiffness: 300, damping: 22 }}
+              >
                 <span className="dash-stat-icon">
                   <ChartBarIcon />
                 </span>
                 <div>
-                  <span className="dash-stat-value">
-                    {stats?.averageScore !== null ? `${stats?.averageScore}%` : "—"}
-                  </span>
+                  {stats && stats.averageScore !== null ? (
+                    <CountUp className="dash-stat-value" value={stats.averageScore} suffix="%" />
+                  ) : (
+                    <span className="dash-stat-value">—</span>
+                  )}
                   <span className="dash-stat-label">Average score</span>
                 </div>
-              </div>
-            </div>
+              </motion.div>
+            </motion.div>
 
             <section className="glass dash-card">
               <h3 className="dash-card-title">
@@ -556,13 +633,24 @@ function ManagerDashboardPage() {
               {data.learners.length === 0 ? (
                 <p className="cfg-empty">No new hires on your team yet.</p>
               ) : (
-                <div className="dash-learner-list">
+                <motion.div
+                  className="dash-learner-list"
+                  variants={staggerParent}
+                  initial="hidden"
+                  animate="show"
+                >
                   {data.learners.map((learner) => {
                     const completedCount = learner.assignments.filter(
                       (assignment) => assignment.status === "completed"
                     ).length;
                     return (
-                      <div className="dash-learner-card" key={learner.id}>
+                      <motion.div
+                        className="dash-learner-card"
+                        key={learner.id}
+                        variants={staggerChild}
+                        whileHover={{ y: -3 }}
+                        transition={{ type: "spring", stiffness: 300, damping: 24 }}
+                      >
                         <div className="dash-learner-head">
                           <span className="dash-avatar">{initialsOf(learner.name)}</span>
                           <div className="dash-learner-info">
@@ -614,10 +702,10 @@ function ManagerDashboardPage() {
                             })}
                           </div>
                         )}
-                      </div>
+                      </motion.div>
                     );
                   })}
-                </div>
+                </motion.div>
               )}
             </section>
 
@@ -737,6 +825,7 @@ function ManagerDashboardPage() {
             </section>
           </>
         )}
+        </FadeSwap>
 
         {quizModal.shouldRender ? (
           <div
@@ -765,7 +854,7 @@ function ManagerDashboardPage() {
               </div>
               <div className="dash-quiz-modal-body">
                 {isQuizModalLoading ? (
-                  <p className="cfg-empty">Loading quiz…</p>
+                  <QuizCardsSkeleton count={3} />
                 ) : quizModalError ? (
                   <p className="form-error">{quizModalError}</p>
                 ) : !quizToShow ? (
@@ -833,7 +922,7 @@ function ManagerDashboardPage() {
                 <div className="assign-learners">
                   <p className="rp-assign-label">Already on your team</p>
                   {isLoadingMembers ? (
-                    <p className="cfg-empty">Loading team roster…</p>
+                    <RosterSkeleton count={3} />
                   ) : membersError ? (
                     <p className="form-error">{membersError}</p>
                   ) : teamMembers.length === 0 ? (

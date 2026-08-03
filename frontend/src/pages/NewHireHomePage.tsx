@@ -5,6 +5,7 @@ import mascot from "../assets/panda-home.png";
 import { getMyTeam, listAssignedQuizzes, type AssignedQuiz } from "../api/client";
 import { describeError, type FriendlyError } from "../api/errors";
 import ApiErrorCard from "../components/ApiErrorCard";
+import Skeleton from "../components/Skeleton";
 import { useAuth } from "../context/AuthContext";
 import { getUserDisplayFirstName } from "../features/auth/userDisplayName";
 import {
@@ -141,7 +142,11 @@ function NewHireHomePage() {
             <div className="nh-assigned-body">
               <div className="nh-assigned-info">
                 {isLoading ? (
-                  <h2>Loading…</h2>
+                  <div style={{ display: "grid", gap: 12 }}>
+                    <Skeleton width="68%" height={24} />
+                    <Skeleton width="90%" height={13} />
+                    <Skeleton width="52%" height={13} />
+                  </div>
                 ) : current ? (
                   <>
                     <h2>{current.title}</h2>
@@ -187,14 +192,16 @@ function NewHireHomePage() {
             {error ? (
               <ApiErrorCard error={error} onRetry={() => setReloadKey((k) => k + 1)} />
             ) : isLoading ? (
-              <ul className="nh-timeline">
-                <li className="nh-step upcoming">
-                  <span className="nh-step-icon" />
-                  <div className="nh-step-main">
-                    <strong>Loading your quizzes…</strong>
-                    <span>Please wait</span>
-                  </div>
-                </li>
+              <ul className="nh-timeline" aria-busy="true">
+                {[0, 1, 2].map((i) => (
+                  <li className="nh-step upcoming" key={i}>
+                    <span className="nh-step-icon" />
+                    <div className="nh-step-main" style={{ display: "grid", gap: 8, flex: 1 }}>
+                      <Skeleton width={`${58 + i * 10}%`} height={14} />
+                      <Skeleton width={`${38 + i * 8}%`} height={11} />
+                    </div>
+                  </li>
+                ))}
               </ul>
             ) : steps.length === 0 ? (
               <ul className="nh-timeline">

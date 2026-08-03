@@ -2,6 +2,7 @@ import type { CSSProperties } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import AppNav from "../components/navigation/AppNav";
+import Skeleton from "../components/Skeleton";
 import mascot from "../assets/panda-cheer-fullhat.png";
 import {
   getDocumentDetail,
@@ -114,6 +115,7 @@ function QuizResultsPage() {
   const [isLoadingResult, setIsLoadingResult] = useState(true);
   // Which review row's source document is open in the source modal.
   const [sourceModalRowId, setSourceModalRowId] = useState<number | null>(null);
+  const [openingSourceRowId, setOpeningSourceRowId] = useState<number | null>(null);
   const [sourceTextByDocumentId, setSourceTextByDocumentId] = useState<Record<number, string>>({});
   const [sourceLoadingByDocumentId, setSourceLoadingByDocumentId] = useState<
     Record<number, boolean>
@@ -277,15 +279,23 @@ function QuizResultsPage() {
   // back to the same text modal.
   const openSourceModal = (row: ReviewRow) => {
     if (!row.citation) return;
+    // Ignore clicks on other sources while one is already resolving, so a slow
+    // fetch can't get overtaken by a second click landing on a different doc.
+    if (openingSourceRowId !== null) return;
     const documentId = row.citation.sourceDocumentId;
 
     if (isMarkdownSource(row.citation.sourceDocumentTitle)) {
+      // Markdown opens its real file in a new tab, so there's no modal to show
+      // instant feedback — mark this row as "opening" to spin its button and
+      // lock the others until the fetch resolves.
+      setOpeningSourceRowId(row.id);
       getDocumentDetail(documentId)
         .then((detail) => {
           if (detail.sourceUrl) openSourceUrl(detail.sourceUrl);
           else openTextModal(row);
         })
-        .catch(() => openTextModal(row));
+        .catch(() => openTextModal(row))
+        .finally(() => setOpeningSourceRowId(null));
       return;
     }
 
@@ -376,10 +386,39 @@ function QuizResultsPage() {
 
       <main className="results-stage">
         {isLoadingResult && !hasRealData ? (
-          <section className="glass card results-empty">
-            <p className="results-eyebrow">YOUR PROGRESS</p>
-            <h1>Loading your results…</h1>
-          </section>
+          <>
+            <div className="results-hero">
+              <div style={{ display: "grid", gap: 14 }}>
+                <Skeleton width={120} height={12} />
+                <Skeleton width={280} height={32} />
+                <Skeleton width="72%" height={14} />
+              </div>
+            </div>
+            <div className="results-grid">
+              <section className="glass card">
+                <Skeleton width={150} height={18} />
+                <div
+                  className="score-row"
+                  style={{ display: "flex", alignItems: "center", gap: 20, marginTop: 20 }}
+                >
+                  <Skeleton width={132} height={132} radius={999} />
+                  <div style={{ display: "grid", gap: 12, flex: 1 }}>
+                    <Skeleton width="82%" height={14} />
+                    <Skeleton width="64%" height={14} />
+                    <Skeleton width="72%" height={14} />
+                  </div>
+                </div>
+              </section>
+              <section className="glass card">
+                <Skeleton width={180} height={18} />
+                <div style={{ display: "grid", gap: 12, marginTop: 18 }}>
+                  {[0, 1, 2, 3].map((i) => (
+                    <Skeleton key={i} width={`${92 - i * 6}%`} height={44} radius={12} />
+                  ))}
+                </div>
+              </section>
+            </div>
+          </>
         ) : !hasRealData ? (
           <section className="glass card results-empty">
             <img className="results-empty-mascot" src={mascot} alt="" aria-hidden />
@@ -511,9 +550,15 @@ function QuizResultsPage() {
                         className="source-icon-btn"
                         title={`View source: ${row.source}`}
                         aria-label={`View source for ${row.source}`}
+                        disabled={openingSourceRowId !== null}
+                        aria-busy={openingSourceRowId === row.id}
                         onClick={() => openSourceModal(row)}
                       >
-                        <FileTextIcon aria-hidden />
+                        {openingSourceRowId === row.id ? (
+                          <span className="source-btn-spin" aria-hidden />
+                        ) : (
+                          <FileTextIcon aria-hidden />
+                        )}
                       </button>
                     ) : null}
                   </div>
@@ -580,7 +625,13 @@ function QuizResultsPage() {
               </div>
               <div className="rp-source-body">
                 {sourceLoadingByDocumentId[frozenSourceRow.citation!.sourceDocumentId] ? (
-                  <p className="cfg-empty">Loading source…</p>
+                  <div className="rp-source-page" aria-busy="true">
+                    <Skeleton width="92%" height={14} />
+                    <Skeleton width="98%" height={14} style={{ marginTop: 10 }} />
+                    <Skeleton width="85%" height={14} style={{ marginTop: 10 }} />
+                    <Skeleton width="94%" height={14} style={{ marginTop: 10 }} />
+                    <Skeleton width="70%" height={14} style={{ marginTop: 10 }} />
+                  </div>
                 ) : sourceErrorByDocumentId[frozenSourceRow.citation!.sourceDocumentId] ? (
                   <p className="form-error">
                     {sourceErrorByDocumentId[frozenSourceRow.citation!.sourceDocumentId]}

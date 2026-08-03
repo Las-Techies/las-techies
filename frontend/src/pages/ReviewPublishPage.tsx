@@ -11,6 +11,7 @@ import {
   type QuizConfig,
 } from "../features/quiz/types";
 import { ArrowLeft, ClipboardIcon, FileTextIcon } from "../components/icons";
+import Skeleton, { QuizCardsSkeleton, RosterSkeleton } from "../components/Skeleton";
 import { useLastNonNull, useModalTransition } from "../hooks/useModalTransition";
 
 const questionBankDefault = [
@@ -394,11 +395,11 @@ function ReviewPublishPage() {
             </div>
           </div>
 
-          <div className="qcards rp-qcards">
-            {isLoadingQuiz ? (
-              <p className="cfg-empty">Loading quiz…</p>
-            ) : (
-              questionDetails.map((item, index) => (
+          {isLoadingQuiz ? (
+            <QuizCardsSkeleton count={3} />
+          ) : (
+            <div className="qcards rp-qcards">
+              {questionDetails.map((item, index) => (
                 <article className="qcard" key={item.prompt}>
                   <div className="qcard-head">
                     <span className="qcard-num">{index + 1}</span>
@@ -432,16 +433,16 @@ function ReviewPublishPage() {
                     ) : null}
                   </div>
                 </article>
-              ))
-            )}
-          </div>
+              ))}
+            </div>
+          )}
 
           <div className="assign-learners rp-assign">
             <h3>Assign Learners</h3>
 
             <p className="rp-assign-label">Already on your team</p>
             {isLoadingMembers ? (
-              <p className="cfg-empty">Loading team roster…</p>
+              <RosterSkeleton count={3} />
             ) : membersError ? (
               <p className="form-error">{membersError}</p>
             ) : teamMembers.length === 0 ? (
@@ -551,7 +552,13 @@ function ReviewPublishPage() {
               </div>
               <div className="rp-source-body">
                 {sourceLoadingByDocumentId[frozenSourceItem.citation!.sourceDocumentId] ? (
-                  <p className="cfg-empty">Loading source…</p>
+                  <div className="rp-source-page" aria-busy="true">
+                    <Skeleton width="92%" height={14} />
+                    <Skeleton width="98%" height={14} style={{ marginTop: 10 }} />
+                    <Skeleton width="85%" height={14} style={{ marginTop: 10 }} />
+                    <Skeleton width="94%" height={14} style={{ marginTop: 10 }} />
+                    <Skeleton width="70%" height={14} style={{ marginTop: 10 }} />
+                  </div>
                 ) : sourceErrorByDocumentId[frozenSourceItem.citation!.sourceDocumentId] ? (
                   <p className="form-error">
                     {sourceErrorByDocumentId[frozenSourceItem.citation!.sourceDocumentId]}
