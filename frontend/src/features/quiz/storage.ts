@@ -97,23 +97,29 @@ export const loadQuizAttempt = (): QuizAttempt | null => {
   }
 };
 
-const MODULE_PROGRESS_STORAGE_KEY = "sageforce_module_progress";
+const MODULE_READ_IDS_STORAGE_KEY = "sageforce_module_read_ids";
 
-export type ModuleProgress = { read: number; total: number };
+// Read-progress is tracked per learner AND per quiz/module, so one learner's
+// progress on a module doesn't bleed into another module — or into a different
+// learner signing in on the same browser. The value is the set of read
+// document IDs (the DisplayDoc `id`s, e.g. "doc-12"), not just a count, so the
+// per-row Read/Unread badges can be restored too, not only the bar total.
+const moduleReadKey = (userId: string, quizId: number) =>
+  `${MODULE_READ_IDS_STORAGE_KEY}:${userId}:${quizId}`;
 
-export const saveModuleProgress = (progress: ModuleProgress) => {
-  localStorage.setItem(MODULE_PROGRESS_STORAGE_KEY, JSON.stringify(progress));
+export const loadReadDocIds = (userId: string, quizId: number): Set<string> => {
+  const raw = localStorage.getItem(moduleReadKey(userId, quizId));
+  if (!raw) return new Set();
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed)
+      ? new Set(parsed.filter((id): id is string => typeof id === "string"))
+      : new Set();
+  } catch {
+    return new Set();
+  }
 };
 
-export const loadModuleProgress = (): ModuleProgress | null => {
-  const raw = localStorage.getItem(MODULE_PROGRESS_STORAGE_KEY);
-  if (!raw) return null;
-  try {
-    const parsed = JSON.parse(raw) as ModuleProgress;
-    return typeof parsed?.read === "number" && typeof parsed?.total === "number"
-      ? parsed
-      : null;
-  } catch {
-    return null;
-  }
+export const saveReadDocIds = (userId: string, quizId: number, ids: Set<string>) => {
+  localStorage.setItem(moduleReadKey(userId, quizId), JSON.stringify(Array.from(ids)));
 };
