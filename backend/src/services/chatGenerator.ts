@@ -54,11 +54,13 @@ export function computeConfidence(chunks: SimilarChunk[]): Confidence {
   return "low";
 }
 
-// Non-streaming call to the same Salesforce LLM Gateway used for quiz
-// generation — a single chat answer is short enough that a live progress
-// stream (like quizGenerator.ts uses for multi-question generation) isn't
-// needed here.
-async function callGateway(prompt: string): Promise<string> {
+const CHAT_SYSTEM_PROMPT =
+  "You are a helpful onboarding assistant for Salesforce engineering teams. You answer " +
+  "questions using only the excerpts you're given, always cite your sources, and say " +
+  "plainly when you don't have enough information instead of guessing. You only output " +
+  "valid JSON with no markdown fences and no prose before or after the JSON.";
+
+function ensureGatewayConfigured(): void {
   if (!env.resolvedLlmGatewayUrl || !env.resolvedLlmKey) {
     throw new ChatGenerationError(
       env.useOpenRouter
@@ -66,6 +68,11 @@ async function callGateway(prompt: string): Promise<string> {
         : "LLM gateway is not configured. Set LLM_GATEWAY_URL and ENG_AI_MODEL_GW_KEY in backend/.env."
     );
   }
+}
+
+// Call to the same Salesforce LLM Gateway used for quiz generation.
+async function callGateway(prompt: string): Promise<string> {
+  ensureGatewayConfigured();
 
   const res = await fetch(env.resolvedLlmGatewayUrl, {
     method: "POST",
@@ -79,14 +86,7 @@ async function callGateway(prompt: string): Promise<string> {
       model: env.resolvedLlmModel,
       stream: false,
       messages: [
-        {
-          role: "system",
-          content:
-            "You are a helpful onboarding assistant for Salesforce engineering teams. You answer " +
-            "questions using only the excerpts you're given, always cite your sources, and say " +
-            "plainly when you don't have enough information instead of guessing. You only output " +
-            "valid JSON with no markdown fences and no prose before or after the JSON.",
-        },
+        { role: "system", content: CHAT_SYSTEM_PROMPT },
         { role: "user", content: prompt },
       ],
     }),
@@ -190,4 +190,51 @@ export async function generateChatAnswer(
 
   const detail = lastError instanceof Error ? lastError.message : String(lastError);
   throw new ChatGenerationError(`Failed to generate a chat answer after ${maxRetries + 1} attempt(s): ${detail}`);
+}
+
+// Asks the LLM for a few short starter questions grounded in the provided
+// document excerpts, so a fresh chat's suggestion chips reflect the team's
+// actual materials instead of generic placeholders. Returns up to `max`
+// questions; the caller is expected to further filter them for answerability.
+// Returns [] on any failure — starters are a nicety, never worth failing the
+// page for.
+export async function generateStarterQuestions(
+  context: { documentTitle: string; content: string }[],
+  max = 3
+): Promise<string[]> {
+  if (context.length === 0) return [];
+
+  const excerpts = context
+    .map(
+      (c) => `DOCUMENT TITLE: ${c.documentTitle}\nEXCERPT:\n"""\n${c.content}\n"""`
+    )
+    .join("\n\n---\n\n");
+
+  const prompt = `You are helping a new hire start a chat about their onboarding materials.
+Based ONLY on the document excerpts below, write up to ${max} short, natural questions
+a new hire could ask that are clearly answerable from these materials.
+
+Rules:
+- Each question must be answerable from the excerpts — do not ask about things not present.
+- Keep each question short (under ~10 words) and specific to the actual content.
+- Do not ask the assistant to generate a quiz or perform actions; only content questions.
+- No numbering, no preamble.
+
+Return ONLY valid JSON (no markdown, no prose) in this exact shape:
+{ "questions": ["string", "string", "string"] }
+
+DOCUMENT EXCERPTS:
+${excerpts}`;
+
+  try {
+    const raw = await callGateway(prompt);
+    const parsed = extractJson(raw) as { questions?: unknown };
+    if (!Array.isArray(parsed.questions)) return [];
+    return parsed.questions
+      .filter((q): q is string => typeof q === "string" && q.trim() !== "")
+      .map((q) => q.trim())
+      .slice(0, max);
+  } catch {
+    return [];
+  }
 }
