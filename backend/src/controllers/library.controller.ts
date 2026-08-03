@@ -26,6 +26,10 @@ type AuthUser = {
 // memory, and how many chunks to retrieve per question.
 const HISTORY_LIMIT = 10;
 const RETRIEVAL_TOP_K = 6;
+// How many documents to sample when grounding fresh-chat starter chips, and
+// how many starter questions to propose from that sample.
+const STARTER_SAMPLE_DOCS = 4;
+const STARTER_QUESTION_COUNT = 3;
 
 function getAuthUser(req: Request): AuthUser | null {
   const user = (req as any).user as AuthUser | undefined;
@@ -54,31 +58,31 @@ function buildRetrievalQuery(message: string, teamName?: string | null): string 
   return message.replace(TEAM_REFERENCE_PATTERN, teamName.trim());
 }
 
-// The LLM proposes follow-up questions grounded in the excerpts it just saw,
-// but clicking one triggers a FRESH retrieval over the whole corpus — which
-// can miss and drop the user into the low-confidence fallback ("I couldn't
-// find an answer…"). That makes Sage suggest questions it then can't answer.
+// Keeps only the suggested questions Sage could actually answer. Both
+// follow-up chips and fresh-chat starter chips are questions we offer for
+// one-tap submission, and tapping one triggers a FRESH retrieval over the
+// whole corpus — which can miss and dead-end in the low-confidence fallback
+// ("I couldn't find an answer…"). To avoid suggesting questions we can't
+// answer, this pre-flights each candidate through the exact same retrieval a
+// real tap would run and drops any that wouldn't clear the confidence bar.
 //
-// This pre-flights each proposed follow-up through the exact same retrieval a
-// real click would run, and keeps only the ones that would clear the
-// confidence bar. Cheap: embeddings run locally (embedBatch is one batched
-// call, no API/LLM cost) and each retrieval is a single top-1 vector lookup.
-// Runs the lookups in parallel and preserves the LLM's original ordering.
-async function filterAnswerableFollowUps(
-  followUps: string[],
+// Cheap: embeddings run locally (embedBatch is one batched call, no API/LLM
+// cost) and each retrieval is a single top-1 vector lookup. Runs the lookups
+// in parallel and preserves the input ordering.
+async function filterAnswerableQuestions(
+  questions: string[],
   teamId: number,
   teamName: string | null | undefined,
   selectedDocumentIds: number[] | undefined
 ): Promise<string[]> {
-  if (followUps.length === 0) return [];
+  if (questions.length === 0) return [];
 
   const embeddings = await embedBatch(
-    followUps.map((f) => buildRetrievalQuery(f, teamName))
+    questions.map((q) => buildRetrievalQuery(q, teamName))
   );
 
   const answerable = await Promise.all(
-    followUps.map(async (_followUp, i) => {
-      const embedding = embeddings[i];
+    embeddings.map(async (embedding) => {
       if (!embedding) return false;
       // limit: 1 — computeConfidence only inspects the single closest chunk,
       // so retrieving more would be wasted work here.
@@ -90,7 +94,7 @@ async function filterAnswerableFollowUps(
     })
   );
 
-  return followUps.filter((_followUp, i) => answerable[i]);
+  return questions.filter((_question, i) => answerable[i]);
 }
 
 type PreparedChatTurn = {
@@ -103,11 +107,10 @@ type PreparedChatTurn = {
   selectedDocumentIds: number[] | undefined;
 };
 
-// Everything both the streaming and non-streaming chat handlers need before
-// calling the generator: validated input, the resolved (or newly created)
-// conversation, recent history, and the retrieved chunks. Returns a
-// `{ status, message }` error descriptor instead of throwing so each caller can
-// surface it in the shape it needs (JSON body, or an SSE error event).
+// Everything postChatMessage needs before calling the generator: validated
+// input, the resolved (or newly created) conversation, recent history, and the
+// retrieved chunks. Returns a `{ status, message }` error descriptor instead of
+// throwing so the caller can turn each failure into the right HTTP response.
 async function prepareChatTurn(
   user: AuthUser,
   body: any
@@ -196,10 +199,7 @@ export async function postChatMessage(req: Request, res: Response, next: NextFun
 
     const result = await generateChatAnswer(chunks, history, message);
 
-    // Only surface follow-ups Sage can actually answer — clicking one runs a
-    // fresh retrieval, so a suggestion that wouldn't clear the confidence bar
-    // would dead-end in the "I couldn't find an answer" fallback.
-    const followUps = await filterAnswerableFollowUps(
+    const followUps = await filterAnswerableQuestions(
       result.followUps,
       user.teamId,
       teamName,
@@ -241,12 +241,16 @@ export async function getStarterQuestions(req: Request, res: Response, next: Nex
     const user = getAuthUser(req);
     if (!user) return res.status(401).json({ error: { message: "Unauthorized" } });
 
-    const sample = await sampleTeamChunks(user.teamId, 4);
+    const sample = await sampleTeamChunks(user.teamId, STARTER_SAMPLE_DOCS);
     if (sample.length === 0) return res.json({ data: { questions: [] } });
 
-    const team = await findTeamById(user.teamId);
-    const proposed = await generateStarterQuestions(sample, 3);
-    const questions = await filterAnswerableFollowUps(
+    // The team lookup only feeds the answerability filter, so run it alongside
+    // the (slow) LLM generation rather than waiting for one before the other.
+    const [team, proposed] = await Promise.all([
+      findTeamById(user.teamId),
+      generateStarterQuestions(sample, STARTER_QUESTION_COUNT),
+    ]);
+    const questions = await filterAnswerableQuestions(
       proposed,
       user.teamId,
       team?.name,
