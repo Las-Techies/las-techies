@@ -60,7 +60,8 @@ const CHAT_SYSTEM_PROMPT =
   "plainly when you don't have enough information instead of guessing. You only output " +
   "valid JSON with no markdown fences and no prose before or after the JSON.";
 
-function ensureGatewayConfigured(): void {
+// Call to the same Salesforce LLM Gateway used for quiz generation.
+async function callGateway(prompt: string): Promise<string> {
   if (!env.resolvedLlmGatewayUrl || !env.resolvedLlmKey) {
     throw new ChatGenerationError(
       env.useOpenRouter
@@ -68,11 +69,6 @@ function ensureGatewayConfigured(): void {
         : "LLM gateway is not configured. Set LLM_GATEWAY_URL and ENG_AI_MODEL_GW_KEY in backend/.env."
     );
   }
-}
-
-// Call to the same Salesforce LLM Gateway used for quiz generation.
-async function callGateway(prompt: string): Promise<string> {
-  ensureGatewayConfigured();
 
   const res = await fetch(env.resolvedLlmGatewayUrl, {
     method: "POST",

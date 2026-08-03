@@ -28,6 +28,31 @@ Our platform provides a centralized onboarding portal where Salesforce teams can
 
 Deployment Website: **https://las-techies-1.onrender.com/**
 
-### Open-source libraries used
+### Tech stack
 
-- Add any links to open-source libraries used in your project.
+- **Frontend:** [React](https://react.dev/) + [Vite](https://vite.dev/), [React Router](https://reactrouter.com/), [Framer Motion](https://www.framer.com/motion/), [Lenis](https://github.com/darkroomengineering/lenis)
+- **Backend:** [Node.js](https://nodejs.org/) + [Express](https://expressjs.com/), [Prisma](https://www.prisma.io/) (Postgres on [Supabase](https://supabase.com/)), [pgvector](https://github.com/pgvector/pgvector) for embeddings
+- **Auth:** [Supabase Auth](https://supabase.com/docs/guides/auth)
+- **AI:** Salesforce Express LLM Gateway for quiz generation and the Ask Sage document chat; [@huggingface/transformers](https://github.com/huggingface/transformers.js) for local embeddings
+- **Document parsing:** [pdf-parse](https://www.npmjs.com/package/pdf-parse), [mammoth](https://github.com/mwilliamson/mammoth.js) (DOCX), [multer](https://github.com/expressjs/multer) uploads
+- **Email:** [nodemailer](https://nodemailer.com/)
+
+### Getting started
+
+The app is split into two packages, each with its own setup instructions and
+required environment variables:
+
+- [backend/README.md](backend/README.md) — Express API, Prisma schema, env vars
+- [frontend/README.md](frontend/README.md) — React + Vite client
+
+Run each in its own terminal:
+
+```bash
+# Backend
+cd backend && npm install && npm run dev
+
+# Frontend
+cd frontend && npm install && npm run dev
+```
+
+Project planning docs and API contracts live in [planning/](planning/).

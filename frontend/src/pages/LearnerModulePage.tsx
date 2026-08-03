@@ -471,9 +471,15 @@ function LearnerModulePage() {
     };
   }, [quizIdParam]);
 
-  // Load doc-grounded starter questions for a fresh chat. Best-effort: on
-  // failure or an empty result we simply fall back to the static prompts.
+  // Fetch doc-grounded starter chips only once the user is actually on a
+  // fresh thread (hydration finished with just the greeting) — returning
+  // users whose last conversation gets restored never see the chips, so
+  // there's no point paying for the LLM round-trip on their behalf.
+  // Best-effort: on failure or an empty result we fall back to STARTER_PROMPTS.
+  const startersRequested = useRef(false);
   useEffect(() => {
+    if (isConversationLoading || messages.length !== 1 || startersRequested.current) return;
+    startersRequested.current = true;
     let cancelled = false;
     getStarterQuestions()
       .then((questions) => {
@@ -485,7 +491,7 @@ function LearnerModulePage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [isConversationLoading, messages.length]);
 
   // Hydrate the chat panel from the user's most recently active thread, if
   // any. Conversations already come back sorted by updatedAt desc, so the
@@ -731,9 +737,7 @@ function LearnerModulePage() {
           },
         ]);
       })
-      .finally(() => {
-        setIsTyping(false);
-      });
+      .finally(() => setIsTyping(false));
   };
 
   const sendMessage = () => submitMessage(draft);
