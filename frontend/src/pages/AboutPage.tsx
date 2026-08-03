@@ -201,10 +201,13 @@ function FlipShowcase({
     <>
       <div className="lp-browser-bar"><i /><i /><i /></div>
       <div className="lp-flip-video">
-        {/* Drop a <video> or embed here later — this is the demo surface */}
-        <button className="lp-play" type="button" aria-label="Play demo">
-          <span className="lp-play-tri" />
-        </button>
+        <iframe
+          src="https://www.loom.com/embed/8667d545be994a8481839ae0d33c5208"
+          title="Product demo"
+          allow="autoplay; fullscreen; picture-in-picture"
+          allowFullScreen
+          style={{ width: "100%", height: "100%", border: "none" }}
+        />
         <span className="lp-flip-video-label">Product demo</span>
       </div>
     </>
