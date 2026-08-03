@@ -1032,8 +1032,8 @@ function UploadContentPage() {
             <FileTextIcon /> Uploaded Files
           </h3>
           <p className="files-card-hint">
-            Check the documents you want to use for your next quiz — everything stays here
-            either way, unless you delete it.
+            These are your team's uploaded documents. Check the ones you want to include —
+            everything stays here either way, unless you delete it.
           </p>
           {isLoadingDocuments ? (
             <p className="cfg-empty">Loading documents…</p>
