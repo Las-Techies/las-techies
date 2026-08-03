@@ -10,8 +10,8 @@ import {
 import { createMessage, listMessagesForConversation } from "../models/chatMessage.model";
 import { findSimilarChunks } from "../models/documentChunk.model";
 import { findTeamById } from "../models/team.model";
-import { embedText } from "../services/embeddings";
-import { generateChatAnswer } from "../services/chatGenerator";
+import { embedBatch, embedText } from "../services/embeddings";
+import { computeConfidence, generateChatAnswer } from "../services/chatGenerator";
 
 type AuthUser = {
   id: number;
@@ -48,6 +48,45 @@ const TEAM_REFERENCE_PATTERN = /\b(my|our|this)\s+team\b/gi;
 function buildRetrievalQuery(message: string, teamName?: string | null): string {
   if (!teamName?.trim()) return message;
   return message.replace(TEAM_REFERENCE_PATTERN, teamName.trim());
+}
+
+// The LLM proposes follow-up questions grounded in the excerpts it just saw,
+// but clicking one triggers a FRESH retrieval over the whole corpus — which
+// can miss and drop the user into the low-confidence fallback ("I couldn't
+// find an answer…"). That makes Sage suggest questions it then can't answer.
+//
+// This pre-flights each proposed follow-up through the exact same retrieval a
+// real click would run, and keeps only the ones that would clear the
+// confidence bar. Cheap: embeddings run locally (embedBatch is one batched
+// call, no API/LLM cost) and each retrieval is a single top-1 vector lookup.
+// Runs the lookups in parallel and preserves the LLM's original ordering.
+async function filterAnswerableFollowUps(
+  followUps: string[],
+  teamId: number,
+  teamName: string | null | undefined,
+  selectedDocumentIds: number[] | undefined
+): Promise<string[]> {
+  if (followUps.length === 0) return [];
+
+  const embeddings = await embedBatch(
+    followUps.map((f) => buildRetrievalQuery(f, teamName))
+  );
+
+  const answerable = await Promise.all(
+    followUps.map(async (_followUp, i) => {
+      const embedding = embeddings[i];
+      if (!embedding) return false;
+      // limit: 1 — computeConfidence only inspects the single closest chunk,
+      // so retrieving more would be wasted work here.
+      const chunks = await findSimilarChunks(teamId, embedding, {
+        ...(selectedDocumentIds ? { documentIds: selectedDocumentIds } : {}),
+        limit: 1,
+      });
+      return computeConfidence(chunks) !== "low";
+    })
+  );
+
+  return followUps.filter((_followUp, i) => answerable[i]);
 }
 
 // Sends a message in a conversation (creating the conversation on first
@@ -107,6 +146,16 @@ export async function postChatMessage(req: Request, res: Response, next: NextFun
 
     const result = await generateChatAnswer(chunks, history, message);
 
+    // Only surface follow-ups Sage can actually answer — clicking one runs a
+    // fresh retrieval, so a suggestion that wouldn't clear the confidence bar
+    // would dead-end in the "I couldn't find an answer" fallback.
+    const followUps = await filterAnswerableFollowUps(
+      result.followUps,
+      user.teamId,
+      team?.name,
+      selectedDocumentIds
+    );
+
     await createMessage({ conversationId, role: "user", content: message });
     await createMessage({
       conversationId,
@@ -125,7 +174,7 @@ export async function postChatMessage(req: Request, res: Response, next: NextFun
       answer: result.answer,
       sources: result.sources,
       confidence: result.confidence,
-      followUps: result.followUps,
+      followUps,
     });
   } catch (err) {
     next(err);
