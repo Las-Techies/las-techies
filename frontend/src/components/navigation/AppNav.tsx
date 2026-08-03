@@ -25,7 +25,7 @@ type NavItem = { label: string; type: "link"; to: string; icon: ReactNode };
 const managerNavItems: NavItem[] = [
   { label: "Dashboard", type: "link", to: "/manager-dashboard", icon: <ChartBarIcon /> },
   { label: "Upload + Generate", type: "link", to: "/upload-content", icon: <UploadIcon /> },
-  { label: "Uploads", type: "link", to: "/learner-module", icon: <ModulesIcon /> },
+  { label: "Library", type: "link", to: "/learner-module", icon: <ModulesIcon /> },
 ];
 
 const newHireNavItems: NavItem[] = [
