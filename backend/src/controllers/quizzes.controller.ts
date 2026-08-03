@@ -11,6 +11,7 @@ import {
   isValidQuizStatus,
   markAssignmentComplete,
   deleteQuizForTeam,
+  updateDraftQuiz,
   updateQuizQuestions,
   updateQuizStatus,
 } from "../models/quiz.model";
@@ -220,6 +221,7 @@ function parseMetadata(raw: any): QuizMetadata {
 export async function generateQuiz(req: Request, res: Response, next: NextFunction) {
   const user = (req as any).user;
   const { documentIds } = req.body ?? {};
+  const rawReplaceQuizId = req.body?.replaceQuizId;
 
   if (!Array.isArray(documentIds) || documentIds.length === 0) {
     return res
@@ -233,6 +235,23 @@ export async function generateQuiz(req: Request, res: Response, next: NextFuncti
   }
 
   const metadata = parseMetadata(req.body?.metadata);
+  let replaceQuizId: number | null = null;
+  if (rawReplaceQuizId !== undefined && rawReplaceQuizId !== null && rawReplaceQuizId !== "") {
+    const parsed = Number(rawReplaceQuizId);
+    if (!Number.isFinite(parsed)) {
+      return res.status(400).json({ error: { message: "replaceQuizId must be a valid number" } });
+    }
+    const existingDraft = await findQuizByIdForTeam(parsed, user.teamId);
+    if (!existingDraft) {
+      return res.status(404).json({ error: { message: "Draft quiz to replace was not found" } });
+    }
+    if (existingDraft.status !== "draft") {
+      return res.status(400).json({
+        error: { message: "Only draft quizzes can be regenerated in place." },
+      });
+    }
+    replaceQuizId = parsed;
+  }
 
   res.writeHead(200, {
     "Content-Type": "text/event-stream",
@@ -266,19 +285,44 @@ export async function generateQuiz(req: Request, res: Response, next: NextFuncti
       },
     });
 
-    const quiz = await createQuiz({
-      teamId: user.teamId,
-      createdByUserId: user.id,
-      title:
-        metadata.title ??
-        `Quiz from document${documentIds.length > 1 ? "s" : ""} ${documentIds.join(", ")}`,
-      sourceDocumentIds: documentIds,
-      generationConfig: config,
-      questionsPayload: questions,
-      passingScore: metadata.passingScore,
-      timeLimitMinutes: metadata.timeLimitMinutes,
-      dueDate: metadata.dueDate,
-    });
+    const title =
+      metadata.title ??
+      `Quiz from document${documentIds.length > 1 ? "s" : ""} ${documentIds.join(", ")}`;
+
+    let quiz;
+    if (replaceQuizId !== null) {
+      const result = await updateDraftQuiz({
+        id: replaceQuizId,
+        teamId: user.teamId,
+        title,
+        sourceDocumentIds: documentIds,
+        generationConfig: config,
+        questionsPayload: questions,
+        passingScore: metadata.passingScore,
+        timeLimitMinutes: metadata.timeLimitMinutes,
+        dueDate: metadata.dueDate,
+      });
+      if (result.count === 0) {
+        throw new Error("Draft quiz could not be updated.");
+      }
+      quiz = await findQuizById(replaceQuizId);
+    } else {
+      quiz = await createQuiz({
+        teamId: user.teamId,
+        createdByUserId: user.id,
+        title,
+        sourceDocumentIds: documentIds,
+        generationConfig: config,
+        questionsPayload: questions,
+        passingScore: metadata.passingScore,
+        timeLimitMinutes: metadata.timeLimitMinutes,
+        dueDate: metadata.dueDate,
+      });
+    }
+
+    if (!quiz) {
+      throw new Error("Failed to load generated quiz.");
+    }
 
     send({ type: "done", quiz });
   } catch (err) {
